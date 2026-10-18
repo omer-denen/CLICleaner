@@ -22,7 +22,7 @@ import {
   setToken,
   startScan,
 } from './api.ts';
-import { CliView, type CliViewState } from './components/CliView.tsx';
+import { CliView } from './components/CliView.tsx';
 import { ClusterRow } from './components/ClusterRow.tsx';
 import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
@@ -93,8 +93,7 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [view, setView] = useState<'disk' | 'cli'>('disk');
-  const [cliRefresh, setCliRefresh] = useState(0);
-  const [cliState, setCliState] = useState<CliViewState>({ busy: false, hasInventory: false });
+
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [scan, setScan] = useState<ScanResult | null>(null);
@@ -568,7 +567,6 @@ export default function App() {
             className={view === 'cli' ? 'active' : ''}
             onClick={() => {
               // CliView yeniden mount olacagi icin ust bar durumunu sifirla.
-              setCliState({ busy: false, hasInventory: false });
               setView('cli');
             }}
             disabled={phase === 'deleting'}
@@ -586,40 +584,16 @@ export default function App() {
               EN
             </button>
           </div>
-          <button
-            className="btn"
-            onClick={() => {
-              // Sekmeye gore: Disk -> tarama, CLI -> envanter yenileme.
-              if (view === 'cli') {
-                notify(t('Envanter yenileniyor…'));
-                setCliRefresh((n) => n + 1);
-              } else {
-                void beginScan();
-              }
-            }}
-            disabled={
-              view === 'cli'
-                ? cliState.busy
-                : phase === 'scanning' || phase === 'deleting'
-            }
-            title={
-              view === 'cli'
-                ? cliState.busy
-                  ? t('Envanter inceleniyor…')
-                  : t('Envanteri yenile')
-                : t('İncele (tara ve kanıtları göster)')
-            }
-          >
-            {view === 'cli'
-              ? cliState.busy
-                ? t('İnceleniyor…')
-                : cliState.hasInventory
-                  ? t('Envanteri yenile')
-                  : t('İncele')
-              : scan
-                ? t('Yeniden tara')
-                : t('İncele')}
-          </button>
+          {view === 'disk' && (
+            <button
+              className="btn"
+              onClick={() => void beginScan()}
+              disabled={phase === 'scanning' || phase === 'deleting'}
+              title={t('İncele (tara ve kanıtları göster)')}
+            >
+              {scan ? t('Yeniden tara') : t('İncele')}
+            </button>
+          )}
 
           {view === 'disk' && (
             <div className="mode-switch" role="group" aria-label={t('Silme modu')}>
@@ -888,14 +862,14 @@ export default function App() {
         </>
       )}
 
-      {view === 'cli' && (
-        <CliView
-          onError={setError}
-          onNotice={notify}
-          refreshSignal={cliRefresh}
-          onStateChange={setCliState}
-        />
-      )}
+      {/*
+        CliView HER ZAMAN bagli kalir; yalnizca gizlenir. Aksi halde
+        Disk sekmesine gidip donunce envanter, filtreler ve bulunan
+        araclar sifirlaniyordu.
+      */}
+      <div style={{ display: view === 'cli' ? undefined : 'none' }}>
+        <CliView onError={setError} onNotice={notify} />
+      </div>
     </div>
   );
 }

@@ -1025,9 +1025,11 @@ async function handleCliPlan(
   }
 
   const wanted = new Set(commands.map((c) => c.toLowerCase()));
-  const selected = inv.tools.filter(
-    (t) => wanted.has(t.command.toLowerCase()) || wanted.has(t.id.toLowerCase()),
-  );
+  // Kimlik verildiyse YALNIZ onu sec. Ayni komutu iki paket
+  // saglayabildigi icin komut eslesmesi yanlis kurulumu planlayabilir.
+  const byId = inv.tools.filter((t) => wanted.has(t.id.toLowerCase()));
+  const selected =
+    byId.length > 0 ? byId : inv.tools.filter((t) => wanted.has(t.command.toLowerCase()));
   if (selected.length === 0) {
     sendJson(res, 400, { error: 'Secilen araclar envanterde yok' });
     return;

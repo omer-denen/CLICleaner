@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, utimes } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -158,6 +158,9 @@ function findDuplicates(tools: CliTool[]): CliDuplicates[] {
   for (const [command, arr] of groups) {
     if (arr.length < 2) continue;
     const sorted = [...arr].sort((a, b) => {
+      // 0) Aktif shim: gercekten cagrilan kurulum her zaman once gelir.
+      const act = Number(b.activeShim === true) - Number(a.activeShim === true);
+      if (act !== 0) return act;
       // 1) en son durum/erisim kaniti, 2) gecmis, 3) surum, 4) kaynak
       const state = b.lastStateAt - a.lastStateAt;
       if (state !== 0) return state;
@@ -171,14 +174,24 @@ function findDuplicates(tools: CliTool[]): CliDuplicates[] {
     });
     const keep = sorted[0]!;
     const remove = sorted.slice(1);
+    const active = arr.find((t) => t.activeShim === true);
     out.push({
       command,
       keepId: keep.id,
       removeIds: remove.map((t) => t.id),
-      reason: `Ayni komut ${arr.length} farkli kaynaktan kurulu. En guclu kullanim kaniti: ${keep.source} (${keep.id}).`,
+      ...(active ? { activeId: active.id } : {}),
+      reason:
+        `Ayni komut ${arr.length} kurulumda. Aktif: ${describeTool(keep)}. ` +
+        `Golgede: ${remove.map(describeTool).join(', ')}.`,
     });
   }
   return out.sort((a, b) => a.command.localeCompare(b.command)).slice(0, 50);
+}
+
+/** Kullaniciya gosterilecek kisa kurulum etiketi: paket@surum [kaynak]. */
+function describeTool(t: CliTool): string {
+  const v = t.version ? `@${t.version}` : '';
+  return `${t.packageName}${v} [${t.source}]`;
 }
 
 function sourcePriority(s: CliSource): number {
@@ -273,7 +286,10 @@ async function scanNpmGlobal(
               };
 
       const tool: CliTool = {
-        id: `npm-global:${cmd}`,
+        // Paket adi kimlige girer: ayni komutu iki paket saglayabilir
+        // (or. yeni CLI + eski CLI). Ikisi de listede kalmali ki
+        // cakisma analiz edilebilsin.
+        id: `npm-global:${name}:${cmd}`,
         command: cmd,
         source: 'npm-global',
         packageName: name,
@@ -299,8 +315,65 @@ async function scanNpmGlobal(
     }
   }
 
+  await annotateNpmShims(out, prefix);
   if (out.length === 0) notes.push(`npm global prefix bulundu ama komut eslesmedi: ${prefix}`);
   return out;
+}
+
+/**
+ * Ayni komutu birden fazla paket sagliyorsa hangisinin gercekten
+ * cagrildigini shim dosyasindan okur. Ornek: guncelleme sonrasi
+ * eski paket kaldirilmadan kalmis olabilir; shim yeni paketi gosterir.
+ *
+ * Shim okumak atime'i gunceller; bu yuzden once kaydedilir, sonra
+ * geri yazilir. Aksi halde envanter kendi kanitini bozar (observer etkisi).
+ */
+async function annotateNpmShims(tools: CliTool[], prefix: string): Promise<void> {
+  const cache = new Map<string, string | null>();
+  for (const tool of tools) {
+    const shim = tool.shims.find((p) => p.toLowerCase().endsWith('.cmd')) ?? tool.shims[0];
+    if (!shim) continue;
+    let target = cache.get(shim);
+    if (target === undefined) {
+      target = await readShimTarget(shim, prefix);
+      cache.set(shim, target);
+    }
+    if (!target) continue;
+    tool.shimTarget = target;
+    const install = normPath(tool.installPath);
+    const pointed = normPath(target);
+    tool.activeShim = pointed === install || pointed.startsWith(install + '\\');
+    tool.evidence.push(
+      tool.activeShim
+        ? 'aktif shim bu kurulumu gosteriyor'
+        : 'shim baska kurulumu gosteriyor (golgede kalan eski kurulum)',
+    );
+  }
+}
+
+/**
+ * `.cmd` / `.ps1` shim'inin hedef yolunu cikarir. npm shim'i
+ * `%dp0%\node_modules\<paket>\<dosya>` bicimindedir; paket scoped
+ * olabilir (`@scope\paket`).
+ */
+async function readShimTarget(shim: string, prefix: string): Promise<string | null> {
+  const before = await stat(longPath(shim)).catch(() => null);
+  try {
+    const txt = await readFile(longPath(shim), 'utf8');
+    const m = /node_modules[\\/]((?:@[^\\/\s"']+[\\/])?[^\\/\s"']+)[\\/]([^\s"']+)/i.exec(txt);
+    if (!m?.[1] || !m[2]) return null;
+    const rel = `node_modules\\${m[1]}\\${m[2]}`.replace(/[\\/]+/g, '\\');
+    return join(prefix, rel);
+  } catch {
+    return null;
+  } finally {
+    // Observer etkisi: shim'i okumak atime'i gunceller; geri koy.
+    if (before) {
+      await utimes(longPath(shim), before.atime, before.mtime).catch(() => {
+        /* geri yazilamadi; atime kaniti etkilenmis olabilir */
+      });
+    }
+  }
 }
 
 async function listPackageDirs(modules: string): Promise<string[]> {
@@ -424,7 +497,7 @@ async function scanUvTools(
       });
 
       const tool: CliTool = {
-        id: `uv-tool:${command}`,
+        id: `uv-tool:${pkgName}:${command}`,
         command,
         source: 'uv-tool',
         packageName: pkgName,
@@ -642,7 +715,7 @@ async function scanPythonUser(
       });
 
       const tool: CliTool = {
-        id: `pip-user:${cmd}`,
+        id: `pip-user:${dist?.packageName ?? cmd}:${cmd}`,
         command: cmd,
         source: 'pip-user',
         packageName: dist?.packageName ?? cmd,

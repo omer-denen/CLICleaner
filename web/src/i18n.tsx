@@ -218,6 +218,9 @@ const EN: Record<string, string> = {
   'Onaylamak için SIL yaz:': 'Type SIL to confirm:',
   'Planı uygula': 'Apply plan',
   'Envanter taranıyor…': 'Scanning inventory…',
+  'Kurulu CLI envanterini incele': 'Review installed CLI inventory',
+  'Kurulu araçları, atıllık kanıtlarını ve kaldırma planlarını görün. Hiçbir şey silinmez.':
+    'See installed tools, idle evidence and removal plans. Nothing is deleted.',
   "Kurulu CLI'lar taranıyor; bu işlem biraz zaman alabilir…":
     'Scanning installed CLIs; this may take a little while…',
   'Envanter iptal edildi.': 'Inventory cancelled.',
@@ -229,6 +232,14 @@ const EN: Record<string, string> = {
   'Kaldırma paket yöneticisinin kendisiyle yapılır; kurulum klasörü elle silinmez.':
     'Removal runs the package manager uninstall; the install folder is never deleted by hand.',
   bağımsız: 'standalone',
+
+  // --- CLI cakisma (ayni komutu iki paket sagliyor) ---
+  'Aynı komutun birden fazla kurulumu': 'Multiple installations of the same command',
+  "Aynı komutu iki paket sağlıyor. Shim'in gösterdiği aktif kurulum korunur; gölgede kalan eski paket kaldırılabilir.":
+    'Two packages provide the same command. The active installation (the one the shim points to) is kept; the shadowed old package can be removed.',
+  Aktif: 'Active',
+  Gölgede: 'Shadowed',
+  'Eski sürümü planla': 'Plan removal of the old version',
 
   // --- disk listesi: sekmeler, siralama, tamamlandi ---
   Kategoriler: 'Categories',

@@ -1374,6 +1374,82 @@ input {
   margin: 0;
 }
 
+/* CLI sekmesi bos hali: tek ve buyuk "Incele" cagrisi. */
+.cli-empty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 46px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.cli-empty-cta h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.cli-empty-cta p {
+  margin: 0;
+  max-width: 520px;
+}
+
+.btn-lg {
+  padding: 10px 26px;
+  font-size: 15px;
+}
+
+/* Ayni komutu saglayan birden fazla kurulum: aktif + golgede. */
+.conflicts {
+  padding: 14px 16px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: var(--radius);
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.conflicts h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.conflict-main {
+  min-width: 0;
+}
+
+.conflict-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.conflict-versions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.tag-shadowed {
+  color: var(--yellow);
+  border-color: rgba(251, 191, 36, 0.45);
+  margin-left: 6px;
+}
+
 .cli-loading {
   display: flex;
   align-items: center;

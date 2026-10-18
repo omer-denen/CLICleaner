@@ -24,6 +24,13 @@ export interface CliTool {
   version: string;
   installPath: string;
   shims: string[];
+  /**
+   * PATH'teki shim'in gosterdigi hedef (npm icin). Ayni komutu birden
+   * fazla paket sagladiginda hangisinin gercekten cagrildigini kanitlar.
+   */
+  shimTarget?: string;
+  /** Shim bu kurulumu mu gosteriyor? (false = golgede kalan eski kurulum) */
+  activeShim?: boolean;
   /** Ayni kurulumun icinde kalan eski surum yollari (or. .store) */
   stalePaths: string[];
   stateDirs: string[];
@@ -51,6 +58,8 @@ export interface CliDuplicates {
   command: string;
   keepId: string;
   removeIds: string[];
+  /** Aktif shim'in isaret ettigi kurulum (varsa). */
+  activeId?: string;
   reason: string;
 }
 

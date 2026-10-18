@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { longPath } from '../util/longpath.ts';
 import type { CliTool } from '../core/cli-inventory-types.ts';
 import {
@@ -56,7 +57,15 @@ export async function planCliRemoval(tools: CliTool[], backup: boolean): Promise
   let totalBytes = 0;
   let backupBytes = 0;
 
+  // Ayni paket birden fazla komut saglayabilir (or. opencode + opencode2).
+  // Ayni paketi plana iki kez koymak uninstall'i iki kez calistirir.
+  const seenPackages = new Set<string>();
+
   for (const tool of tools) {
+    const packageKey = `${tool.source}:${tool.packageName.toLowerCase()}`;
+    if (seenPackages.has(packageKey)) continue;
+    seenPackages.add(packageKey);
+
     const backupPlan = await planToolBackup(tool, backup);
     items.push({
       tool,
@@ -117,7 +126,14 @@ export async function executeCliRemoval(plan: CliRemovalPlan): Promise<CliRemova
     }
 
     const r = await runProcess(tool.uninstall.program, tool.uninstall.args);
-    const verified = !tool.shims.some((p) => existsSync(longPath(p)));
+    // Ayni komutu baska bir paket de sagliyorsa shim SILINMEZ; hedefi
+    // degisir. Bu yuzden "shim yok" yerine "paket gitti ve shim artik
+    // bu paketi gostermiyor" kontrol edilir.
+    const packageGone = !existsSync(longPath(tool.installPath));
+    const stillPoints = await Promise.all(
+      tool.shims.map((p) => shimPointsTo(p, tool.installPath)),
+    );
+    const verified = packageGone && !stillPoints.some(Boolean);
     out.push({
       command: tool.command,
       ok: r.code === 0,
@@ -177,6 +193,20 @@ function runProcess(program: string, args: string[]): Promise<ProcessResult> {
       resolve({ code, stdout, stderr, timedOut });
     });
   });
+}
+
+/**
+ * Shim dosyasi hala verilen kurulum yolunu mu gosteriyor?
+ * Kaldirma sonrasi shim baska bir pakete yonlendiyse false doner.
+ */
+async function shimPointsTo(shim: string, installPath: string): Promise<boolean> {
+  try {
+    const txt = await readFile(longPath(shim), 'utf8');
+    const norm = (s: string) => s.replace(/\//g, '\\').toLowerCase();
+    return norm(txt).includes(norm(installPath));
+  } catch {
+    return false;
+  }
 }
 
 function truncate(s: string): string {

@@ -18,19 +18,9 @@ import { shortPath } from '../labels.ts';
 
 type Filter = 'all' | CliStatus;
 
-export interface CliViewState {
-  /** Envanter islemi suruyor mu? */
-  busy: boolean;
-  /** En az bir envanter sonucu var mi? */
-  hasInventory: boolean;
-}
-
 interface Props {
   onError: (message: string) => void;
   onNotice?: (message: string) => void;
-  /** Ust bardaki "Envanteri yenile" tetikleyicisi */
-  refreshSignal: number;
-  onStateChange?: (state: CliViewState) => void;
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -41,7 +31,7 @@ const SOURCE_LABEL: Record<string, string> = {
   standalone: 'standalone',
 };
 
-export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Props) {
+export function CliView({ onError, onNotice }: Props) {
   const { t, lang } = useI18n();
   const [inventory, setInventory] = useState<CliInventory | null>(null);
   const [loading, setLoading] = useState(false);
@@ -185,21 +175,6 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
     });
   };
 
-  const handledRefresh = useRef(0);
-
-  // Ust bardaki "Envanteri yenile" yalnizca CLI sekmesindeyken buraya gelir.
-  useEffect(() => {
-    if (refreshSignal > 0 && refreshSignal !== handledRefresh.current) {
-      handledRefresh.current = refreshSignal;
-      void load();
-    }
-  }, [refreshSignal, load]);
-
-  // Ust bardaki dugmenin etiketi/durumu icin App'e ozet ver.
-  useEffect(() => {
-    onStateChange?.({ busy: loading || busy, hasInventory: !!inventory });
-  }, [loading, busy, inventory, onStateChange]);
-
   // Tarama surerken bulunanlar canli gosterilir; bitince tam envanter.
   const allTools = useMemo(
     () => (loading ? liveTools : (inventory?.tools ?? [])),
@@ -231,12 +206,14 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
     setSelected(new Set(tools.filter(selectable).map((x) => x.id)));
   };
 
-  const openPlan = async () => {
-    if (selected.size === 0) return;
+  // `ids` verilmezse mevcut secim kullanilir. Cakisma kartindan yalnizca
+  // golgede kalan kurulumun kimligi gecilir; aktif kurulum plana girmez.
+  const openPlan = async (ids: string[] = [...selected]) => {
+    if (ids.length === 0) return;
     setBusy(true);
     try {
       const p = await cliPlan({
-        commands: [...selected],
+        commands: ids,
         backup,
         unusedDays,
       });
@@ -283,18 +260,16 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
               onChange={(e) => setUnusedDays(Math.max(1, Number(e.target.value) || 21))}
             />
           </label>
-          <button
-            className="btn btn-primary"
-            onClick={() => void load()}
-            disabled={loading || busy}
-            title={t('İncele (tara ve kanıtları göster)')}
-          >
-            {loading
-              ? `${t('İnceleniyor…')} ${elapsed}s`
-              : inventory
-                ? t('Yenile')
-                : t('İncele')}
-          </button>
+          {inventory && (
+            <button
+              className="btn"
+              onClick={() => void load()}
+              disabled={loading || busy}
+              title={t('Envanteri yenile')}
+            >
+              {loading ? `${t('İnceleniyor…')} ${elapsed}s` : t('Yenile')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -328,6 +303,18 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
         </p>
       )}
 
+      {!inventory && !loading && (
+        <div className="cli-empty-cta">
+          <h2>{t('Kurulu CLI envanterini incele')}</h2>
+          <p className="dim">
+            {t('Kurulu araçları, atıllık kanıtlarını ve kaldırma planlarını görün. Hiçbir şey silinmez.')}
+          </p>
+          <button className="btn btn-primary btn-lg" onClick={() => void load()}>
+            {t('İncele')}
+          </button>
+        </div>
+      )}
+
       {inventory && (
         <div className="summary cli-summary">
           <div className="card">
@@ -353,7 +340,55 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
         </div>
       )}
 
-      <div className="toolbar">
+      {inventory && inventory.duplicates.length > 0 && (
+        <section className="conflicts">
+          <h3>{t('Aynı komutun birden fazla kurulumu')}</h3>
+          <p className="dim small">
+            {t(
+              "Aynı komutu iki paket sağlıyor. Shim'in gösterdiği aktif kurulum korunur; gölgede kalan eski paket kaldırılabilir.",
+            )}
+          </p>
+          {inventory.duplicates.map((d) => {
+            const keep = inventory.tools.find((x) => x.id === d.keepId);
+            const remove = d.removeIds
+              .map((id) => inventory.tools.find((x) => x.id === id))
+              .filter((x): x is CliTool => !!x);
+            const bytes = remove.reduce((a, x) => a + x.totalBytes, 0);
+            return (
+              <div className="conflict" key={d.command}>
+                <div className="conflict-main">
+                  <div className="conflict-head">
+                    <strong>{d.command}</strong>
+                    <span className="dim small">{d.reason}</span>
+                  </div>
+                  <div className="conflict-versions">
+                    <span>
+                      <span className="dim">{t('Aktif')}: </span>
+                      <code>{keep ? `${keep.packageName}@${keep.version}` : '-'}</code>
+                    </span>
+                    <span>
+                      <span className="dim">{t('Gölgede')}: </span>
+                      <code>
+                        {remove.map((x) => `${x.packageName}@${x.version}`).join(', ') || '-'}
+                      </code>
+                    </span>
+                    {bytes > 0 && <span className="dim">{formatBytes(bytes)}</span>}
+                  </div>
+                </div>
+                <button
+                  className="btn"
+                  disabled={busy || remove.length === 0}
+                  onClick={() => void openPlan(d.removeIds)}
+                >
+                  {t('Eski sürümü planla')}
+                </button>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      <div className="toolbar" style={{ display: inventory || loading ? undefined : 'none' }}>
         <div className="filters">
           {(
             [
@@ -383,12 +418,7 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
         </div>
       </div>
 
-      <div className="cli-list">
-        {!inventory && !loading && (
-          <div className="empty">
-            {t('Kurulu CLI\'ları incelemek için "İncele"ye bas; hiçbir şey silinmez.')}
-          </div>
-        )}
+      <div className="cli-list" style={{ display: inventory || loading ? undefined : 'none' }}>
         {inventory && !loading && tools.length === 0 && (
           <div className="empty">{t('Aramanla eşleşen küme yok.')}</div>
         )}
@@ -410,7 +440,13 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
                 </label>
                 <div className="cli-command">
                   <strong>{tool.command}</strong>
-                  <span className="dim">{tool.packageName}{tool.version ? `@${tool.version}` : ''}</span>
+                  <span className="dim">
+                    {tool.packageName}
+                    {tool.version ? `@${tool.version}` : ''}
+                    {tool.activeShim === false && (
+                      <span className="tag tag-shadowed">{t('Gölgede')}</span>
+                    )}
+                  </span>
                 </div>
                 <div className="cli-source">{SOURCE_LABEL[tool.source] ?? tool.source}</div>
                 <div className="cli-idle">{idleDaysLabel(tool.idleDays, lang)}</div>
@@ -496,7 +532,10 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
         </div>
       )}
 
-      <footer className="actionbar cli-actionbar">
+      <footer
+        className="actionbar cli-actionbar"
+        style={{ display: inventory ? undefined : 'none' }}
+      >
         <div className="selection-info">
           <strong>{t('{n} araç seçildi', { n: selected.size })}</strong>
           <label className="backup-toggle">
@@ -530,6 +569,10 @@ export function CliView({ onError, onNotice, refreshSignal, onStateChange }: Pro
                   <div className="plan-head">
                     <span className={`tag cli-status-${item.status}`}>{t(STATUS_LABEL[item.status as CliStatus] ?? item.status)}</span>
                     <strong>{item.command}</strong>
+                    <span className="dim">
+                      {item.packageName}
+                      {item.version ? `@${item.version}` : ''}
+                    </span>
                     <span className="dim">{SOURCE_LABEL[item.source] ?? item.source}</span>
                   </div>
                   <div className="dim plan-reason">{shortPath(item.installPath)}</div>
