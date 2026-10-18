@@ -5,6 +5,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ## [Unreleased]
 
+### Belgelendirme
+- İki dilli README: Türkçe (varsayılan) `README.md` ve İngilizce `README.en.md`;
+  ayrıntılı kurulum, ilk çalıştırma, sorun giderme ve kaldırma talimatları.
+
 ## [0.1.0] - 2026-10-18
 
 İlk kamuya açık sürüm (anasürüm).

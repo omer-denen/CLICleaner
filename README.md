@@ -1,5 +1,11 @@
 # CLICleaner
 
+![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+![Lisans](https://img.shields.io/github/license/omer-denen/CLICleaner)
+![Sürüm](https://img.shields.io/github/v/tag/omer-denen/CLICleaner?label=s%C3%BCr%C3%BCm)
+
+**Türkçe (varsayılan)** · [English](README.en.md)
+
 Windows'ta geliştiricilerin diskini dolduran **önbellekleri, paket depolarını,
 yorumlayıcı ortamlarını ve CLI artıklarını** kanıtlara dayanarak bulan,
 hiçbir şeyi onayın olmadan silmeyen temizleyici.
@@ -44,8 +50,8 @@ Yeni bir araç çıktığında kural eklemek gerekmez: aynı işaretlerle tanın
   (ör. `Temp`'te 3 günden eski dosyalar, Electron'da yalnız `Cache`).
 - **İki aşamalı onay:** plan → yazılı onay. Orta/yüksek riskte `SIL` yazmak
   zorunludur; `--yes` bunu atlayamaz.
-- **Canlı tarama:** web arayüzünde tarama sürerken taranan dizinler ve bulunan
-  kümeler anlık listelenir; iptal sunucudaki işi gerçekten durdurur.
+- **Canlı tarama:** tarama sürerken taranan dizinler ve bulunan kümeler anlık
+  listelenir; iptal sunucudaki işi gerçekten durdurur.
 - **Kullanılmayan CLI envanteri:** kurulu araçları ve "atıl" kanıtlarını
   (shim erişimi, durum klasörü, kabuk geçmişi) raporlar; kaldırma paket
   yöneticisinin kendi komutuyla yapılır.
@@ -54,37 +60,96 @@ Yeni bir araç çıktığında kural eklemek gerekmez: aynı işaretlerle tanın
 
 ## Kurulum
 
-Windows 10/11 ve Node.js 22.6+ gerekir.
+### Gereksinimler
+
+- **Windows 10/11** (64 bit)
+- **Node.js 22.6 veya üzeri** — [nodejs.org](https://nodejs.org)
+- Yönetici hakkı gerekmez; araç yalnızca kullanıcı klasörlerini okur.
+
+Sürümü doğrula:
 
 ```bash
-npx clicleaner ui --web     # tarayıcı arayüzü (önerilen)
-npx clicleaner scan         # terminal raporu
+node --version    # v22.6.0 veya üzeri olmalı
 ```
 
-Kaynaktan çalıştırmak için:
+### 1) Kurulum yapmadan dene
 
 ```bash
-git clone <depo-adresi>
+npx clicleaner ui --web
+```
+
+Tarayıcı otomatik açılır. Açılmazsa terminalde yazan adresi kullan
+(token içerir; her başlatmada değişir).
+
+### 2) Kalıcı kurulum
+
+```bash
+npm install -g clicleaner
+clicleaner ui --web
+```
+
+### 3) Kaynaktan çalıştırma
+
+```bash
+git clone https://github.com/omer-denen/CLICleaner.git
 cd CLICleaner
 npm install
 node bin/clicleaner.mjs ui --web
 ```
 
-## Kullanım
+### İlk çalıştırma — web arayüzü
+
+1. **İncele**'ye bas. Tarama sürerken solda taranan dizinler, sağda bulunan
+   kümeler canlı listelenir.
+2. Tarama bitince **"Tarama tamamlandı"** diyaloğu çıkar; **Tamam** ile listeye geç.
+3. Kümeleri sekmelerden incele: `Önerilen` / `Doğrulama` / `Rapor` / `Korunuyor`.
+   Boyut, risk, tarih veya ada göre sıralayabilirsin.
+4. Silmek istediklerini işaretle → **Planla ve onayla**.
+5. Plan ekranını oku → onay kutusunu işaretle (yüksek risk varsa) → `SIL` yaz →
+   **Planı uygula**.
+6. Varsayılan mod **geri dönüşüm kutusu**'dur; yanlış karar verirsen geri
+   döndürebilirsin. Kalıcı silme ayrı bir moddur ve geri alınamaz.
+
+`CLI'lar` sekmesinde kurulu araçları, atıllık kanıtlarını ve kaldırma planlarını
+görebilirsin (envanter salt okunurdur).
+
+### İlk çalıştırma — terminal
 
 ```bash
-clicleaner scan                     # tara ve listele
-clicleaner ui                       # terminal TUI (Ink)
-clicleaner ui --web                 # yerel web arayüzü
-clicleaner clean                    # iki aşamalı onay + geri dönüşüm kutusu
-clicleaner clean --dry-run          # yalnızca planı göster
-clicleaner clean --purge            # kalıcı silme (yazılı onay ister)
-clicleaner inventory --verbose      # kurulu CLI envanteri (salt okunur)
-clicleaner inventory --unused 21    # 21+ gündür kullanılmayanlar
-clicleaner explain muhasib          # karar gerekçesini kanıtlarla göster
-clicleaner log --summary            # son kararların özeti
-clicleaner status                   # proje/görev durumu
+clicleaner scan                    # tara ve listele
+clicleaner clean --dry-run         # yalnızca planı göster, hiçbir şey silme
+clicleaner clean                   # iki aşamalı onay + geri dönüşüm kutusu
+clicleaner inventory --verbose     # kurulu CLI envanteri (salt okunur)
+clicleaner inventory --unused 21   # 21+ gündür kullanılmayanlar
+clicleaner explain <küme>          # karar gerekçesini kanıtlarla göster
+clicleaner log --summary           # son kararların özeti
+clicleaner doctor                  # ortam kontrolü (uzun yol, geri dönüşüm, GPU)
 ```
+
+### Kaldırma ve veri konumu
+
+```bash
+npm uninstall -g clicleaner
+```
+
+- Araç verileri: `%LOCALAPPDATA%\clicleaner` — günlükler, plan günlükleri,
+  24 saatlik tarama önbelleği ve yedek kasası. Silmekte sakınca yoktur; araç
+  gerektiğinde yeniden oluşturur.
+- `npx` ile denediysen kurulum kalmaz; npm indirme önbelleği `npm cache clean`
+  ile temizlenebilir.
+
+### Sorun giderme
+
+| Sorun | Çözüm |
+|---|---|
+| TUI bozuk görünüyor / açılmıyor | Ink gerçek bir terminal (TTY) ister; Windows Terminal veya PowerShell kullan |
+| Tarayıcı açılmadı | Terminaldeki `http://127.0.0.1:<port>/?token=...` adresini yapıştır |
+| "Geçersiz token" | Sunucu her başlatmada yeni token üretir; eski sekmeyi kapat, yeni adresi kullan |
+| Uzun yol hataları | Araç `\\?\` önekini kullanır; `clicleaner doctor` ile doğrula |
+| Windows dışı sistem | Şu an yalnızca Windows desteklenir |
+| Antivirüs uyarısı | Araç dosya silebilir; imza gerekmiyorsa davranışı `clean --dry-run` ile sınayıp kendin karar ver |
+
+## Kullanım
 
 ### Ortamlar (`--env`)
 
