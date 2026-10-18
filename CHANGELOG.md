@@ -3,7 +3,7 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
-## [Unreleased]
+## [0.4.0] - 2026-10-18
 
 ### Değişti
 
