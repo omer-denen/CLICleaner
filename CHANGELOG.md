@@ -15,6 +15,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   shim yok; boş `@scope` klasörü. Hepsi yalnızca **raporlanır**, silinmez.
 - **PATH gölgeleme:** aynı komut PATH'te birden fazla kez bulunuyorsa ilki
   çalışır, kalanlar gölgede listelenir; yinelenen PATH dizinleri tekilleştirilir.
+- **Karantina modu (T19):** paket yöneticisi olmayan bağımsız araçlar silinmek
+  yerine kasaya taşınır. Shim PATH'ten düşer, durum klasörleri kopyalanır,
+  `manifest.json` + `RESTORE.md` geri dönüş adımlarını verir.
+  `clicleaner quarantine <ad> [--dry-run]`; yazılı `KARANTINA` onayı zorunlu.
 
 ## [0.3.0] - 2026-10-18
 
