@@ -7,67 +7,185 @@
 
 **Türkçe (varsayılan)** · [English](README.en.md)
 
-Windows'ta geliştiricilerin diskini dolduran **önbellekleri, paket depolarını,
-yorumlayıcı ortamlarını ve CLI artıklarını** kanıtlara dayanarak bulan,
-hiçbir şeyi onayın olmadan silmeyen temizleyici.
+**Windows'ta diskini dolduran ama "Program ekle/kaldır" listesinde görünmeyen
+dosyaları bulur; ne olduğunu kanıtıyla gösterir; sen onaylamadan hiçbir şeyi
+silmez.**
 
-> **Hiçbir şeyi adına göre değil, kanıta göre sınıflandır.**
-> Kararı gerekçesiyle göster. Silmeyi iki aşamada onaylat.
+Önbellekler, paket depoları, yorumlayıcı ortamları, model ağırlıkları,
+güncelleyici artıkları, kullanılmayan CLI'lar… Hepsi diskte yer kaplar ama
+hangisinin silinebileceğini bilmek zordur. CLICleaner bunu tahminle değil,
+diskte gördüğü **işaretlerle** yapar.
+
+> **Hiçbir şey sen onaylamadan silinmez.** İlk tarama yalnızca listeler.
 
 ---
 
-## Neden?
+## 30 saniyede başla
 
-Kod yazan bir bilgisayarda yer kaplayan şeyler tek bir uygulamaya ait değil:
-npm/NuGet/conda/uv önbellekleri, `.venv` ve conda ortamları, AI ajanlarının
-oturum klasörleri, güncelleyici artıkları, yarım inmiş modeller. Windows
-"Program ekle/kaldır" listesinde görünmezler; ne olduklarını bilmeden
-silmek de risklidir.
+1. **Node.js 22.6 veya üzeri** kurulu olsun → [nodejs.org](https://nodejs.org) (LTS).
+2. **PowerShell**'i aç: Başlat → `PowerShell` yaz → aç.
+3. Şunu yaz ve Enter'a bas:
 
-CLICleaner bu klasörleri **adına bakmadan** tanır. Kaynak kodda `opencode`,
-`claude` gibi bir uygulama adı geçmez; yalnızca diskte gözlenen işaretler
-okunur:
+   ```powershell
+   npx clicleaner
+   ```
 
-| Gözlem | Çıkarım |
+4. Tarayıcı otomatik açılır. Açılmazsa terminalde yazan
+   `http://localhost:<port>` adresini tarayıcıya yapıştır.
+5. **İncele**'ye bas. Tarama sürerken solda taranan dizinleri, sağda bulunanları
+   canlı görürsün.
+6. Tarama bitince **Tamam** → listeyi incele.
+7. Silmek istediklerini işaretle → **Planla ve onayla** → planı oku → `SIL` yaz →
+   **Planı uygula**.
+
+Varsayılan mod **Geri Dönüşüm Kutusu**'dur; yanlış karar verirsen geri
+alabilirsin (`clicleaner undo --restore`).
+
+### Hiç terminal kullanmadıysan
+
+- `node --version` yaz; `v22.6.0` veya üzeri değilse nodejs.org'dan LTS kur.
+- `npx clicleaner` ilk çalıştırmada paketi indirir; birkaç saniye sürer.
+- Tarama büyük klasörlerde birkaç dakika sürebilir. **Taramayı iptal et**
+  düğmesi her zaman vardır.
+- Kapatmak için terminalde `Ctrl+C`.
+- Hiçbir şeyi silmek zorunda değilsin; sadece listeye bakıp çıkabilirsin.
+
+---
+
+## AI kod araçları kullanıyorsan
+
+> **AI araçlarında yeniysen** — ilk kez bir ajan veya model kurduysan — bu
+> bölüm tam sana göre. Kıdemli bir geliştirici olsan da AI araçlarına yeni
+> başlamış olabilirsin; fark etmez.
+
+AI kod araçları arka planda çok şey indirir: model ağırlıkları, CUDA/cuDNN
+runtime'ları, Python ortamları, paket önbellekleri, ajan oturumları ve
+becerileri. Bunlar "Program ekle/kaldır" listesinde görünmez; hangisinin
+yeniden indirilebilir, hangisinin **senin verin** olduğunu bilmek zordur.
+
+CLICleaner bu ayrımı tahminle değil, kanıtla yapar:
+
+| AI tarafında ne var? | CLICleaner ne yapar? |
 |---|---|
-| `CACHEDIR.TAG` | Bu klasör bir önbellek (npm, conda, uv, pip standardı) |
-| `packages/<paket>/<sürüm>/*.nupkg` | NuGet paket deposu |
-| `model.onnx` + `tokenizer.json` | Yerel AI model deposu |
-| `cuDNN` / `cuBLAS` / `onnxruntime_providers_cuda.dll` | GPU hızlandırıcı runtime |
-| `pyvenv.cfg`, `conda-meta`, `envs/`, `site-packages` | Derlenmiş yorumlayıcı ortamı |
-| `.vhd` / `.vhdx` | Sanal disk — **asla otomatik silinmez** |
-| Log'da `Device: CPU` + CUDA DLL'leri | İndirilmiş ama kullanılamayan runtime |
-| `skills/` + `SKILL.md` veya `.skill-lock.json` | Ajan çalışma alanı — **kullanıcı değeri** |
-| `extensions/` + `extensions.json` | Editör uzantı deposu (eski sürümler hedeflenir) |
-| `app-<sürüm>` + `Update.exe` | Sürümlü uygulama deposu (en güncel sürüm korunur) |
+| Ajan oturumları, beceriler, hafıza | **Korur.** Kullanıcı değeridir; silme hedefi üretmez. |
+| Model ağırlıkları (ONNX/GGUF) | **Korur.** Yalnız kullanılamayan GPU varyantları/artıkları hedeflenir; CPU modelleri kalır. |
+| CUDA / cuDNN / ORT runtime | Log "CPU" diyorsa ve runtime kullanılmıyorsa aday olur; yoksa dokunmaz. |
+| Python / conda ortamları | Eski veya atıl olanları **raporlar**; projeye bağlı ortamlar korunur. |
+| Paket önbellekleri (npm, uv, NuGet) | Yeniden indirilebildiği için güvenli aday. |
+| Kullanılmayan CLI araçları | Kaldırma **planı** çıkarır; kendiliğinden kaldırmaz. |
 
-Yeni bir araç çıktığında kural eklemek gerekmez: aynı işaretlerle tanınır.
+### Basit sözlük
 
-## Öne çıkanlar
+| Terim | Ne demek? |
+|---|---|
+| **Önbellek** | Tekrar indirilebilen dosyalar; silinince yeniden oluşur. |
+| **Model** | AI'ın "beyni" olan büyük dosya; yeniden indirmek GB'larca olabilir. |
+| **Runtime** | Modeli çalıştıran kütüphane; CPU ve GPU sürümleri vardır. |
+| **Ortam (venv/conda)** | Bir projenin Python paketlerinin izole kurulumu. |
+| **Ajan oturumu / beceri** | Sohbet geçmişi ve öğrenilmiş beceriler — **senin verin**. |
+| **Shim** | Bir komutu çalıştıran küçük kısayol dosyası. |
 
-- **Kanıt zinciri:** her karar "hangi gözleme dayanıyor" sorusunu yanıtlar
-  (`clicleaner explain <küme>`).
+> Kural: **Ajan verisi, beceri ve modeller asla otomatik silinmez.** Yalnız
+> yeniden üretilebilir önbellekler ve kanıtla "kullanılamaz" olduğu gösterilen
+> parçalar aday olur.
+
+---
+
+## Ne bulur, neye dokunmaz?
+
+**Bulur (aday gösterir):**
+
+| Kategori | Örnek |
+|---|---|
+| Paket önbellekleri | npm, NuGet, conda, uv |
+| Yorumlayıcı ortamları | `.venv`, conda `envs/` |
+| Model depoları | ONNX / GGUF ağırlıkları |
+| GPU runtime artıkları | kullanılmayan CUDA DLL'leri |
+| Güncelleyici artıkları | `app-<sürüm>`, updater klasörleri |
+| CLI / ajan artıkları | eski sürümler, kullanılmayan araçlar |
+
+**Dokunmaz:**
+
+| Dokunmaz | Neden |
+|---|---|
+| Belgeler, fotoğraflar, projeler | taranmaz |
+| Uygulama ayarları | yalnız `Cache` / `GPUCache` hedeflenir |
+| Ajan oturumları ve becerileri | kullanıcı değeri taşır |
+| Sanal diskler (`.vhd` / `.vhdx`) | yalnız raporlanır |
+| SDK kurulumları | yalnız raporlanır |
+
+---
+
+## Neden güvenli?
+
+- **Kanıt:** her kararın yanında "bunu neden öneriyorum" yazar
+  (`CACHEDIR.TAG`, `.nupkg`, `model.onnx`, log satırı…).
+- **İki aşama:** önce plan, sonra yazılı `SIL` onayı. Orta/yüksek riskte `--yes`
+  bile bunu atlayamaz.
+- **Geri dönüşüm kutusu:** varsayılan mod. Yanlışsa geri alabilirsin.
 - **Hedefli silme:** klasörün tamamı değil, yalnız güvenli kısım silinir
-  (ör. `Temp`'te 3 günden eski dosyalar, Electron'da yalnız `Cache`).
-- **İki aşamalı onay:** plan → yazılı onay. Orta/yüksek riskte `SIL` yazmak
-  zorunludur; `--yes` bunu atlayamaz.
-- **Canlı tarama:** tarama sürerken taranan dizinler ve bulunan kümeler anlık
-  listelenir; iptal sunucudaki işi gerçekten durdurur.
-- **Kullanılmayan CLI envanteri:** kurulu araçları ve "atıl" kanıtlarını
-  (shim erişimi, durum klasörü, kabuk geçmişi) raporlar; kaldırma paket
-  yöneticisinin kendi komutuyla yapılır.
-- **Yerel ve sessiz:** arayüz yalnız `127.0.0.1` üzerinde çalışır, her
-  başlatmada rastgele token üretir; telemetri yoktur.
+  (ör. `Temp`'te 3 günden eski dosyalar).
+- **Yerel:** arayüz yalnız `127.0.0.1` üzerinde çalışır; telemetri yoktur,
+  hiçbir veri dışarı gitmez.
+- **Açık kaynak:** MIT lisansı; kodu okuyabilir, kendin derleyebilirsin.
 
-## Kurulum
+---
+
+## İlk açılışta ne göreceksin?
+
+1. **Tarama ekranı:** solda taranacak dizinler ve durumları
+   (`✓` bulundu, `●` taranıyor, `○` bekliyor); sağda bulunanlar canlı listelenir.
+2. **Liste:** `Tümü` / `Önerilen` / `Doğrulama` / `Rapor` / `Korunuyor`
+   sekmeleri; boyut, risk, tarih veya ada göre sıralama.
+3. **Plan:** seçtiğin her hedef, boyutu ve uygulanacak komut. Onay metni `SIL`.
+4. **CLI'lar sekmesi:** kurulu araçlar, "atıl" kanıtları ve kaldırma planı
+   (envanter salt okunurdur; hiçbir şeyi kendi başına kaldırmaz).
+
+---
+
+## Sık sorulanlar
+
+**Sadece bakmak istiyorum, silmek istemiyorum.**
+İncele; hiçbir şey silinmez. Terminalde `clicleaner clean --dry-run` yalnızca
+planı gösterir.
+
+**AI ajanımın sohbetleri, becerileri veya modeli silinir mi?**
+Hayır. Ajan oturumları/becerileri kullanıcı verisi sayılır ve silme hedefi
+üretmez. Modeller korunur; yalnız kanıtla "kullanılamayan" GPU artıkları aday
+olur.
+
+**Yanlış sildim.**
+Geri dönüşüm kutusundan geri al: `clicleaner undo --restore`.
+
+**Tarama neden uzun sürüyor?**
+Diskteki en büyük klasörlerin boyutu ölçülüyor. İstediğin an
+**Taramayı iptal et** ile durdurabilirsin.
+
+**Node yok / sürüm eski.**
+[nodejs.org](https://nodejs.org) LTS kur; `node --version` ile doğrula.
+
+**Windows dışında çalışır mı?**
+Şu an yalnızca Windows destekleniyor.
+
+**Antivirüs uyarı verdi.**
+Araç dosya silebilir. Önce `clicleaner clean --dry-run` ile plana bak; hiçbir
+şey silinmez.
+
+**Verilerim bir yere gönderiliyor mu?**
+Hayır. Her şey yerel makinede çalışır.
+
+**Nasıl kaldırırım?**
+`npm uninstall -g clicleaner`. `npx` ile denediysen kurulum kalmaz.
+
+---
+
+## Kurulum (ayrıntılı)
 
 ### Gereksinimler
 
 - **Windows 10/11** (64 bit)
 - **Node.js 22.6 veya üzeri** — [nodejs.org](https://nodejs.org)
-- Yönetici hakkı gerekmez; araç yalnızca kullanıcı klasörlerini okur.
-
-Sürümü doğrula:
+- Yönetici hakkı gerekmez.
 
 ```bash
 node --version    # v22.6.0 veya üzeri olmalı
@@ -78,9 +196,6 @@ node --version    # v22.6.0 veya üzeri olmalı
 ```bash
 npx clicleaner
 ```
-
-Tarayıcı otomatik açılır. Açılmazsa terminalde yazan adresi kullan
-(token içerir; her başlatmada değişir).
 
 ### 2) Kalıcı kurulum
 
@@ -98,37 +213,6 @@ npm install
 node bin/clicleaner.mjs
 ```
 
-### İlk çalıştırma — web arayüzü
-
-1. **İncele**'ye bas. Tarama sürerken solda taranan dizinler, sağda bulunan
-   kümeler canlı listelenir.
-2. Tarama bitince **"Tarama tamamlandı"** diyaloğu çıkar; **Tamam** ile listeye geç.
-3. Kümeleri sekmelerden incele: `Önerilen` / `Doğrulama` / `Rapor` / `Korunuyor`.
-   Boyut, risk, tarih veya ada göre sıralayabilirsin.
-4. Silmek istediklerini işaretle → **Planla ve onayla**.
-5. Plan ekranını oku → onay kutusunu işaretle (yüksek risk varsa) → `SIL` yaz →
-   **Planı uygula**.
-6. Varsayılan mod **geri dönüşüm kutusu**'dur; yanlış karar verirsen geri
-   döndürebilirsin. Kalıcı silme ayrı bir moddur ve geri alınamaz.
-
-`CLI'lar` sekmesinde kurulu araçları, atıllık kanıtlarını ve kaldırma planlarını
-görebilirsin (envanter salt okunurdur).
-
-### İlk çalıştırma — terminal
-
-```bash
-clicleaner                         # tarayıcı arayüzünü aç (önerilen)
-clicleaner ui --tui                # terminal arayüzü (isteğe bağlı)
-clicleaner scan                    # terminalde tara ve listele
-clicleaner clean --dry-run         # yalnızca planı göster, hiçbir şey silme
-clicleaner clean                   # iki aşamalı onay + geri dönüşüm kutusu
-clicleaner inventory --verbose     # kurulu CLI envanteri (salt okunur)
-clicleaner inventory --unused 21   # 21+ gündür kullanılmayanlar
-clicleaner explain <küme>          # karar gerekçesini kanıtlarla göster
-clicleaner log --summary           # son kararların özeti
-clicleaner doctor                  # ortam kontrolü (uzun yol, geri dönüşüm, GPU)
-```
-
 ### Kaldırma ve veri konumu
 
 ```bash
@@ -136,23 +220,39 @@ npm uninstall -g clicleaner
 ```
 
 - Araç verileri: `%LOCALAPPDATA%\clicleaner` — günlükler, plan günlükleri,
-  24 saatlik tarama önbelleği ve yedek kasası. Silmekte sakınca yoktur; araç
-  gerektiğinde yeniden oluşturur.
-- `npx` ile denediysen kurulum kalmaz; npm indirme önbelleği `npm cache clean`
-  ile temizlenebilir.
+  24 saatlik tarama önbelleği ve yedek kasası. Silmekte sakınca yoktur.
+- `npx` ile denediysen kurulum kalmaz; npm indirme önbelleği
+  `npm cache clean` ile temizlenebilir.
 
 ### Sorun giderme
 
 | Sorun | Çözüm |
 |---|---|
-| TUI bozuk görünüyor / açılmıyor | Ink gerçek bir terminal (TTY) ister; Windows Terminal veya PowerShell kullan |
-| Tarayıcı açılmadı | Terminaldeki `http://127.0.0.1:<port>/?token=...` adresini yapıştır |
+| Tarayıcı açılmadı | Terminaldeki `http://localhost:<port>` adresini yapıştır |
 | "Geçersiz token" | Sunucu her başlatmada yeni token üretir; eski sekmeyi kapat, yeni adresi kullan |
+| TUI bozuk görünüyor | Ink gerçek bir terminal (TTY) ister; Windows Terminal veya PowerShell kullan |
 | Uzun yol hataları | Araç `\\?\` önekini kullanır; `clicleaner doctor` ile doğrula |
 | Windows dışı sistem | Şu an yalnızca Windows desteklenir |
-| Antivirüs uyarısı | Araç dosya silebilir; imza gerekmiyorsa davranışı `clean --dry-run` ile sınayıp kendin karar ver |
+| Eski bir sekme açık kaldı | Sunucu her başlatmada yeni token üretir; yeni adresi kullan |
+
+---
 
 ## Kullanım
+
+```bash
+clicleaner                         # tarayıcı arayüzünü aç (önerilen)
+clicleaner ui --tui                # terminal arayüzü (isteğe bağlı)
+clicleaner scan                    # terminalde tara ve listele
+clicleaner clean --dry-run         # yalnızca planı göster, hiçbir şey silme
+clicleaner clean                   # iki aşamalı onay + geri dönüşüm kutusu
+clicleaner clean --purge           # kalıcı silme (yazılı onay ister)
+clicleaner inventory --verbose     # kurulu CLI envanteri (salt okunur)
+clicleaner inventory --unused 21   # 21+ gündür kullanılmayanlar
+clicleaner explain <küme>          # karar gerekçesini kanıtlarla göster
+clicleaner log --summary           # son kararların özeti
+clicleaner doctor                  # ortam kontrolü
+clicleaner undo --restore          # geri dönüşüm kutusundan geri al
+```
 
 ### Ortamlar (`--env`)
 
@@ -175,7 +275,9 @@ npm uninstall -g clicleaner
 | `audit` | Her şeyi raporla, hiçbir şey silme |
 | `full` | Tüm kategoriler, risk düzeyine göre onayla |
 
-## Güvenlik modeli
+---
+
+## Güvenlik modeli (ayrıntılı)
 
 Kararlar üç seviyeye ayrılır:
 
@@ -202,7 +304,7 @@ src/
     classifier.ts         kanıt toplayıcı (dosya türü, dizin yapısı, log sinyalleri)
     analyze.ts            kanıt → mimari tip → karar + silme hedefleri
     merge.ts              uygulama bazlı kümeleme ve risk birleştirme
-    discover.ts           kök keşfi, ortam profilleri, korumalı yollar
+    discover.ts           dizin keşfi, ortam profilleri, korumalı yollar
     cli-inventory.ts      kurulu CLI'lar + atıllık kanıtı (salt okunur)
   actions/
     guard.ts              hedef güvenlik kapısı

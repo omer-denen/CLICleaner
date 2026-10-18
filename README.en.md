@@ -7,67 +7,185 @@
 
 [Türkçe (varsayılan)](README.md) · **English**
 
-A Windows cleaner that finds the **caches, package stores, interpreter
-environments and CLI leftovers** filling a developer's disk — based on
-evidence, never deleting anything without your approval.
+**Finds the files that fill your Windows disk but never appear in "Add or
+remove programs" — shows you the evidence, and deletes nothing without your
+approval.**
 
-> **Classify by evidence, never by name.**
-> Show every decision with its reason. Make deletion a two-step confirmation.
+Caches, package stores, interpreter environments, model weights, updater
+leftovers, unused CLIs… They all take space, and it is hard to know which ones
+are safe to remove. CLICleaner decides by **markers observed on disk**, not by
+guessing from folder names.
+
+> **Nothing is deleted without your approval.** The first scan only lists.
 
 ---
 
-## Why?
+## Start in 30 seconds
 
-On a developer machine, the space hogs rarely belong to a single application:
-npm/NuGet/conda/uv caches, `.venv` and conda environments, AI agent session
-folders, updater leftovers, half-downloaded models. They are invisible in
-Windows "Add or remove programs", and deleting them without knowing what they
-are is risky.
+1. Install **Node.js 22.6 or newer** → [nodejs.org](https://nodejs.org) (LTS).
+2. Open **PowerShell**: Start → type `PowerShell` → open.
+3. Type this and press Enter:
 
-CLICleaner recognises these folders **without looking at their names**. No
-application name (like `opencode` or `claude`) appears in the source; only
-markers observed on disk are read:
+   ```powershell
+   npx clicleaner
+   ```
 
-| Observation | Conclusion |
+4. The browser opens automatically. If it does not, paste the
+   `http://localhost:<port>` address printed in the terminal.
+5. Press **Inspect**. While the scan runs, the left column shows the directories
+   being scanned and the right column shows what is found.
+6. When it finishes press **OK**, then review the list.
+7. Tick what you want to delete → **Plan and confirm** → read the plan → type
+   `SIL` → **Apply plan**.
+
+The default mode is the **Recycle Bin**, so a wrong decision is reversible
+(`clicleaner undo --restore`).
+
+### Never used a terminal before?
+
+- Run `node --version`; if it is below `v22.6.0`, install the LTS from nodejs.org.
+- `npx clicleaner` downloads the package on first run; it takes a few seconds.
+- A scan may take a few minutes on large folders. The **Cancel scan** button is
+  always available.
+- Press `Ctrl+C` in the terminal to stop.
+- You do not have to delete anything; you can just look and close it.
+
+---
+
+## If you use AI coding tools
+
+> **New to AI tools** — installing your first agent or model? This section is
+> for you. You can be a senior developer and still be new to AI tooling; that
+> is exactly the point.
+
+AI coding tools download a lot in the background: model weights, CUDA/cuDNN
+runtimes, Python environments, package caches, agent sessions and skills. They
+never appear in "Add or remove programs", and it is hard to tell what can be
+regenerated and what is **your data**.
+
+CLICleaner makes that distinction from evidence, not guesses:
+
+| What is on the AI side? | What CLICleaner does |
 |---|---|
-| `CACHEDIR.TAG` | This folder is a cache (npm, conda, uv, pip standard) |
-| `packages/<pkg>/<version>/*.nupkg` | NuGet package store |
-| `model.onnx` + `tokenizer.json` | Local AI model store |
-| `cuDNN` / `cuBLAS` / `onnxruntime_providers_cuda.dll` | GPU accelerator runtime |
-| `pyvenv.cfg`, `conda-meta`, `envs/`, `site-packages` | Compiled interpreter environment |
-| `.vhd` / `.vhdx` | Virtual disk — **never deleted automatically** |
-| `Device: CPU` in a log + CUDA DLLs | Downloaded but unusable runtime |
-| `skills/` + `SKILL.md` or `.skill-lock.json` | Agent workspace — **user value** |
-| `extensions/` + `extensions.json` | Editor extension store (old versions are targeted) |
-| `app-<version>` + `Update.exe` | Versioned app store (newest version kept) |
+| Agent sessions, skills, memory | **Keeps them.** User value; never produces a delete target. |
+| Model weights (ONNX/GGUF) | **Keeps them.** Only unusable GPU variants/leftovers are targeted; CPU models stay. |
+| CUDA / cuDNN / ORT runtime | A candidate only if a log says "CPU" and the runtime is unused; otherwise untouched. |
+| Python / conda environments | **Reports** old or idle ones; environments tied to a project are kept. |
+| Package caches (npm, uv, NuGet) | Safe candidate because they can be downloaded again. |
+| Unused CLI tools | Produces a removal **plan**; never removes anything on its own. |
 
-When a new tool appears, no rule is needed: the same markers recognise it.
+### Plain-language glossary
 
-## Highlights
+| Term | What it means |
+|---|---|
+| **Cache** | Files that can be downloaded again; deleting them recreates them. |
+| **Model** | The big file that is the AI's "brain"; re-downloading can be gigabytes. |
+| **Runtime** | The library that runs the model; CPU and GPU versions exist. |
+| **Environment (venv/conda)** | An isolated install of a project's Python packages. |
+| **Agent session / skill** | Chat history and learned skills — **your data**. |
+| **Shim** | A small shortcut file that launches a command. |
 
-- **Evidence chain:** every decision answers "which observation supports it"
-  (`clicleaner explain <cluster>`).
-- **Targeted deletion:** never the whole folder — only the safe part
-  (e.g. files older than 3 days in `Temp`, only `Cache` in Electron apps).
-- **Two-step confirmation:** plan → written approval. Medium/high risk requires
-  typing `SIL`; `--yes` cannot bypass it.
-- **Live scanning:** while a scan runs, scanned directories and found clusters
-  stream to the screen; cancel really stops the server-side work.
-- **Unused CLI inventory:** reports installed tools with idle evidence
-  (shim access time, state folder, shell history); removal uses the package
-  manager's own uninstall command.
-- **Local and quiet:** the UI listens only on `127.0.0.1`, generates a random
-  token on every start, and sends no telemetry.
+> Rule: **agent data, skills and models are never deleted automatically.** Only
+> reproducible caches and parts proven unusable become candidates.
 
-## Installation
+---
+
+## What it finds — and what it leaves alone
+
+**Finds (shows as candidates):**
+
+| Category | Examples |
+|---|---|
+| Package caches | npm, NuGet, conda, uv |
+| Interpreter environments | `.venv`, conda `envs/` |
+| Model stores | ONNX / GGUF weights |
+| GPU runtime leftovers | unused CUDA DLLs |
+| Updater leftovers | `app-<version>`, updater folders |
+| CLI / agent leftovers | old versions, unused tools |
+
+**Leaves alone:**
+
+| Untouched | Why |
+|---|---|
+| Documents, photos, projects | never scanned |
+| Application settings | only `Cache` / `GPUCache` are targeted |
+| Agent sessions and skills | user value |
+| Virtual disks (`.vhd` / `.vhdx`) | report only |
+| SDK installations | report only |
+
+---
+
+## Why it is safe
+
+- **Evidence:** every decision says why it was made (`CACHEDIR.TAG`, `.nupkg`,
+  `model.onnx`, a log line…).
+- **Two steps:** a plan first, then a written `SIL` approval. `--yes` cannot
+  bypass it for medium/high risk.
+- **Recycle Bin:** default mode; undo a mistake.
+- **Targeted deletion:** not the whole folder — only the safe part (e.g. files
+  older than 3 days in `Temp`).
+- **Local:** the UI listens only on `127.0.0.1`; no telemetry, nothing leaves
+  your machine.
+- **Open source:** MIT licensed; read the code, build it yourself.
+
+---
+
+## What you will see on first launch
+
+1. **Scan screen:** the directories being scanned on the left with their status
+   (`✓` found, `●` scanning, `○` pending), findings streaming on the right.
+2. **List:** `All` / `Recommended` / `Verify` / `Report` / `Protected` tabs;
+   sort by size, risk, date or name.
+3. **Plan:** each target, its size and the exact command. Confirm by typing
+   `SIL`.
+4. **CLIs tab:** installed tools, idle evidence and a removal plan (the
+   inventory is read-only; it never removes anything on its own).
+
+---
+
+## FAQ
+
+**I only want to look, not delete.**
+Inspect; nothing is deleted. In the terminal, `clicleaner clean --dry-run`
+shows the plan only.
+
+**Will it delete my AI agent's chats, skills or model?**
+No. Agent sessions and skills count as user data and never become delete
+targets. Models are kept; only GPU leftovers proven unusable become candidates.
+
+**I deleted something by mistake.**
+Restore from the Recycle Bin: `clicleaner undo --restore`.
+
+**Why is the scan slow?**
+It measures the largest folders on disk. You can stop it at any time with
+**Cancel scan**.
+
+**Node is missing / too old.**
+Install the LTS from [nodejs.org](https://nodejs.org); verify with
+`node --version`.
+
+**Does it work outside Windows?**
+Windows only for now.
+
+**My antivirus warned me.**
+The tool can delete files. Run `clicleaner clean --dry-run` first; it deletes
+nothing.
+
+**Is my data sent anywhere?**
+No. Everything runs locally.
+
+**How do I uninstall it?**
+`npm uninstall -g clicleaner`. If you only used `npx`, nothing is installed.
+
+---
+
+## Installation (detailed)
 
 ### Requirements
 
 - **Windows 10/11** (64-bit)
 - **Node.js 22.6 or newer** — [nodejs.org](https://nodejs.org)
-- No administrator rights needed; the tool only reads user folders.
-
-Verify the version:
+- No administrator rights needed.
 
 ```bash
 node --version    # must be v22.6.0 or newer
@@ -78,9 +196,6 @@ node --version    # must be v22.6.0 or newer
 ```bash
 npx clicleaner
 ```
-
-The browser opens automatically. If it does not, use the address printed in the
-terminal (it contains a token that changes on every start).
 
 ### 2) Install globally
 
@@ -98,47 +213,14 @@ npm install
 node bin/clicleaner.mjs
 ```
 
-### First run — web UI
-
-1. Press **Inspect**. While the scan runs, the left column lists the directories
-   being scanned and the right column shows clusters as they are found.
-2. When the scan finishes a **"Scan complete"** dialog appears; press **OK** to
-   see the list.
-3. Review clusters in the tabs: `Recommended` / `Verify` / `Report` / `Protected`.
-   Sort by size, risk, date or name.
-4. Tick the ones you want to delete → **Plan and confirm**.
-5. Read the plan → tick the acknowledgement (if high risk exists) → type `SIL` →
-   **Apply plan**.
-6. The default mode is the **Recycle Bin**, so a wrong decision is reversible.
-   Permanent deletion is a separate mode and cannot be undone.
-
-The `CLIs` tab shows installed tools, their idle evidence and removal plans
-(the inventory is read-only).
-
-### First run — terminal
-
-```bash
-clicleaner                         # open the browser UI (recommended)
-clicleaner ui --tui                # terminal UI (optional)
-clicleaner scan                    # scan and list in the terminal
-clicleaner clean --dry-run         # show the plan only, delete nothing
-clicleaner clean                   # two-step confirmation + Recycle Bin
-clicleaner inventory --verbose     # installed CLI inventory (read-only)
-clicleaner inventory --unused 21   # tools unused for 21+ days
-clicleaner explain <cluster>       # show the decision with evidence
-clicleaner log --summary           # summary of recent decisions
-clicleaner doctor                  # environment check (long paths, recycle, GPU)
-```
-
 ### Uninstall and data location
 
 ```bash
 npm uninstall -g clicleaner
 ```
 
-- Tool data: `%LOCALAPPDATA%\clicleaner` — logs, plan journals, the 24-hour
-  scan cache and the backup vault. It is safe to delete; the tool recreates
-  what it needs.
+- Tool data: `%LOCALAPPDATA%\clicleaner` — logs, plan journals, the 24-hour scan
+  cache and the backup vault. Safe to delete.
 - If you only tried `npx`, nothing is installed; the npm download cache can be
   cleared with `npm cache clean`.
 
@@ -146,14 +228,31 @@ npm uninstall -g clicleaner
 
 | Problem | Fix |
 |---|---|
-| TUI looks broken / does not start | Ink needs a real terminal (TTY); use Windows Terminal or PowerShell |
-| Browser did not open | Paste the `http://127.0.0.1:<port>/?token=...` address from the terminal |
-| "Invalid token" | The server generates a new token on every start; close the old tab and use the new address |
+| Browser did not open | Paste the `http://localhost:<port>` address from the terminal |
+| "Invalid token" | A new token is generated on every start; close the old tab and use the new address |
+| TUI looks broken | Ink needs a real terminal (TTY); use Windows Terminal or PowerShell |
 | Long path errors | The tool uses the `\\?\` prefix; verify with `clicleaner doctor` |
 | Non-Windows system | Only Windows is supported for now |
-| Antivirus warning | The tool can delete files; try `clean --dry-run` and decide for yourself |
+| An old tab is still open | A new token is generated on every start; use the new address |
+
+---
 
 ## Usage
+
+```bash
+clicleaner                         # open the browser UI (recommended)
+clicleaner ui --tui                # terminal UI (optional)
+clicleaner scan                    # scan and list in the terminal
+clicleaner clean --dry-run         # show the plan only, delete nothing
+clicleaner clean                   # two-step confirmation + Recycle Bin
+clicleaner clean --purge           # permanent deletion (written approval)
+clicleaner inventory --verbose     # installed CLI inventory (read-only)
+clicleaner inventory --unused 21   # tools unused for 21+ days
+clicleaner explain <cluster>       # show the decision with evidence
+clicleaner log --summary           # summary of recent decisions
+clicleaner doctor                  # environment check
+clicleaner undo --restore          # restore from the Recycle Bin
+```
 
 ### Environments (`--env`)
 
@@ -176,7 +275,9 @@ npm uninstall -g clicleaner
 | `audit` | Report everything, delete nothing |
 | `full` | All categories, confirm by risk level |
 
-## Safety model
+---
+
+## Safety model (detailed)
 
 Decisions fall into three levels:
 
@@ -204,7 +305,7 @@ src/
     classifier.ts         evidence collector (file kinds, dir layout, log signals)
     analyze.ts            evidence → archetype → verdict + delete targets
     merge.ts              app-based clustering and risk merging
-    discover.ts           root discovery, environment profiles, protected paths
+    discover.ts           directory discovery, environment profiles, protected paths
     cli-inventory.ts      installed CLIs + idle evidence (read-only)
   actions/
     guard.ts              target safety gate
