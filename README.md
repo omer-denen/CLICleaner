@@ -162,6 +162,26 @@ npm run build:web          # web arayüzünü derle
 node bin/clicleaner.mjs scan
 ```
 
+## Sürümleme
+
+CLICleaner [Semantic Versioning](https://semver.org/lang/tr/) kullanır:
+
+| Değişiklik | Sürüm |
+|---|---|
+| Yeni özellik | MINOR (`0.1.0 → 0.2.0`) |
+| Hata düzeltme | PATCH (`0.2.0 → 0.2.1`) |
+| Geriye uyumsuz değişiklik | MAJOR (`1.0.0`) |
+
+Her sürüm `vX.Y.Z` etiketiyle yayınlanır; insan okur özet
+[CHANGELOG.md](CHANGELOG.md) içinde tutulur.
+
+```bash
+npm run release:patch   # hata düzeltme
+npm run release:minor   # yeni özellik
+npm run release:major   # geriye uyumsuz değişiklik
+git push --follow-tags
+```
+
 ## Lisans
 
 MIT — bkz. [LICENSE](LICENSE).

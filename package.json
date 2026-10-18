@@ -24,6 +24,7 @@
     "src/",
     "dist/web/",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "bin": {
@@ -41,6 +42,10 @@
     "doctor": "tsx src/cli.ts doctor",
     "undo": "tsx src/cli.ts undo",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
+    "preversion": "npm run typecheck",
+    "release:patch": "npm version patch -m \"surum: v%s\"",
+    "release:minor": "npm version minor -m \"surum: v%s\"",
+    "release:major": "npm version major -m \"surum: v%s\"",
     "prepack": "npm run build:web",
     "start": "tsx src/cli.ts",
     "status": "tsx src/cli.ts status",
