@@ -268,6 +268,21 @@ const EN: Record<string, string> = {
   'Onarımı uygula': 'Apply repair',
   'Onarım tamamlandı.': 'Repair completed.',
 
+  // --- T19: karantina (paket yoneticisi olmayan bagimsiz araclar) ---
+  'Bağımsız araçlar (paket yöneticisi yok)': 'Standalone tools (no package manager)',
+  "Silinmek yerine karantinaya alınır: komut PATH'ten düşer, durum klasörleriniz yerinde kalır, geri dönüş adımları kasaya yazılır.":
+    'Quarantined instead of deleted: the command leaves PATH, your state folders stay in place, and restore steps are written to the vault.',
+  'Karantinaya al': 'Quarantine',
+  Karantina: 'Quarantine',
+  KARANTINA: 'KARANTINA',
+  "Shim dosyaları kasaya taşınır (komut PATH'ten düşer); durum klasörleri kasaya kopyalanır, verileriniz yerinde kalır. Geri dönüş adımları RESTORE.md'ye yazılır.":
+    'Shim files are moved to the vault (the command leaves PATH); state folders are copied to the vault and your data stays in place. Restore steps are written to RESTORE.md.',
+  'Taşınacak shim': 'Shim to move',
+  'Kopyalanacak durum klasörü': 'State folder to copy',
+  'Onaylamak için KARANTINA yaz:': 'Type KARANTINA to confirm:',
+  'Karantinayı uygula': 'Apply quarantine',
+  'Karantina tamamlandı.': 'Quarantine completed.',
+
   // --- disk listesi: sekmeler, siralama, tamamlandi ---
   Kategoriler: 'Categories',
   'Tüm kategoriler': 'All categories',

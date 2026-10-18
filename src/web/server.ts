@@ -16,6 +16,7 @@ import { DeleteService } from '../services/delete-service.ts';
 import { CliInventoryService } from '../services/cli-inventory-service.ts';
 import { CliRemovalService } from '../services/cli-removal-service.ts';
 import { CliRepairService } from '../services/cli-repair-service.ts';
+import { CliQuarantineService } from '../services/cli-quarantine-service.ts';
 import { ServiceError, describeError } from '../services/errors.ts';
 import { readJson, sendJson, sseSend, sseSetup } from './http.ts';
 import type { Env } from '../core/types.ts';
@@ -28,6 +29,8 @@ import type {
   CliPlanRequest,
   CliRepairExecuteRequest,
   CliRepairPlanRequest,
+  CliQuarantineExecuteRequest,
+  CliQuarantinePlanRequest,
   ExecuteRequest,
   LatestResponse,
   MetaResponse,
@@ -86,6 +89,7 @@ interface WebContext {
   inventory: CliInventoryService;
   removal: CliRemovalService;
   repair: CliRepairService;
+  quarantine: CliQuarantineService;
   /** jobId -> SSE istemcileri (HTTP adaptorune ait gecici durum). */
   streams: Map<string, Set<ServerResponse>>;
 }
@@ -112,6 +116,7 @@ export function createWebServer(opts: WebOptions = {}): { server: Server; token:
   const inventory = new CliInventoryService(emit);
   const removal = new CliRemovalService(inventory);
   const repair = new CliRepairService(inventory);
+  const quarantine = new CliQuarantineService(inventory);
 
   const ctx: WebContext = {
     token,
@@ -121,6 +126,7 @@ export function createWebServer(opts: WebOptions = {}): { server: Server; token:
     inventory,
     removal,
     repair,
+    quarantine,
     streams,
   };
 
@@ -323,6 +329,22 @@ async function handleRequest(
     const body = await readJson<CliRepairExecuteRequest>(req);
     const planId = typeof body.planId === 'string' ? body.planId : '';
     sendJson(res, 200, await ctx.repair.execute(planId, body.phrase));
+    return;
+  }
+
+  if (route === 'POST /api/cli/quarantine/plan') {
+    const body = await readJson<CliQuarantinePlanRequest>(req);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((x): x is string => typeof x === 'string' && x.length > 0)
+      : [];
+    sendJson(res, 200, await ctx.quarantine.plan(ids));
+    return;
+  }
+
+  if (route === 'POST /api/cli/quarantine/execute') {
+    const body = await readJson<CliQuarantineExecuteRequest>(req);
+    const planId = typeof body.planId === 'string' ? body.planId : '';
+    sendJson(res, 200, await ctx.quarantine.execute(planId, body.phrase));
     return;
   }
 

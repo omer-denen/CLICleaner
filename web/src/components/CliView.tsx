@@ -4,6 +4,7 @@ import type {
   CliExecuteResponse,
   CliInventoryStreamEvent,
   CliPlanResponse,
+  CliQuarantinePlanResponse,
   CliRepairPlanResponse,
 } from '../../../src/web/contract.ts';
 import { formatBytes } from '../../../src/util/format.ts';
@@ -12,6 +13,8 @@ import {
   cliExecute,
   cliInventoryStream,
   cliPlan,
+  cliQuarantineExecute,
+  cliQuarantinePlan,
   cliRepairExecute,
   cliRepairPlan,
   startCliInventory,
@@ -49,6 +52,8 @@ export function CliView({ onError, onNotice }: Props) {
   const [results, setResults] = useState<CliExecuteResponse | null>(null);
   const [repairPlan, setRepairPlan] = useState<CliRepairPlanResponse | null>(null);
   const [repairPhrase, setRepairPhrase] = useState('');
+  const [quarantinePlan, setQuarantinePlan] = useState<CliQuarantinePlanResponse | null>(null);
+  const [quarantinePhrase, setQuarantinePhrase] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [lastInspectedAt, setLastInspectedAt] = useState<number | null>(null);
   /** Tarama surerken bulunan araclar; bitince yerini `inventory` alir. */
@@ -207,6 +212,12 @@ export function CliView({ onError, onNotice }: Props) {
     return [...map.values()];
   }, [inventory]);
 
+  // Karantina yalnizca paket yoneticisi olmayan (standalone) araclar icin.
+  const standaloneTools = useMemo(
+    () => (inventory?.tools ?? []).filter((x) => x.source === 'standalone' && x.shims.length > 0),
+    [inventory],
+  );
+
   const selectable = (x: CliTool) => x.status !== 'protected' && x.uninstall !== null;
 
   const toggle = (id: string) => {
@@ -282,6 +293,43 @@ export function CliView({ onError, onNotice }: Props) {
         onError(failed.map((x) => `${x.command}: ${x.error ?? 'hata'}`).join(' | '));
       } else {
         onNotice?.(t('Onarım tamamlandı.'));
+      }
+      await load();
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openQuarantine = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      const p = await cliQuarantinePlan({ ids });
+      setQuarantinePlan(p);
+      setQuarantinePhrase('');
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyQuarantine = async () => {
+    if (!quarantinePlan || quarantinePhrase.trim() !== 'KARANTINA') return;
+    setBusy(true);
+    try {
+      const r = await cliQuarantineExecute({
+        planId: quarantinePlan.planId,
+        phrase: 'KARANTINA',
+      });
+      setQuarantinePlan(null);
+      const failed = r.results.filter((x) => !x.ok);
+      if (failed.length > 0) {
+        onError(failed.map((x) => `${x.command}: ${x.error ?? 'hata'}`).join(' | '));
+      } else {
+        onNotice?.(t('Karantina tamamlandı.'));
       }
       await load();
     } catch (e) {
@@ -472,6 +520,31 @@ export function CliView({ onError, onNotice }: Props) {
               </div>
             );
           })}
+        </section>
+      )}
+
+      {standaloneTools.length > 0 && (
+        <section className="conflicts">
+          <h3>{t('Bağımsız araçlar (paket yöneticisi yok)')}</h3>
+          <p className="dim small">
+            {t(
+              "Silinmek yerine karantinaya alınır: komut PATH'ten düşer, durum klasörleriniz yerinde kalır, geri dönüş adımları kasaya yazılır.",
+            )}
+          </p>
+          {standaloneTools.map((tool) => (
+            <div className="conflict" key={tool.id}>
+              <div className="conflict-main">
+                <div className="conflict-head">
+                  <strong>{tool.command}</strong>
+                  <span className="dim small">{STATUS_LABEL[tool.status]}</span>
+                  <span className="dim small">{formatBytes(tool.totalBytes)}</span>
+                </div>
+              </div>
+              <button className="btn" disabled={busy} onClick={() => void openQuarantine([tool.id])}>
+                {t('Karantinaya al')}
+              </button>
+            </div>
+          ))}
         </section>
       )}
 
@@ -830,6 +903,75 @@ export function CliView({ onError, onNotice }: Props) {
                 onClick={() => void applyRepair()}
               >
                 {busy ? t('Başlatılıyor…') : t('Onarımı uygula')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {quarantinePlan && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('Karantina')}
+        >
+          <div className="modal repair-modal">
+            <header className="modal-head">
+              <h2>{t('Karantina')}</h2>
+              <span className="tag tag-recycle">{t('KARANTINA')}</span>
+            </header>
+            <p className="dim">
+              {t(
+                "Shim dosyaları kasaya taşınır (komut PATH'ten düşer); durum klasörleri kasaya kopyalanır, verileriniz yerinde kalır. Geri dönüş adımları RESTORE.md'ye yazılır.",
+              )}
+            </p>
+            <div className="modal-list">
+              {quarantinePlan.items.map((item) => (
+                <div className="plan-cluster" key={item.id}>
+                  <div className="plan-head">
+                    <strong>{item.command}</strong>
+                    <span className="dim">
+                      {item.packageName}
+                      {item.version ? `@${item.version}` : ''} · {formatBytes(item.totalBytes)}
+                    </span>
+                  </div>
+                  <ul>
+                    {item.shims.map((s) => (
+                      <li key={s}>
+                        {t('Taşınacak shim')}: <code>{s}</code>
+                      </li>
+                    ))}
+                    {item.stateDirs.map((d) => (
+                      <li key={d}>
+                        {t('Kopyalanacak durum klasörü')}: <code>{d}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <label className="phrase">
+              <span>{t('Onaylamak için KARANTINA yaz:')}</span>
+              <input
+                type="text"
+                value={quarantinePhrase}
+                onChange={(e) => setQuarantinePhrase(e.target.value)}
+                placeholder="KARANTINA"
+                disabled={busy}
+                autoFocus
+              />
+            </label>
+            <footer className="modal-actions">
+              <button className="btn" onClick={() => setQuarantinePlan(null)} disabled={busy}>
+                {t('Vazgeç')}
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={busy || quarantinePhrase.trim() !== 'KARANTINA'}
+                onClick={() => void applyQuarantine()}
+              >
+                {busy ? t('Başlatılıyor…') : t('Karantinayı uygula')}
               </button>
             </footer>
           </div>

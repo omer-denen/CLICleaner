@@ -10,6 +10,10 @@ import type {
   CliRepairExecuteResponse,
   CliRepairPlanRequest,
   CliRepairPlanResponse,
+  CliQuarantineExecuteRequest,
+  CliQuarantineExecuteResponse,
+  CliQuarantinePlanRequest,
+  CliQuarantinePlanResponse,
   ExecuteRequest,
   ExecuteStartResponse,
   LatestResponse,
@@ -209,6 +213,24 @@ export function cliRepairExecute(
   body: CliRepairExecuteRequest,
 ): Promise<CliRepairExecuteResponse> {
   return request<CliRepairExecuteResponse>('/api/cli/repair/execute', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function cliQuarantinePlan(
+  body: CliQuarantinePlanRequest,
+): Promise<CliQuarantinePlanResponse> {
+  return request<CliQuarantinePlanResponse>('/api/cli/quarantine/plan', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function cliQuarantineExecute(
+  body: CliQuarantineExecuteRequest,
+): Promise<CliQuarantineExecuteResponse> {
+  return request<CliQuarantineExecuteResponse>('/api/cli/quarantine/execute', {
     method: 'POST',
     body: JSON.stringify(body),
   });

@@ -133,6 +133,12 @@ leftovers proven unusable become candidates.
 **I deleted something by mistake.**
 Restore from the Recycle Bin: `clicleaner undo --restore`.
 
+**Can I disable a standalone tool without deleting it?**
+Yes. Quarantine it: use the **Quarantine** button in the browser UI or
+`clicleaner quarantine <ad>` in the terminal. The shim moves to the vault
+(the command leaves PATH), your data stays in place, and the restore steps
+are written to the vault.
+
 **Why is the scan slow?**
 It measures the largest folders on disk. You can stop it at any time with
 **Cancel scan**.
@@ -199,6 +205,7 @@ clicleaner clean               # two-step confirmation + Recycle Bin
 clicleaner undo --restore      # restore from the Recycle Bin
 clicleaner repair --dry-run    # show broken / partial installations
 clicleaner repair              # repair (ONAR confirmation; live output)
+clicleaner quarantine <ad>     # move a standalone tool to the vault (KARANTINA confirmation)
 clicleaner ui --tui            # terminal UI (optional)
 ```
 

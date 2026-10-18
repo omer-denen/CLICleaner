@@ -134,6 +134,11 @@ yalnız kanıtla "kullanılamayan" GPU artıkları aday olur.
 **Yanlış sildim.**
 Geri dönüşüm kutusundan geri al: `clicleaner undo --restore`.
 
+**Bağımsız bir aracı silmeden devre dışı bırakabilir miyim?**
+Evet. Karantinaya al: web arayüzünde **Karantinaya al** düğmesi ya da terminalde
+`clicleaner quarantine <ad>`. Shim kasaya taşınır (komut PATH'ten düşer),
+verileriniz yerinde kalır; geri alma adımları kasaya yazılır.
+
 **Tarama neden uzun sürüyor?**
 Diskteki en büyük klasörlerin boyutu ölçülüyor. İstediğin an
 **Taramayı iptal et** ile durdurabilirsin.
@@ -199,6 +204,7 @@ clicleaner clean               # iki aşamalı onay + geri dönüşüm kutusu
 clicleaner undo --restore      # geri dönüşüm kutusundan geri al
 clicleaner repair --dry-run    # bozuk / yarım kurulumları göster
 clicleaner repair              # onar (ONAR onayı; çıktı canlı akar)
+clicleaner quarantine <ad>     # bağımsız aracı silmeden kasaya taşı (KARANTINA onayı)
 clicleaner ui --tui            # terminal arayüzü (isteğe bağlı)
 ```
 

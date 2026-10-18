@@ -297,3 +297,57 @@ export interface CliRepairResultView {
 export interface CliRepairExecuteResponse {
   results: CliRepairResultView[];
 }
+
+// ---------------------------------------------------------------------------
+// CLI karantina (paket yoneticisi olmayan bagimsiz araclar)
+// ---------------------------------------------------------------------------
+
+export interface CliQuarantinePlanRequest {
+  ids: string[];
+}
+
+export interface CliQuarantineItemView {
+  id: string;
+  command: string;
+  packageName: string;
+  version: string;
+  installPath: string;
+  /** Kasaya TASINACAK shim dosyalari (komut PATH'ten duser). */
+  shims: string[];
+  /** Kasaya KOPYALANACAK durum klasorleri (veri yerinde kalir). */
+  stateDirs: string[];
+  status: string;
+  idleDays: number;
+  evidence: string[];
+  totalBytes: number;
+}
+
+export interface CliQuarantinePlanResponse {
+  planId: string;
+  items: CliQuarantineItemView[];
+  totalBytes: number;
+  /** Karantina da yazili onay ister */
+  requiresPhrase: true;
+  /** Kullanicinin yazmasi gereken ifade */
+  phrase: 'KARANTINA';
+  expiresAt: number;
+}
+
+export interface CliQuarantineExecuteRequest {
+  planId: string;
+  phrase: string;
+}
+
+export interface CliQuarantineResultView {
+  command: string;
+  ok: boolean;
+  verified: boolean;
+  movedShims: number;
+  copiedState: number;
+  vaultDir: string;
+  error?: string;
+}
+
+export interface CliQuarantineExecuteResponse {
+  results: CliQuarantineResultView[];
+}
