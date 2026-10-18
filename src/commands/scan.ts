@@ -72,7 +72,7 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
   log(`\n  CLICleaner taramasi\n`);
   log(`  Ortam      : ${envs.join(', ')}`);
   if (args.profile) log(`  Profil     : ${args.profile}`);
-  log(`  Kokler     : ${targets.length} aday`);
+  log(`  Dizinler   : ${targets.length} aday`);
   log(`  GPU        : ${gpu.hasNvidia ? 'NVIDIA bulundu' : 'NVIDIA yok'}\n`);
 
   // Kuyruk tabanli paralel tarama (6 es zamanli is)

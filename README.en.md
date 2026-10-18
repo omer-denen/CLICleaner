@@ -3,6 +3,7 @@
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/github/license/omer-denen/CLICleaner)
 ![Version](https://img.shields.io/github/v/tag/omer-denen/CLICleaner?label=version)
+![npm](https://img.shields.io/npm/v/clicleaner)
 
 [Türkçe (varsayılan)](README.md) · **English**
 

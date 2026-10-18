@@ -317,7 +317,7 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
         </Box>
         <Box paddingLeft={2} marginTop={1}>
           <Text color={color.gray}>
-            {progress.done}/{progress.total} kok {glyph.dot} {formatBytes(progress.bytes)}
+            {progress.done}/{progress.total} dizin {glyph.dot} {formatBytes(progress.bytes)}
           </Text>
         </Box>
         <Box marginTop={1} paddingLeft={2}>

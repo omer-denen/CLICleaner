@@ -3,6 +3,7 @@
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![Lisans](https://img.shields.io/github/license/omer-denen/CLICleaner)
 ![Sürüm](https://img.shields.io/github/v/tag/omer-denen/CLICleaner?label=s%C3%BCr%C3%BCm)
+![npm](https://img.shields.io/npm/v/clicleaner)
 
 **Türkçe (varsayılan)** · [English](README.en.md)
 
