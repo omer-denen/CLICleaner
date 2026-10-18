@@ -11,10 +11,9 @@
 remove programs" — shows you the evidence, and deletes nothing without your
 approval.**
 
-Caches, package stores, interpreter environments, model weights, updater
-leftovers, unused CLIs… They all take space, and it is hard to know which ones
-are safe to remove. CLICleaner decides by **markers observed on disk**, not by
-guessing from folder names.
+Caches, model files, Python environments, updater leftovers, unused CLIs…
+It is hard to know which ones are safe to remove. CLICleaner decides from
+markers observed on disk, not from guesses.
 
 > **Nothing is deleted without your approval.** The first scan only lists.
 
@@ -47,31 +46,27 @@ The default mode is the **Recycle Bin**, so a wrong decision is reversible
 - `npx clicleaner` downloads the package on first run; it takes a few seconds.
 - A scan may take a few minutes on large folders. The **Cancel scan** button is
   always available.
-- Press `Ctrl+C` in the terminal to stop.
-- You do not have to delete anything; you can just look and close it.
+- Press `Ctrl+C` in the terminal to stop. You do not have to delete anything.
 
 ---
 
 ## If you use AI coding tools
 
 > **New to AI tools** — installing your first agent or model? This section is
-> for you. You can be a senior developer and still be new to AI tooling; that
-> is exactly the point.
+> for you. You can be a senior developer and still be new to AI tooling.
 
-AI coding tools download a lot in the background: model weights, CUDA/cuDNN
-runtimes, Python environments, package caches, agent sessions and skills. They
-never appear in "Add or remove programs", and it is hard to tell what can be
+AI coding tools download a lot in the background: model files, GPU libraries,
+Python environments, package caches, agent sessions and skills. They never
+appear in "Add or remove programs", and it is hard to tell what can be
 regenerated and what is **your data**.
-
-CLICleaner makes that distinction from evidence, not guesses:
 
 | What is on the AI side? | What CLICleaner does |
 |---|---|
 | Agent sessions, skills, memory | **Keeps them.** User value; never produces a delete target. |
-| Model weights (ONNX/GGUF) | **Keeps them.** Only unusable GPU variants/leftovers are targeted; CPU models stay. |
-| CUDA / cuDNN / ORT runtime | A candidate only if a log says "CPU" and the runtime is unused; otherwise untouched. |
-| Python / conda environments | **Reports** old or idle ones; environments tied to a project are kept. |
-| Package caches (npm, uv, NuGet) | Safe candidate because they can be downloaded again. |
+| Model files | **Keeps them.** Only unusable GPU leftovers become candidates; CPU models stay. |
+| GPU libraries | A candidate only when proven unused; otherwise untouched. |
+| Python / conda environments | **Reports** old or idle ones; project-bound environments are kept. |
+| Package caches | Safe candidate because they can be downloaded again. |
 | Unused CLI tools | Produces a removal **plan**; never removes anything on its own. |
 
 ### Plain-language glossary
@@ -80,10 +75,8 @@ CLICleaner makes that distinction from evidence, not guesses:
 |---|---|
 | **Cache** | Files that can be downloaded again; deleting them recreates them. |
 | **Model** | The big file that is the AI's "brain"; re-downloading can be gigabytes. |
-| **Runtime** | The library that runs the model; CPU and GPU versions exist. |
-| **Environment (venv/conda)** | An isolated install of a project's Python packages. |
+| **Environment** | An isolated install of a project's Python packages. |
 | **Agent session / skill** | Chat history and learned skills — **your data**. |
-| **Shim** | A small shortcut file that launches a command. |
 
 > Rule: **agent data, skills and models are never deleted automatically.** Only
 > reproducible caches and parts proven unusable become candidates.
@@ -97,49 +90,33 @@ CLICleaner makes that distinction from evidence, not guesses:
 | Category | Examples |
 |---|---|
 | Package caches | npm, NuGet, conda, uv |
-| Interpreter environments | `.venv`, conda `envs/` |
-| Model stores | ONNX / GGUF weights |
-| GPU runtime leftovers | unused CUDA DLLs |
-| Updater leftovers | `app-<version>`, updater folders |
-| CLI / agent leftovers | old versions, unused tools |
+| Interpreter environments | `.venv`, conda environments |
+| Model stores | ONNX / GGUF files |
+| GPU leftovers | unused CUDA libraries |
+| Updater leftovers | updater folders, old versions |
+| CLI / agent leftovers | unused tools |
 
 **Leaves alone:**
 
 | Untouched | Why |
 |---|---|
 | Documents, photos, projects | never scanned |
-| Application settings | only `Cache` / `GPUCache` are targeted |
+| Application settings | only cache folders are targeted |
 | Agent sessions and skills | user value |
-| Virtual disks (`.vhd` / `.vhdx`) | report only |
+| Virtual disks | report only |
 | SDK installations | report only |
 
 ---
 
 ## Why it is safe
 
-- **Evidence:** every decision says why it was made (`CACHEDIR.TAG`, `.nupkg`,
-  `model.onnx`, a log line…).
+- **Evidence:** every decision says why it was made.
 - **Two steps:** a plan first, then a written `SIL` approval. `--yes` cannot
-  bypass it for medium/high risk.
+  bypass it.
 - **Recycle Bin:** default mode; undo a mistake.
-- **Targeted deletion:** not the whole folder — only the safe part (e.g. files
-  older than 3 days in `Temp`).
-- **Local:** the UI listens only on `127.0.0.1`; no telemetry, nothing leaves
-  your machine.
-- **Open source:** MIT licensed; read the code, build it yourself.
-
----
-
-## What you will see on first launch
-
-1. **Scan screen:** the directories being scanned on the left with their status
-   (`✓` found, `●` scanning, `○` pending), findings streaming on the right.
-2. **List:** `All` / `Recommended` / `Verify` / `Report` / `Protected` tabs;
-   sort by size, risk, date or name.
-3. **Plan:** each target, its size and the exact command. Confirm by typing
-   `SIL`.
-4. **CLIs tab:** installed tools, idle evidence and a removal plan (the
-   inventory is read-only; it never removes anything on its own).
+- **Targeted deletion:** not the whole folder — only the safe part.
+- **Local and open:** the UI runs only on this machine; no telemetry, MIT
+  licensed.
 
 ---
 
@@ -150,8 +127,8 @@ Inspect; nothing is deleted. In the terminal, `clicleaner clean --dry-run`
 shows the plan only.
 
 **Will it delete my AI agent's chats, skills or model?**
-No. Agent sessions and skills count as user data and never become delete
-targets. Models are kept; only GPU leftovers proven unusable become candidates.
+No. Agent sessions and skills count as user data. Models are kept; only GPU
+leftovers proven unusable become candidates.
 
 **I deleted something by mistake.**
 Restore from the Recycle Bin: `clicleaner undo --restore`.
@@ -179,178 +156,53 @@ No. Everything runs locally.
 
 ---
 
-## Installation (detailed)
+## Installation
 
-### Requirements
-
-- **Windows 10/11** (64-bit)
-- **Node.js 22.6 or newer** — [nodejs.org](https://nodejs.org)
-- No administrator rights needed.
+**Requirements:** Windows 10/11 and Node.js 22.6+ ([nodejs.org](https://nodejs.org)).
+No administrator rights needed.
 
 ```bash
-node --version    # must be v22.6.0 or newer
+npx clicleaner              # try without installing
+npm install -g clicleaner   # install globally
+clicleaner                  # open the browser UI
 ```
 
-### 1) Try without installing
-
-```bash
-npx clicleaner
-```
-
-### 2) Install globally
-
-```bash
-npm install -g clicleaner
-clicleaner
-```
-
-### 3) Run from source
+Run from source:
 
 ```bash
 git clone https://github.com/omer-denen/CLICleaner.git
 cd CLICleaner
 npm install
-node bin/clicleaner.mjs
+npm start
 ```
 
-### Uninstall and data location
-
-```bash
-npm uninstall -g clicleaner
-```
-
-- Tool data: `%LOCALAPPDATA%\clicleaner` — logs, plan journals, the 24-hour scan
-  cache and the backup vault. Safe to delete.
-- If you only tried `npx`, nothing is installed; the npm download cache can be
-  cleared with `npm cache clean`.
-
-### Troubleshooting
+**Uninstall:** `npm uninstall -g clicleaner`.
+Tool data lives under `%LOCALAPPDATA%\clicleaner` (logs, scan cache, backup
+vault); it is safe to delete.
 
 | Problem | Fix |
 |---|---|
 | Browser did not open | Paste the `http://localhost:<port>` address from the terminal |
-| "Invalid token" | A new token is generated on every start; close the old tab and use the new address |
-| TUI looks broken | Ink needs a real terminal (TTY); use Windows Terminal or PowerShell |
-| Long path errors | The tool uses the `\\?\` prefix; verify with `clicleaner doctor` |
+| "Invalid token" | A new token is generated on every start; close the old tab |
+| Terminal UI looks broken | Use a real terminal (PowerShell / Windows Terminal) |
 | Non-Windows system | Only Windows is supported for now |
-| An old tab is still open | A new token is generated on every start; use the new address |
 
 ---
 
 ## Usage
 
 ```bash
-clicleaner                         # open the browser UI (recommended)
-clicleaner ui --tui                # terminal UI (optional)
-clicleaner scan                    # scan and list in the terminal
-clicleaner clean --dry-run         # show the plan only, delete nothing
-clicleaner clean                   # two-step confirmation + Recycle Bin
-clicleaner clean --purge           # permanent deletion (written approval)
-clicleaner inventory --verbose     # installed CLI inventory (read-only)
-clicleaner inventory --unused 21   # tools unused for 21+ days
-clicleaner explain <cluster>       # show the decision with evidence
-clicleaner log --summary           # summary of recent decisions
-clicleaner doctor                  # environment check
-clicleaner undo --restore          # restore from the Recycle Bin
+clicleaner                     # browser UI (recommended)
+clicleaner scan                # scan and list in the terminal
+clicleaner clean --dry-run     # show the plan only, delete nothing
+clicleaner clean               # two-step confirmation + Recycle Bin
+clicleaner undo --restore      # restore from the Recycle Bin
+clicleaner ui --tui            # terminal UI (optional)
 ```
 
-### Environments (`--env`)
-
-| Environment | Scope |
-|---|---|
-| `dotfolders` | `.*` folders in the home directory |
-| `localappdata` | Local application data |
-| `roamingappdata` | Roaming application data |
-| `pkgcache` | npm / NuGet / conda / uv caches |
-| `agent` | AI agent sessions and workspaces |
-| `runtime` | Compiled interpreter environments |
-| `temp` | Temporary files |
-| `vdisk` | WSL / Docker / VM disks (report only) |
-
-### Profiles
-
-| Profile | Behaviour |
-|---|---|
-| `lean` | Safe caches only |
-| `audit` | Report everything, delete nothing |
-| `full` | All categories, confirm by risk level |
+For more: `clicleaner help`
 
 ---
-
-## Safety model (detailed)
-
-Decisions fall into three levels:
-
-- **Recommended** — reproducible caches; selected by default.
-- **Verify** — review the content before deleting; written `SIL` approval.
-- **Report** — virtual disks, VPN settings, SDK installs; **never deleted
-  automatically**.
-
-Additional gates:
-
-- Final guard `guard.ts`: a **parent** of a protected path (home directory,
-  `%LOCALAPPDATA%`, Program Files, the running `node.exe`) can never be a target.
-- In the web UI the client sends **no paths**; it only selects cluster keys.
-  Deletion first creates a plan (10 min TTL), then requires written approval.
-- Deletions go to the **Recycle Bin** by default.
-
-## Architecture
-
-```
-bin/clicleaner.mjs        entry point (tsx loader)
-src/
-  core/
-    types.ts              data model (Cluster, Part, DeleteTarget, Verdict)
-    walker.ts             parallel filesystem walker (long-path aware)
-    classifier.ts         evidence collector (file kinds, dir layout, log signals)
-    analyze.ts            evidence → archetype → verdict + delete targets
-    merge.ts              app-based clustering and risk merging
-    discover.ts           directory discovery, environment profiles, protected paths
-    cli-inventory.ts      installed CLIs + idle evidence (read-only)
-  actions/
-    guard.ts              target safety gate
-    delete.ts             Recycle Bin / permanent deletion, journal
-    cli-backup.ts         backup vault (state folders)
-    cli-remove.ts         package manager's own uninstall
-  web/
-    server.ts             local HTTP + SSE API (token, Host/Origin gate)
-  commands/               scan · clean · inventory · explain · rules · doctor · undo · log · status · tui
-web/                      React browser UI (Vite)
-```
-
-### Long path support
-
-`npm-cache\_cacache` contains hundreds of paths beyond MAX_PATH; skipping them
-would misreport a 15 GB cache. All filesystem calls use the `\\?\` prefix.
-
-## Development
-
-```bash
-npm install
-npm run typecheck          # root + web type check
-npm run build:web          # build the web UI
-node bin/clicleaner.mjs scan
-```
-
-## Versioning
-
-CLICleaner follows [Semantic Versioning](https://semver.org/):
-
-| Change | Version |
-|---|---|
-| New feature | MINOR (`0.1.0 → 0.2.0`) |
-| Bug fix | PATCH (`0.2.0 → 0.2.1`) |
-| Breaking change | MAJOR (`1.0.0`) |
-
-Every release is tagged `vX.Y.Z`; the human-readable summary lives in
-[CHANGELOG.md](CHANGELOG.md).
-
-```bash
-npm run release:patch   # bug fix
-npm run release:minor   # new feature
-npm run release:major   # breaking change
-git push --follow-tags
-```
 
 ## License
 
