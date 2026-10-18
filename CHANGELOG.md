@@ -17,6 +17,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   komutu ve **canlı çıktı akışı**.
 - Kaldırma sonrası **shim onarımı**: gölgede kalan paket silinince komutun
   kaybolmaması için aktif paket yeniden bağlanır.
+- **Markdown raporu:** `clicleaner inventory --report <dosya.md>` — özet,
+  atıl araçlar ve kanıtları, çoklu kurulum analizi ve önerilen
+  kaldırma/onarım komutlarıyla paylaşılabilir rapor.
 
 ## [0.2.1] - 2026-10-18
 

@@ -70,6 +70,7 @@ ${C.bold}Sadece inventory icin${C.reset}
   --all              Yakin/korunan araclari da listele
   --verbose          Kanitlari ve kaldirma komutlarini goster
   --json             Makine okunur JSON
+  --report <dosya.md>  Paylasilabilir Markdown raporu yaz
 
 ${C.bold}Ornekler${C.reset}
   clicleaner
@@ -77,6 +78,7 @@ ${C.bold}Ornekler${C.reset}
   clicleaner clean --env pkgcache
   clicleaner clean --only nuget --purge
   clicleaner inventory --unused 21 --verbose
+  clicleaner inventory --report envanter.md
   clicleaner scan --profile audit --json
 `);
 }

@@ -1,18 +1,13 @@
 import { scanCliInventory, type CliTool } from '../core/cli-inventory.ts';
+import { SOURCE_LABEL, renderInventoryMarkdown } from '../core/cli-inventory-report.ts';
 import { formatBytes } from '../util/format.ts';
+import { resolve } from 'node:path';
+import { writeFile } from 'node:fs/promises';
 
 const C = {
   reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m',
   green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m',
   cyan: '\x1b[36m', gray: '\x1b[90m', magenta: '\x1b[35m',
-};
-
-const SOURCE_LABEL: Record<string, string> = {
-  'npm-global': 'npm -g',
-  'uv-tool': 'uv tool',
-  'dotnet-tool': 'dotnet tool',
-  'pip-user': 'pip --user',
-  standalone: 'bagimsiz',
 };
 
 /**
@@ -27,15 +22,45 @@ export async function runInventory(args: string[]): Promise<void> {
   const all = args.includes('--all');
   const verbose = args.includes('--verbose') || args.includes('-v');
   let unusedDays = 21;
+  let reportFile: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--unused') {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a === '--unused') {
       const n = Number(args[i + 1]);
       if (Number.isFinite(n) && n > 0) unusedDays = Math.floor(n);
+    }
+    if (a === '--report' || a.startsWith('--report=')) {
+      const inline = a.startsWith('--report=') ? a.slice('--report='.length) : '';
+      const val = inline || args[i + 1] || '';
+      if (!val || (!inline && val.startsWith('--'))) {
+        console.error('Kullanim: clicleaner inventory --report <dosya.md>');
+        process.exitCode = 1;
+        return;
+      }
+      reportFile = val;
     }
   }
 
   const inv = await scanCliInventory({ unusedDays });
+
+  if (reportFile) {
+    const target = resolve(reportFile);
+    try {
+      await writeFile(target, renderInventoryMarkdown(inv), 'utf8');
+    } catch (err) {
+      console.error(`Rapor yazilamadi: ${(err as Error).message}`);
+      process.exitCode = 1;
+      return;
+    }
+    const unusedCount = inv.tools.filter((t) => t.status === 'unused').length;
+    console.log(`${C.bold}Rapor yazildi:${C.reset} ${target}`);
+    console.log(
+      `${C.gray}${inv.tools.length} arac · ${unusedCount} atil · atillik esigi ${inv.unusedDays} gun · SALT OKUNUR${C.reset}\n`,
+    );
+    return;
+  }
 
   if (json) {
     console.log(JSON.stringify(inv, null, 2));
