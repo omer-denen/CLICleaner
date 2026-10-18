@@ -20,17 +20,21 @@ function printHelp(): void {
   console.log(`
 ${C.bold}CLICleaner${C.reset} — disk artiklarini kanitlarla listeler, secimini sen onaylarsin
 
-${C.bold}Kullanim${C.reset}
-  clicleaner scan [secenekler]        Tarama yap ve listele (varsayilan)
-  clicleaner clean [secenekler]       Tarama yap, onay iste, secileni sil
-  clicleaner ui [--web]               Terminal TUI; --web ile tarayici arayuzu
-  clicleaner inventory [secenekler]   Kurulu CLI'lari ve atillik kanitlarini listele
-  clicleaner explain <ad>             Bir kumenin neden oyle karar verdigini goster
-  clicleaner rules                    Kural listesini goster
-  clicleaner doctor                   Ortam kontrolu
-  clicleaner undo [--restore]      Son silme islemlerini listele, geri al
-  clicleaner log [secenekler]      Gunluk: karar gerekceleri, uyarilar, hatalar
-  clicleaner status [secenekler]  Proje durumu: nereye kadar gelindi, acik hatalar
+${C.bold}Baslamak icin${C.reset}
+  ${C.cyan}clicleaner${C.reset}                  Tarayici arayuzunu ac (onerilen)
+  ${C.cyan}clicleaner scan${C.reset}             Terminalde tara ve listele
+  ${C.cyan}clicleaner clean --dry-run${C.reset}  Plani goster; hicbir sey silme
+
+${C.bold}Gelismis${C.reset}
+  clicleaner ui --tui             Terminal arayuzu (Ink)
+  clicleaner clean                Iki asamali onay + geri donusum kutusu
+  clicleaner inventory [...]      Kurulu CLI envanteri (salt okunur)
+  clicleaner explain <ad>         Bir kumenin karar gerekcesi
+  clicleaner undo [--restore]     Son silmeyi geri al
+  clicleaner log [--summary]      Gunluk
+  clicleaner doctor               Ortam kontrolu
+  clicleaner rules                Kural listesi
+  clicleaner status               Proje durumu (gelistirici)
 
 ${C.bold}Ortam secimi${C.reset}  ${C.gray}(--env ile birden fazla)${C.reset}
 ${ENVS.map((e) => `  ${C.cyan}${e.id.padEnd(16)}${C.reset}${e.label.padEnd(26)}${C.gray}${e.description}${C.reset}`).join('\n')}
@@ -54,9 +58,10 @@ ${C.bold}Sadece clean icin${C.reset}
   --dry-run          Sadece plani goster, hicbir sey silme
   -y, --yes          Onay sormadan calistir
 
-${C.bold}Sadece ui --web icin${C.reset}
+${C.bold}Web arayuzu icin${C.reset}
   --port <n>         Sabit port (varsayilan: bos port otomatik secilir)
   --no-open          Tarayiciyi otomatik acma, yalnizca adresi yaz
+  --tui              Terminal arayuzunu kullan (varsayilan: tarayici)
 
 ${C.bold}Sadece inventory icin${C.reset}
   --unused <gun>     Atillik esigi (varsayilan: 21 gun)
@@ -65,19 +70,20 @@ ${C.bold}Sadece inventory icin${C.reset}
   --json             Makine okunur JSON
 
 ${C.bold}Ornekler${C.reset}
+  clicleaner
   clicleaner scan --env pkgcache
   clicleaner clean --env pkgcache
   clicleaner clean --only nuget --purge
-  clicleaner ui --web
   clicleaner inventory --unused 21 --verbose
   clicleaner scan --profile audit --json
-  clicleaner scan --env agent --min-age 30
 `);
 }
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'scan';
+  // Komut verilmezse web arayuzu acilir: asil urun budur; terminal
+  // komutlari (scan/clean) bilincli olarak secilir.
+  const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'ui';
   const rest = argv[0] && !argv[0].startsWith('-') ? argv.slice(1) : argv;
 
   if (cmd === '-h' || cmd === '--help' || cmd === 'help') {
@@ -144,7 +150,7 @@ async function main(): Promise<void> {
     const exclude: string[] = [];
     let profile: string | undefined;
     let purge = false;
-    let web = false;
+    let tui = false;
     let port = 0;
     let open = true;
 
@@ -154,14 +160,16 @@ async function main(): Promise<void> {
       else if (a === '--profile') profile = rest[++i];
       else if (a === '--exclude') exclude.push(rest[++i]!);
       else if (a === '--purge') purge = true;
-      else if (a === '--web') web = true;
+      else if (a === '--tui') tui = true;
+      // Geriye uyumluluk: eski `ui --web` hala web arayuzunu acar.
+      else if (a === '--web') tui = false;
       else if (a === '--port') {
         const n = Number(rest[++i]);
         if (Number.isInteger(n) && n >= 0 && n <= 65535) port = n;
       } else if (a === '--no-open') open = false;
     }
 
-    if (web) {
+    if (!tui) {
       const { runWeb } = await import('./web/server.ts');
       await runWeb({ envs, profile, exclude, port, open });
       return;

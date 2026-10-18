@@ -76,7 +76,7 @@ node --version    # must be v22.6.0 or newer
 ### 1) Try without installing
 
 ```bash
-npx clicleaner ui --web
+npx clicleaner
 ```
 
 The browser opens automatically. If it does not, use the address printed in the
@@ -86,7 +86,7 @@ terminal (it contains a token that changes on every start).
 
 ```bash
 npm install -g clicleaner
-clicleaner ui --web
+clicleaner
 ```
 
 ### 3) Run from source
@@ -95,7 +95,7 @@ clicleaner ui --web
 git clone https://github.com/omer-denen/CLICleaner.git
 cd CLICleaner
 npm install
-node bin/clicleaner.mjs ui --web
+node bin/clicleaner.mjs
 ```
 
 ### First run — web UI
@@ -118,7 +118,9 @@ The `CLIs` tab shows installed tools, their idle evidence and removal plans
 ### First run — terminal
 
 ```bash
-clicleaner scan                    # scan and list
+clicleaner                         # open the browser UI (recommended)
+clicleaner ui --tui                # terminal UI (optional)
+clicleaner scan                    # scan and list in the terminal
 clicleaner clean --dry-run         # show the plan only, delete nothing
 clicleaner clean                   # two-step confirmation + Recycle Bin
 clicleaner inventory --verbose     # installed CLI inventory (read-only)

@@ -226,13 +226,21 @@ export async function runWeb(opts: WebOptions = {}): Promise<void> {
   const actualPort = typeof addr === 'object' && addr ? addr.port : port;
   const openHost = host === '::1' ? '127.0.0.1' : host;
   const url = `http://${openHost}:${actualPort}/?token=${token}`;
+  const displayUrl = `http://localhost:${actualPort}`;
 
   console.log('');
-  console.log('  CLICleaner web arayuzu hazir:');
+  console.log('  CLICleaner web arayuzu hazir.');
   console.log('');
-  console.log(`    ${url}`);
+  console.log(`  Tarayicida acin:  ${displayUrl}`);
+  console.log('  Yalnizca bu bilgisayarda calisir (127.0.0.1).');
+  if (opts.open !== false) {
+    console.log('  Her baslatmada yeni bir guvenlik token\'i uretilir;');
+    console.log('  tarayici bu token ile otomatik acilir.');
+  } else {
+    console.log('');
+    console.log(`  Elle acmak icin (token ile): ${url}`);
+  }
   console.log('');
-  console.log('  Tarayici acilmazsa yukaridaki adresi kullan.');
   console.log('  Kapatmak icin Ctrl+C.');
   console.log('');
 

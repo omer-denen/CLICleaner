@@ -76,7 +76,7 @@ node --version    # v22.6.0 veya üzeri olmalı
 ### 1) Kurulum yapmadan dene
 
 ```bash
-npx clicleaner ui --web
+npx clicleaner
 ```
 
 Tarayıcı otomatik açılır. Açılmazsa terminalde yazan adresi kullan
@@ -86,7 +86,7 @@ Tarayıcı otomatik açılır. Açılmazsa terminalde yazan adresi kullan
 
 ```bash
 npm install -g clicleaner
-clicleaner ui --web
+clicleaner
 ```
 
 ### 3) Kaynaktan çalıştırma
@@ -95,7 +95,7 @@ clicleaner ui --web
 git clone https://github.com/omer-denen/CLICleaner.git
 cd CLICleaner
 npm install
-node bin/clicleaner.mjs ui --web
+node bin/clicleaner.mjs
 ```
 
 ### İlk çalıştırma — web arayüzü
@@ -117,7 +117,9 @@ görebilirsin (envanter salt okunurdur).
 ### İlk çalıştırma — terminal
 
 ```bash
-clicleaner scan                    # tara ve listele
+clicleaner                         # tarayıcı arayüzünü aç (önerilen)
+clicleaner ui --tui                # terminal arayüzü (isteğe bağlı)
+clicleaner scan                    # terminalde tara ve listele
 clicleaner clean --dry-run         # yalnızca planı göster, hiçbir şey silme
 clicleaner clean                   # iki aşamalı onay + geri dönüşüm kutusu
 clicleaner inventory --verbose     # kurulu CLI envanteri (salt okunur)

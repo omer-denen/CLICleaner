@@ -5,9 +5,20 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ## [Unreleased]
 
-### Belgelendirme
-- İki dilli README: Türkçe (varsayılan) `README.md` ve İngilizce `README.en.md`;
-  ayrıntılı kurulum, ilk çalıştırma, sorun giderme ve kaldırma talimatları.
+## [0.2.0] - 2026-10-18
+
+### Değişti
+
+- **Varsayılan giriş artık web arayüzü.** `clicleaner` tarayıcıyı açar; terminal
+  TUI yalnızca `clicleaner ui --tui` ile isteğe bağlıdır. `clicleaner ui` ve
+  eski `ui --web` de web arayüzünü açar.
+- Başlangıç çıktısı sadeleştirildi: kısa açıklama + `http://localhost:<port>`.
+  Güvenlik token'ı yalnızca `--no-open` modunda yazdırılır.
+- Yardım metni **Başlamak için / Gelişmiş** olarak gruplandı.
+
+### Düzeltildi
+
+- Arayüzde "kök" yerine "dizin" terminolojisi (TUI ve terminal çıktısı).
 
 ## [0.1.0] - 2026-10-18
 
@@ -38,6 +49,8 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   `doctor`, `explain`, `rules`, `status` komutları.
 - **Arayüz:** TR/EN, disk listesinde kategori sekmeleri, risk/boyut/tarih/ad
   sıralaması, kademeli listeleme; tarama sonunda `Tamam` diyalogu.
+- **Belgelendirme:** iki dilli README — Türkçe (varsayılan) `README.md` ve
+  İngilizce `README.en.md`; kurulum, ilk çalıştırma, kaldırma ve sorun giderme.
 
 ### Bilinen sınırlar
 
