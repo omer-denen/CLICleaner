@@ -1,0 +1,67 @@
+{
+  "name": "clicleaner",
+  "version": "0.1.0",
+  "description": "Evidence-based Windows disk cleaner for developer caches, package stores and CLI leftovers",
+  "type": "module",
+  "license": "MIT",
+  "author": "CLICleaner contributors",
+  "keywords": [
+    "disk",
+    "cleanup",
+    "cache",
+    "windows",
+    "cli",
+    "developer-tools",
+    "nuget",
+    "npm-cache",
+    "onnx"
+  ],
+  "os": [
+    "win32"
+  ],
+  "files": [
+    "bin/",
+    "src/",
+    "dist/web/",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "clicleaner": "./bin/clicleaner.mjs"
+  },
+  "scripts": {
+    "scan": "tsx src/cli.ts scan",
+    "ui": "tsx src/cli.ts ui",
+    "ui:web": "tsx src/cli.ts ui --web",
+    "build:web": "vite build",
+    "inventory": "tsx src/cli.ts inventory",
+    "clean": "tsx src/cli.ts clean",
+    "explain": "tsx src/cli.ts explain",
+    "rules": "tsx src/cli.ts rules",
+    "doctor": "tsx src/cli.ts doctor",
+    "undo": "tsx src/cli.ts undo",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
+    "prepack": "npm run build:web",
+    "start": "tsx src/cli.ts",
+    "status": "tsx src/cli.ts status",
+    "log": "tsx src/cli.ts log",
+    "init-state": "tsx scripts/init-state.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.7.2",
+    "vite": "^8.3.4"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "dependencies": {
+    "ink": "^8.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.23.15"
+  }
+}

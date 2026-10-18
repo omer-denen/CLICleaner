@@ -1,0 +1,229 @@
+/**
+ * CLICleaner cekirdek tipleri.
+ *
+ * Tasarim ilkesi: hicbir sey "uygulama adiyla" tanimlanmaz. Bir aday
+ * (Candidate) yalnizca gozlenen KANITLARDAN siniflanir. Kanit toplayan
+ * katman (Classifier) uygulamanin ne oldugunu bilmez; sadece diskte ne
+ * gordugunu raporlar. Karari Evidence -> Verdict katmani verir.
+ */
+
+// ---------------------------------------------------------------------------
+// Kanit
+// ---------------------------------------------------------------------------
+
+/** Bir aday icin toplanan gozlemler. Her alan tek bir kanit turudur. */
+export interface Evidence {
+  /** Klasor/dosya adi veya log iceriginden cikarilan uygulama kimligi */
+  owner?: OwnerSignal;
+  /** Klasor icindeki dosya turleri (uzantiya gore sayim) */
+  fileKinds?: FileKind[];
+  /** Buyuk dosya turleri ornegi (ornegin model agirligi) */
+  largeFiles?: LargeFile[];
+  /** Ic yapida tespit edilen anlamli alt klasorler */
+  markers?: string[];
+  /** Klasorun kendi sinyali (adi ne olursa olsun icerik turu) */
+  archetype?: Archetype;
+  /** Log/manifest iceriginden cikarilan sinyaller */
+  logSignals?: LogSignal[];
+  /** Son kullanma / yazma zamani */
+  lastTouched?: number;
+  /** Sahiplik: klasor baska bir kullaniciya mi ait */
+  ownerAccount?: string;
+  /** Kume icinde tespit edilen bilesik alt parca sayisi (rapor icin) */
+  markerSubpartCount?: number;
+}
+
+export type OwnerSignal =
+  | { kind: 'packageJson'; name: string; version?: string }
+  | { kind: 'manifest'; app: string; raw?: string }
+  | { kind: 'logFile'; product: string; hint?: string }
+  | { kind: 'binaryProduct'; product: string; company?: string }
+  | { kind: 'directoryName'; name: string };
+
+export type FileKind =
+  | 'onnx-model'
+  | 'cuda-runtime'
+  | 'container-image'
+  | 'python-env'
+  | 'node-modules'
+  | 'nuget-package'
+  | 'npm-cache'
+  | 'venv'
+  | 'archive'
+  | 'installer'
+  | 'crash-dump'
+  | 'log'
+  | 'sqlite'
+  | 'lockfile'
+  | 'vpn-config'
+  | 'wsl-disk'
+  /** Herhangi bir native kutuphane — CUDA olmak ZORUNDA DEGIL */
+  | 'native-lib';
+
+export interface LargeFile {
+  relPath: string;
+  bytes: number;
+  kind: FileKind;
+}
+
+export type Archetype =
+  | 'pkg-manager-cache'
+  | 'runtime-pool'
+  | 'model-store'
+  | 'accelerator-runtime'
+  | 'agent-workspace'
+  | 'electron-app-data'
+  | 'editor-extension-store'
+  | 'versioned-app-store'
+  | 'temp-scratch'
+  | 'crash-artifacts'
+  | 'updater-staging'
+  | 'global-packages'
+  | 'editor-workspace'
+  | 'os-user-data'
+  | 'virtual-disk'
+  | 'unknown';
+
+export interface LogSignal {
+  line: string;
+  means: string;
+}
+
+// ---------------------------------------------------------------------------
+// Aday ve kume
+// ---------------------------------------------------------------------------
+
+/** Tek bir disk yolu. Birlestirme bunun uzerinde calisir. */
+export interface Part {
+  path: string;
+  bytes: number;
+  files: number;
+  lastTouched: number;
+  /** Bu parca icinde silinebilecek tahmini bayt */
+  reclaimableBytes: number;
+  /** Parcanin kayit oldugu yer: 'home' | 'localappdata' | 'roamingappdata' | 'custom' */
+  origin: Origin;
+  note?: string;
+}
+
+export type Origin = 'home' | 'localappdata' | 'roamingappdata' | 'custom';
+
+/**
+ * Kume icindeki ayri degerlendirilebilir parca.
+ * Bir klasorun icinde hem silinebilir hem KORUNMASI gereken seyler
+ * olabilir; bu yuzden karar kume seviyesinde degil parca seviyesinde verilir.
+ */
+export interface SubPart {
+  path: string;
+  bytes: number;
+  label: string;
+  verdictKind: VerdictKind;
+  reason: string;
+}
+
+/**
+ * Dosya bazli silme hedefi.
+ *
+ * Klasorun TAMAMI her zaman silinmez. Gecici klasorlerde sadece
+ * yasli dosyalar, model depolarda sadece bilesik parcalar hedeflenir.
+ * `kind` degerleri:
+ *   'whole'  -> parcanin tamami (or. NuGet paket onbellegi)
+ *   'older'  -> yas filtresiyle (or. Temp'taki 3 gunden eski dosyalar)
+ */
+export interface DeleteTarget {
+  path: string;
+  kind: 'whole' | 'older';
+  minAgeDays?: number;
+  label: string;
+  bytes: number;
+}
+
+/**
+ * Bir "uygulama" kumesi: ayni uygulamanin/env'in bosta kalan parcalari.
+ * MuhasibPro ornegi: ~/.MuhasibPro/cache + ~/.MuhasibPro/ep + Roaming/MuhasibPro
+ */
+export interface Cluster {
+  /** Kume anahtari: normalize edilmis uygulama adi */
+  key: string;
+  /** Goruntulenecek baslik, kanitta destekleniyorsa */
+  title: string;
+  archetype: Archetype;
+  parts: Part[];
+  /** Kume icinde ayri degerlendirilebilir alt parcalar */
+  subparts?: SubPart[];
+  /** Gercekten silinecek yollar (onay sonrasi kullanilir) */
+  deleteTargets?: DeleteTarget[];
+  totalBytes: number;
+  reclaimableBytes: number;
+  lastTouched: number;
+  evidence: Evidence;
+  verdict: Verdict;
+}
+
+export type Risk = 'safe' | 'low' | 'medium' | 'high';
+export type VerdictKind = 'recommend' | 'ask' | 'report-only' | 'keep';
+
+export interface Verdict {
+  risk: Risk;
+  kind: VerdictKind;
+  /** Kullaniciya gosterilecek tek cumle: "bu ne" */
+  title: string;
+  /** "ne ise yarar" */
+  what: string;
+  /** "silersem ne olur" */
+  consequence: string;
+  /** Bu karari hangi kanita dayandirdim */
+  because: string[];
+  /** Silmeden once yapilmasi gerekenler */
+  preconditions: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Tarama
+// ---------------------------------------------------------------------------
+
+export interface ScanOptions {
+  roots: string[];
+  envs: Env[];
+  minAgeDays: number;
+  deep: boolean;
+  followLinks: boolean;
+}
+
+export type Env =
+  | 'dotfolders'
+  | 'localappdata'
+  | 'roamingappdata'
+  | 'pkgcache'
+  | 'agent'
+  | 'runtime'
+  | 'temp'
+  | 'vdisk';
+
+export interface EnvDef {
+  id: Env;
+  label: string;
+  description: string;
+}
+
+export interface ScanResult {
+  startedAt: number;
+  finishedAt: number;
+  clusters: Cluster[];
+  stats: ScanStats;
+  skipped: SkippedEntry[];
+}
+
+export interface ScanStats {
+  rootsScanned: number;
+  dirsVisited: number;
+  filesSeen: number;
+  bytesSeen: number;
+  denied: number;
+  longPathErrors: number;
+}
+
+export interface SkippedEntry {
+  path: string;
+  reason: 'denied' | 'long-path' | 'link-loop' | 'gone';
+}

@@ -1,0 +1,17 @@
+# Bagimliliklar
+node_modules/
+
+# Derleme ciktilari (npm paketine "files" ile girer)
+dist/
+
+# Dahili calisma kayitlari: makineye ozel bulgular, sirlar ve oturum notlari
+state.json
+SESSION_LOG.md
+AGENTS.md
+
+# Test/teshis betikleri ve gecici dosyalar
+scratch/
+.clicleaner/
+*.log
+.web-run*.log
+*.tsbuildinfo

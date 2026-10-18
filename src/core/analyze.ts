@@ -1,0 +1,1286 @@
+import { stat, readdir, readFile } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { longPath } from '../util/longpath.ts';
+import { debug, warn } from '../util/log.ts';
+import { probeDir, ownerFromName } from './classifier.ts';
+import { walk } from './walker.ts';
+import type {
+  Archetype,
+  Cluster,
+  DeleteTarget,
+  Evidence,
+  FileKind,
+  Part,
+  Risk,
+  Verdict,
+} from './types.ts';
+import { daysSince, formatAge } from '../util/format.ts';
+
+/**
+ * Kanit -> Mimari tip -> Karar.
+ *
+ * Burada kararlar "uygulama adi" ile degil, "tür" ile verilir:
+ * bir klasor CUDA DLL'leri + model dosyalari iceriyorsa, adi ne olursa
+ * olsun bir model calistirma deposudur.
+ */
+
+export interface ClassifyOptions {
+  now?: number;
+  /** Bu yastan eskiyse sadece raporla, silme onerisi verme */
+  minAgeDays?: number;
+  /** Iptal sinyali: yurume durur, yarim sonuc kumeye cevrilmez. */
+  signal?: AbortSignal;
+}
+
+/** Ortam tespiti: makinede GPU var mi? */
+export async function detectGpu(): Promise<{ hasNvidia: boolean; note: string }> {
+  try {
+    const s = await stat(longPath('C:\\Windows\\System32\\nvcuda.dll'));
+    void s;
+    return { hasNvidia: true, note: 'NVIDIA CUDA surucusu bulundu' };
+  } catch {
+    return { hasNvidia: false, note: 'NVIDIA CUDA surucusu yok (GPU runtime kullanilamaz)' };
+  }
+}
+
+/** Tek bir kok klasoru inceler ve (varsa) kumeye cevirir. */
+export async function classifyPath(
+  root: string,
+  origin: Part['origin'],
+  opts: ClassifyOptions = {},
+): Promise<Cluster | null> {
+  const now = opts.now ?? Date.now();
+  const probe = await probeDir(root);
+  const w = await walk({
+    root,
+    largeThreshold: 32 * 1024 * 1024,
+    maxLarge: 12,
+    signal: opts.signal,
+  });
+
+  // Iptal edildiyse yarim olcumle kume uretme.
+  if (opts.signal?.aborted) return null;
+
+  if (w.bytes === 0 && w.files === 0) {
+    debug('bos klasor atlandi', { root, origin });
+    return null;
+  }
+
+  const ev: Evidence = {
+    owner: probe.owner,
+    fileKinds: probe.fileKinds,
+    markers: probe.markers,
+    logSignals: dedupeLogSignals(probe.logSignals),
+    largeFiles: w.largeFiles.map((f) => ({ ...f, kind: 'onnx-model' })),
+    lastTouched: w.lastTouched,
+  };
+
+  const archetype = detectArchetype(ev, root, w.extensionCounts, probe);
+  let reclaimable = estimateReclaimable(archetype, w.bytes, w.extensionCounts);
+  const key = clusterKey(ev, root);
+
+  // Bilesik mimari: model deposunun icinde kullanilamayan GPU runtime'i
+  // varsa, tum kume "temizlenebilir" degil, parca parca olur.
+  // Onemli: alt parca yollari TAHMIN edilmez, gercekten olculur.
+  //
+  // Editor uzanti depolarinda eski surumler, surumlu uygulama
+  // klasorlerinde ise kullanilmayan app-<surum> klasorleri ayni
+  // sekilde GERCEK YOLDAN olculur.
+  const extra: SubPart[] = [];
+  if (probe.editorExtensions) extra.push(...(await detectEditorOrphans(root)));
+  if (probe.appVersions) extra.push(...(await detectAppVersionOrphans(root)));
+  const sub = [...extra, ...(await detectSubParts(root, ev, now))];
+  if (sub.length > 0) {
+    reclaimable += sub.reduce((a, b) => a + b.bytes, 0);
+  }
+
+  const verdict = decide({
+    archetype,
+    ev: { ...ev, markerSubpartCount: sub.length },
+    root,
+    reclaimable,
+    totalBytes: w.bytes,
+    now,
+    minAgeDays: opts.minAgeDays ?? 0,
+  });
+
+  // Her kararin gerekcesi kaydedilir: "bu klasor neden guvenli sayildi"
+  debug('siniflandirma', {
+    root,
+    archetype,
+    risk: verdict.risk,
+    kind: verdict.kind,
+    totalMB: Math.round(w.bytes / 1048576),
+    reclaimMB: Math.round(reclaimable / 1048576),
+    files: w.files,
+    evidence: {
+      fileKinds: ev.fileKinds,
+      markers: ev.markers,
+      logMeans: (ev.logSignals ?? []).map((s) => s.means),
+      subparts: sub.length,
+    },
+    because: verdict.because,
+  });
+
+  // Kanit yetersizse acikca uyari ver (bu, en sik hatadir)
+  if (archetype === 'unknown') {
+    warn('kanit yetersiz, kullanici dogrulamasi gerekiyor', {
+      root,
+      sizeMB: Math.round(w.bytes / 1048576),
+      markers: ev.markers,
+      fileKinds: ev.fileKinds,
+    });
+  }
+
+  if (sub.length > 0) {
+    verdict.because.unshift(
+      `Icinde ${sub.length} ayri degerlendirilebilir parca var: ${sub.map((s) => s.label).join(', ')}`,
+    );
+  }
+
+  const part: Part = {
+    path: root,
+    bytes: w.bytes,
+    files: w.files,
+    lastTouched: w.lastTouched,
+    reclaimableBytes: reclaimable,
+    origin,
+  };
+
+  // --- Gercek silme hedefleri ---
+  // Kume seviyesindeki "silinebilir" bayt tek basina yeterli degildir;
+  // hangi YOLUN ne kadarinin silineceği burada belirlenir.
+  const targets = buildDeleteTargets(root, archetype, sub, w.bytes, now, ev);
+
+  // TUTARLILIK KURALI: Silme hedefi olmayan bir kume "onerilen"
+  // OLABILMEZ. Aksi halde kullanici "sil" derse hicbir sey olmaz ve
+  // arac bozuk gorunur. Hedef yoksa karar en kotu "dogrulama"ya iner.
+  if (targets.length === 0 && verdict.kind === 'recommend') {
+    verdict.kind = 'ask';
+    verdict.risk = verdict.risk === 'safe' ? 'low' : verdict.risk;
+    verdict.consequence += ' (silinecek yol belirlenemedi, bu yuzden otomatik secilmedi)';
+    verdict.preconditions.push('Silme hedefi uretilemedi — icerik elle incelenmeli');
+    warn('hedefsiz kume oneriliyordu, guvenli tarafa cekildi', {
+      root,
+      archetype,
+      hedef: 0,
+    });
+  }
+
+  // Electron onbellegi hedeflerinin gercek boyutunu olc
+  if (archetype === 'electron-app-data' && targets.length > 0) {
+    const measured = await Promise.all(
+      targets.map(async (t) => {
+        const cw = await walk({ root: t.path, largeThreshold: Infinity, maxLarge: 0 });
+        return { ...t, bytes: cw.bytes };
+      }),
+    );
+    return {
+      key,
+      title: verdict.title,
+      archetype,
+      parts: [part],
+      subparts: sub,
+      deleteTargets: measured.filter((t) => t.bytes > 0),
+      totalBytes: w.bytes,
+      reclaimableBytes: measured.reduce((a, b) => a + b.bytes, 0),
+      lastTouched: w.lastTouched,
+      evidence: ev,
+      verdict,
+    };
+  }
+
+  return {
+    key,
+    title: verdict.title,
+    archetype,
+    parts: [part],
+    subparts: sub,
+    deleteTargets: targets,
+    totalBytes: w.bytes,
+    reclaimableBytes: reclaimable,
+    lastTouched: w.lastTouched,
+    evidence: ev,
+    verdict,
+  };
+}
+
+/**
+ * Silme hedeflerini uretir.
+ *
+ * Kritik kural: "guvenli" sinif her zaman tum klasoru silmek demek
+ * DEGILDIR. Gecici klasorlerde sadece yasli dosyalar hedeflenir;
+ * model depolarda sadece bilesik (kullanilamayan) parcalar.
+ */
+function buildDeleteTargets(
+  root: string,
+  archetype: Archetype,
+  sub: SubPart[],
+  totalBytes: number,
+  now: number,
+  ev?: Evidence,
+): DeleteTarget[] {
+  switch (archetype) {
+    case 'virtual-disk':
+    case 'os-user-data':
+      return []; // HICBIR ZAMAN otomatik hedeflenmez
+
+    case 'temp-scratch':
+      // Sadece 3 gunden eski gecici dosyalar
+      return [
+        {
+          path: root,
+          kind: 'older',
+          minAgeDays: 3,
+          label: `${baseName(root)} — 3 gunden eski gecici dosyalar`,
+          bytes: totalBytes,
+        },
+      ];
+
+    case 'model-store': {
+      // Yalnizca bilesik parcalar (kullanilamayan GPU runtime/varyant)
+      return sub.map((s) => ({
+        path: s.path,
+        kind: 'whole' as const,
+        label: s.label,
+        bytes: s.bytes,
+      }));
+    }
+
+    case 'editor-extension-store':
+    case 'versioned-app-store':
+      // Yalnizca artik kalmis alt parcalar (eski uzanti surumu veya
+      // eski app-<surum> klasoru) hedeflenir; kok klasor SILINMEZ.
+      return sub.map((s) => ({
+        path: s.path,
+        kind: 'whole' as const,
+        label: s.label,
+        bytes: s.bytes,
+      }));
+
+    case 'accelerator-runtime':
+      return [
+        { path: root, kind: 'whole', label: `${baseName(root)} — kullanilamayan GPU runtime`, bytes: totalBytes },
+      ];
+
+    case 'electron-app-data': {
+      // Yalnizca onbellek alt klasorleri. "Local Storage",
+      // "Preferences", "Session Storage" SILINMEZ.
+      const CACHE_DIRS = [
+        'Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'DawnGraphiteCache',
+        'DawnWebGPUCache', 'ShaderCache', 'GrShaderCache', 'blob_storage',
+        'Service Worker', 'CacheStorage',
+      ];
+      const found = CACHE_DIRS.filter((d) =>
+        (ev?.markers ?? []).some((m) => m.toLowerCase() === d.toLowerCase()),
+      );
+      if (found.length === 0) return [];
+      return found.map((d) => ({
+        path: `${root}\\${d}`,
+        kind: 'whole' as const,
+        label: `${baseName(root)}\\${d}`,
+        bytes: 0, // yürüyüş sırasında doldurulur
+      }));
+    }
+
+    case 'pkg-manager-cache':
+    case 'crash-artifacts':
+    case 'updater-staging':
+      return [
+        { path: root, kind: 'whole', label: `${baseName(root)} — onbellek`, bytes: totalBytes },
+      ];
+
+    case 'runtime-pool':
+      // Ortam havuzu: yasla kisitla (cok eskiyse oner)
+      return [
+        {
+          path: root,
+          kind: 'older',
+          minAgeDays: 90,
+          label: `${baseName(root)} — 90 gunden eski ortamlar`,
+          bytes: totalBytes,
+        },
+      ];
+
+    default:
+      return [];
+  }
+}
+
+function baseName(p: string): string {
+  return p.split('\\').filter(Boolean).pop() ?? p;
+}
+
+/**
+ * Bilesik degerlendirme: bir klasorun icinde hem "kullanilir" hem
+ * "gereksiz" seyler olabilir. Ornek (bu makinede gercek):
+ *
+ *   .MuhasibPro\cache\models           4.9 GB → silinebilir (yeniden indirilir)
+ *   .MuhasibPro\ep\cuda-ep            2.3 GB → SILINEBILIR, makinede GPU yok
+ *   .MuhasibPro\cache\models\...\gpu  1.2 GB → SILINEBILIR, cihaz CPU
+ *
+ * Kullaniciya "7.1 GB sil" demek dogru olurdu ama "tumunu sil" yanlis
+ * olurdu: uygulama CPU modellerini kullaniyor. Bu yuzden her parca
+ * GERCEK YOLUNDAN olculur ve ayri karar verilir.
+ */
+export interface SubPart {
+  path: string;
+  bytes: number;
+  label: string;
+  verdictKind: Verdict['kind'];
+  reason: string;
+}
+
+async function detectSubParts(root: string, ev: Evidence, now: number): Promise<SubPart[]> {
+  const out: SubPart[] = [];
+  const gpuAbsent = GPU_STATE ? !GPU_STATE.hasNvidia : false;
+  const cpuOnly = /Device: CPU|CPUExecutionProvider/i.test(
+    (ev.logSignals ?? []).map((l) => l.line).join(' '),
+  );
+  const gpuUnusable = gpuAbsent || cpuOnly;
+
+  if (!gpuUnusable) return out;
+
+  // --- 1. CUDA runtime dizinlerini GERCEK yoldan bul ---
+  const cudaDirs = await findDirsContaining(
+    root,
+    4,
+    (name) =>
+      /^cu(dnn|blas|blaslt|fft|rand|solver|art|graph)[a-z0-9_]*64[_-]\d+\.dll$/i.test(name) ||
+      /^onnxruntime[_-].*cuda.*\.dll$/i.test(name),
+  );
+  for (const d of cudaDirs) {
+    const w = await walk({ root: d, largeThreshold: Infinity, maxLarge: 0 });
+    out.push({
+      path: d,
+      bytes: w.bytes,
+      label: 'GPU hizlandirici runtime (bu makinede kullanilamaz)',
+      verdictKind: 'recommend',
+      reason: gpuAbsent
+        ? 'NVIDIA CUDA surucusu yok; bu DLL yigini calistirilamaz'
+        : 'Uygulama gunlugu CPU saglayicisini kullaniyor',
+    });
+  }
+
+  // --- 2. GPU icin derlenmis model varyantlari ---
+  //
+  // Guvenilir yontem: yol adinda GPU/CUDA ipucu tasiyan her dizini
+  // dogrudan olcer. Model dosyasi adi degisebilir (model.onnx.data),
+  // dizin adi degismez ("...-gpu-2", "...-trtrtx-gpu-2").
+  const gpuDirs = await findDirsNamed(root, 5, /(gpu|cuda|trt|rtx)/i);
+  const gpuSeen = new Set<string>();
+  for (const variantDir of gpuDirs) {
+    const key = variantDir.toLowerCase();
+    if (gpuSeen.has(key)) continue;
+    gpuSeen.add(key);
+
+    // CUDA runtime dizini zaten eklendiyse tekrar ekleme
+    if (out.some((o) => variantDir.toLowerCase().startsWith(o.path.toLowerCase()))) continue;
+
+    const variant = variantDir.split('\\').pop() ?? '';
+
+    // Onemli ayrim: "-gpu" / "-trtrtx-gpu" gibi MODEL VARYANTLARI
+    // yalnizca GPU'da calisir. Ama "webgpu-ep" bir CALISTIRMA
+    // SAGLAYICISIDIR (execution provider) ve CPU'da da kullanilabilir;
+    // onu silmek uygulamayi bosuna yorar. Ayrim isimden degil,
+    // dizinin iceriginden yapilir.
+    const isModelVariant = await looksLikeModelDir(variantDir);
+    if (!isModelVariant) continue;
+
+    const w = await walk({ root: variantDir, largeThreshold: Infinity, maxLarge: 0 });
+    if (w.bytes < 8 * 1024 * 1024) continue; // isaretsiz kucuk klasorleri atla
+    out.push({
+      path: variantDir,
+      bytes: w.bytes,
+      label: `GPU icin derlenmis model: ${variant}`,
+      verdictKind: 'recommend',
+      reason: `Model agirliklari yalnizca GPU icin derlenmis ("${variant}"), cihaz ise CPU`,
+    });
+  }
+
+  // Ayni yolu iki kez eklemeyi engelle
+  const seen = new Set<string>();
+  return out.filter((s) => {
+    const k = s.path.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return s.bytes > 0;
+  });
+}
+
+/**
+ * Editor uzanti deposunda ARTIK kalmis surumleri bulur.
+ *
+ * Aktif surumun tek guvenilir kaynagi extensions.json'dur.
+ * .obsolete dosyasi ise editorun acikca "artik" dedigi klasorleri
+ * listeler. Ikisinde de yoksa ve ad uzanti surumu kalibindaysa artik
+ * sayilir. Klasorun TAMAMI hedeflenmez; yalnizca bu alt klasorler.
+ */
+async function detectEditorOrphans(root: string): Promise<SubPart[]> {
+  const extDir = `${root}\\extensions`;
+  let entries: Dirent[];
+  try {
+    entries = await readdir(longPath(extDir), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const active = await readExtensionManifest(`${extDir}\\extensions.json`);
+  const obsolete = await readObsoleteFile(`${extDir}\\.obsolete`);
+  const out: SubPart[] = [];
+
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const key = e.name.toLowerCase();
+    if (active.has(key)) continue;
+    // Yalnizca uzanti klasoru gibi gorunen adlar (publisher.ad-surum)
+    // veya editorun acikca artik dedigi kayitlar.
+    if (!obsolete.has(key) && !/-\d+\.\d+/.test(e.name)) continue;
+
+    const dir = `${extDir}\\${e.name}`;
+    const w = await walk({ root: dir, largeThreshold: Infinity, maxLarge: 0 });
+    if (w.bytes === 0) continue;
+    out.push({
+      path: dir,
+      bytes: w.bytes,
+      label: `${e.name} — kullanilmayan uzanti surumu`,
+      verdictKind: 'recommend',
+      reason: obsolete.has(key)
+        ? 'Editor bu klasoru .obsolete listesinde artik olarak isaretlemis'
+        : 'extensions.json icinde aktif kaydi yok; aktif surum korunur',
+    });
+  }
+
+  return out.sort((a, b) => b.bytes - a.bytes).slice(0, 40);
+}
+
+async function readExtensionManifest(manifest: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  try {
+    const j = JSON.parse(await readFile(longPath(manifest), 'utf8')) as unknown;
+    if (!Array.isArray(j)) return out;
+    for (const item of j) {
+      if (!item || typeof item !== 'object') continue;
+      const o = item as Record<string, unknown>;
+      if (typeof o.relativeLocation === 'string') out.add(o.relativeLocation.toLowerCase());
+      const loc = o.location as Record<string, unknown> | undefined;
+      if (loc && typeof loc.path === 'string') {
+        const base = loc.path.split(/[\\/]/).filter(Boolean).pop();
+        if (base) out.add(base.toLowerCase());
+      }
+    }
+  } catch {
+    /* manifest okunamadi: aktif surum bilinmiyor, yalnizca .obsolete kullanilir */
+  }
+  return out;
+}
+
+async function readObsoleteFile(file: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  try {
+    const j = JSON.parse(await readFile(longPath(file), 'utf8')) as unknown;
+    if (j && typeof j === 'object' && !Array.isArray(j)) {
+      for (const k of Object.keys(j as Record<string, unknown>)) out.add(k.toLowerCase());
+    }
+  } catch {
+    /* .obsolete yok: normal durum */
+  }
+  return out;
+}
+
+/**
+ * app-<surum> kardesleri arasinda en guncel VE gecerli olani secer;
+ * digerlerini silinebilir parca olarak dondurur.
+ *
+ * Kanit: her klasor bir Electron/Chromium uygulama yuklemesidir
+ * (resources/app/package.json veya Chromium runtime dosyalari).
+ * Tek surum varsa parca uretilmez; uygulama guncel surumdedir.
+ */
+async function detectAppVersionOrphans(root: string): Promise<SubPart[]> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(longPath(root), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const candidates: Array<{ name: string; path: string; version: number[] }> = [];
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const verText = /^app-(\d+(?:\.\d+)*)/i.exec(e.name)?.[1];
+    if (!verText) continue;
+    const dir = `${root}\\${e.name}`;
+    if (!(await looksLikeElectronRuntime(dir))) continue;
+    candidates.push({ name: e.name, path: dir, version: verText.split('.').map(Number) });
+  }
+
+  if (candidates.length < 2) return [];
+
+  candidates.sort((a, b) => compareVersions(b.version, a.version));
+  const keep = candidates[0]!;
+  const out: SubPart[] = [];
+  for (const c of candidates.slice(1)) {
+    const w = await walk({ root: c.path, largeThreshold: Infinity, maxLarge: 0 });
+    if (w.bytes === 0) continue;
+    out.push({
+      path: c.path,
+      bytes: w.bytes,
+      label: `${c.name} — eski uygulama surumu`,
+      verdictKind: 'recommend',
+      reason: `Guncel surum dururken (${keep.name}) bu eski surum kullanilmaz`,
+    });
+  }
+  return out;
+}
+
+async function looksLikeElectronRuntime(dir: string): Promise<boolean> {
+  const markers = [
+    'resources\\app\\package.json',
+    'icudtl.dat',
+    'chrome_100_percent.pak',
+    'ffmpeg.dll',
+  ];
+  for (const f of markers) {
+    try {
+      const st = await stat(longPath(`${dir}\\${f}`));
+      if (st.isFile()) return true;
+    } catch {
+      /* yok */
+    }
+  }
+  return false;
+}
+
+function compareVersions(a: number[], b: number[]): number {
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * Bu dizin bir MODEL varyanti mi, yoksa bir CALISTIRMA SAGLAYICISI mi
+ * (execution provider) mi?
+ *
+ * Ayrim isimden yapilamaz: "webgpu-ep" icinde "gpu" gecer ama WebGPU
+ * saglayicisi CPU'da da calisabilir. Kesin ayrim: model agirligi dosyalari
+ * (model.onnx, *.onnx.data, tokenizer.json) iceriyor mu?
+ */
+async function looksLikeModelDir(dir: string): Promise<boolean> {
+  try {
+    const ents = await readdir(longPath(dir), { withFileTypes: true, recursive: false });
+    for (const e of ents) {
+      if (e.isFile() && /^model\.onnx(\.data)?$|^tokenizer\.json$|^genai_config\.json$/i.test(e.name)) {
+        return true;
+      }
+    }
+    // Bir alt duzey daha (v1/ v2/ v4 klasorleri yaygin)
+    for (const e of ents) {
+      if (!e.isDirectory()) continue;
+      const sub = await readdir(longPath(`${dir}\\${e.name}`), { withFileTypes: true });
+      for (const f of sub) {
+        if (f.isFile() && /^model\.onnx(\.data)?$|^tokenizer\.json$|^genai_config\.json$/i.test(f.name)) {
+          return true;
+        }
+      }
+    }
+  } catch {
+    /* okunamadi */
+  }
+  return false;
+}
+
+/**
+ * Agac icinde adi bir duzenli ifadeyle eslesen dizinleri dondurur.
+ * Model varyantlari icin: "qwen2.5-0.5b-instruct-trtrtx-gpu-2" gibi
+ * klasor adlari dosya adindan daha guvenilir bir isaret.
+ */
+async function findDirsNamed(
+  root: string,
+  maxDepth: number,
+  nameRe: RegExp,
+): Promise<string[]> {
+  const found: string[] = [];
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+  const MAX_DIRS = 4000;
+  let visited = 0;
+
+  while (queue.length > 0 && visited < MAX_DIRS) {
+    const { dir, depth } = queue.shift()!;
+    visited++;
+    if (depth >= maxDepth) continue;
+    let ents;
+    try {
+      ents = await readdir(longPath(dir), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of ents) {
+      if (!e.isDirectory()) continue;
+      if (e.name === 'node_modules' || e.name === '.git') continue;
+      const child = `${dir}\\${e.name}`;
+      // Kokten (depth 0) itibaren kontrol etme: ".MuhasibPro" gibi
+      // kok adlar da eslesebilir, ilgilenmedigimiz yerler bunlar.
+      if (depth >= 1 && nameRe.test(e.name)) found.push(child);
+      queue.push({ dir: child, depth: depth + 1 });
+    }
+  }
+  return found.sort();
+}
+
+/**
+ * Klasor agacinda, icinde "tetikleyici dosya" bulunan alt dizinleri
+ * gercek yollariyla dondurur. Tahmin yok, olcum var.
+ */
+async function findDirsContaining(
+  root: string,
+  maxDepth: number,
+  match: (fileName: string) => boolean,
+): Promise<string[]> {
+  const found: string[] = [];
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+  const MAX_DIRS = 6000;
+
+  let visited = 0;
+  while (queue.length > 0 && visited < MAX_DIRS) {
+    const { dir, depth } = queue.shift()!;
+    visited++;
+    if (depth >= maxDepth) continue;
+
+    let ents;
+    try {
+      ents = await readdir(longPath(dir), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    let hit = false;
+    for (const e of ents) {
+      if (e.isFile() && match(e.name)) hit = true;
+      else if (e.isDirectory() && depth < maxDepth - 1) {
+        if (e.name === 'node_modules' || e.name === '.git') continue;
+        queue.push({ dir: `${dir}\\${e.name}`, depth: depth + 1 });
+      }
+    }
+    if (hit) found.push(dir);
+  }
+  return found;
+}
+
+/**
+ * Kume anahtari: ayni uygulamanin parcalarini birlestirmek icin.
+ *
+ * ONEMLI: Ayni isim Local ve Roaming'de varsa bunlar AYRI kumelerdir.
+ * Ornek: Local\uv bir Python paket ONBELLEGI, Roaming\uv ise kurulu
+ * Python surumlerinin KENDISI. Ikisini birlestirip "riskli" olani
+ * guvenli olana tasimak, kullaniciya yanlis bilgi verir.
+ * Birlestirme yalnizca AYNI kokun altinda yapilir.
+ */
+export function clusterKey(ev: Evidence, root: string): string {
+  const scope = rootScope(root);
+  if (ev.owner?.kind === 'packageJson') return `${scope}:pkg:${ev.owner.name.toLowerCase()}`;
+  if (ev.owner?.kind === 'directoryName') {
+    const n = ev.owner.name;
+    // nokta ile baslayan gizli klasorler icin nokta haric
+    return `${scope}:dir:${n.toLowerCase()}`;
+  }
+  if (ev.owner?.kind === 'logFile') return `${scope}:log:${ev.owner.product.toLowerCase()}`;
+  const base = root.split('\\').filter(Boolean).pop() ?? 'root';
+  return `${scope}:dir:${base.toLowerCase()}`;
+}
+
+/** Koke gore kapsam: home / local / roaming. */
+function rootScope(root: string): string {
+  const e = process.env;
+  if (e.LOCALAPPDATA && root.toLowerCase().startsWith(e.LOCALAPPDATA.toLowerCase())) return 'local';
+  if (e.APPDATA && root.toLowerCase().startsWith(e.APPDATA.toLowerCase())) return 'roaming';
+  if (e.USERPROFILE && root.toLowerCase().startsWith(e.USERPROFILE.toLowerCase())) return 'home';
+  return 'other';
+}
+
+/**
+ * Mimari tip tespiti. Sıralama onemli: daha guclu isaret once gelir.
+ */
+export function detectArchetype(
+  ev: Evidence,
+  root: string,
+  extCounts: Map<string, number>,
+  probe?: {
+    electronCache?: boolean;
+    sdkInstall?: boolean;
+    editorExtensions?: boolean;
+    appVersions?: boolean;
+    skillStore?: boolean;
+  },
+): Archetype {
+  const kinds = new Set(ev.fileKinds);
+  const markers = new Set((ev.markers ?? []).map((m) => m.toLowerCase()));
+  const logs = (ev.logSignals ?? []).map((s) => s.means).join(' | ');
+
+  // 0. Gecici klasorler: buradaki HICBIR sey anlamli degildir.
+  //    Tem klasorunde tesadufen bulunan bir cuDNN .dll dosyasi, klasoru
+  //    "GPU runtime" yapmaz. Oyun/sifre verisi de olabilir.
+  if (isTempPath(root)) return 'temp-scratch';
+
+  // 1. Gercek sanal disk (WSL, docker, vm) -> asla otomatik silme
+  if (kinds.has('wsl-disk')) return 'virtual-disk';
+
+  // 1b. SDK / runtime KURULUMU. Bunlar silinmez: proje derlemeleri
+  //     bozulur. Ornek: ~/.dotnet 1.37 GB -> SDK, onbellek DEGIL.
+  if (probe?.sdkInstall) return 'os-user-data';
+
+  // 1c. Editor uzanti deposu: extensions/ + extensions.json.
+  //     Bu bir depodur; eski surumler ayri parca olarak secilir,
+  //     klasorun tamami ASLA hedeflenmez. AI eklentileri model
+  //     dosyasi tasisa bile birincil tip uzanti deposudur.
+  if (probe?.editorExtensions) return 'editor-extension-store';
+
+  // 1d. Surumlu uygulama deposu: app-<surum> kardesleri + updater.
+  //     Guncelleyici eski surumu birakabilir; yalnizca eski surum
+  //     klasorleri hedeflenir, guncel surum korunur.
+  if (probe?.appVersions) return 'versioned-app-store';
+
+  // 2. Model deposu, CUDA'dan ONCE gelir.
+  //    Onemli: .MuhasibPro gibi klasorlerde hem CUDA runtime hem model
+  //    vardir. Birincil tip "model deposu" olmali; kullanilamayan CUDA
+  //    parcasi alt parca olarak ayrica degerlendirilir. Aksi halde
+  //    uygulamanin kullandigi CPU modelleri de silinebilir gorunur.
+  if (kinds.has('onnx-model') || markers.has('models') || /model katalogu|model calistirma/i.test(logs)) {
+    return 'model-store';
+  }
+
+  // 3. CUDA/cuDNN runtime yigini (model icermeyen)
+  if (kinds.has('cuda-runtime')) return 'accelerator-runtime';
+
+  // 4. Ortam HAVUZU, paket ONBELLEGI'nden once gelir.
+  //    Ikisi de "paket" icerir ama riski farklidir: onbellek yeniden
+  //    indirilir, sanal ortam yeniden DERLENIR ve projeyi bozabilir.
+  if (
+    markers.has('envs') || markers.has('runtimed') ||
+    kinds.has('python-env') || kinds.has('venv') || markers.has('site-packages') ||
+    /Python ortam yoneticisi|notebook calistirma|arka plan servisi/i.test(logs)
+  ) {
+    return 'runtime-pool';
+  }
+
+  // 5. Paket yoneticisi ONBELLEGI (yeniden indirilebilir, guvenli)
+  //
+  // CACHEDIR.TAG en guvenilir isaret: paket yoneticileri (npm, conda,
+  // rattler, uv, pip) bu klasoru standart olarak "cache" olarak isaretler.
+  if (
+    markers.has('cachedir-tag') || markers.has('package-store') ||
+    kinds.has('npm-cache') || markers.has('_cacache') || /npm paket onbellegi/i.test(logs) ||
+    kinds.has('nuget-package') || /NuGet paket onbellegi/i.test(logs) ||
+    markers.has('conda') || markers.has('pixi') ||
+    isPackageStoreDir(root, markers, extCounts)
+  ) {
+    return 'pkg-manager-cache';
+  }
+
+  // 6. Electron/Chromium masaustu uygulama verisi.
+  //    Icerisinde hem yeniden uretilir onbellek hem kalici durum vardir
+  //    (Local Storage, Preferences). Klasorun TAMAMI silinmez; sadece
+  //    onbellek alt klasorleri hedeflenir.
+  if (probe?.electronCache) return 'electron-app-data';
+
+  // 7. Ajan calisma alani
+  //
+  // Kesin kanit: SKILL.md iceren skills/ deposu veya beceri kilidi.
+  // sessions/memories/agents klasorleri de ajan verisidir; bunlar
+  // "artik" degil, kullanicinin ajanla urettigi degerdir.
+  if (
+    /notebook|gunlendirme gunlugu|arka plan servisi/i.test(logs) ||
+    markers.has('skill-store') || markers.has('skill-lock') ||
+    markers.has('sessions') || markers.has('skills') ||
+    markers.has('memories') || markers.has('agents')
+  ) {
+    return 'agent-workspace';
+  }
+
+  // 7. Guncelleyici artigi
+  //    DIKKAT: her installer bir ARTIK degildir. Bir kurulum dizinindeki
+  //    uygulama exe'leri de installer sayilir. Gercek artik, yolun
+  //    kendisinin "updater" olmasidir.
+  if (/-updater$|\\updater$/i.test(root)) return 'updater-staging';
+  // Program Files / Programs altindaki exe'ler KURULUMDUR, artik degil
+  if (/\\programs?\\|\\app-[^\\]+\\/i.test(root)) return 'os-user-data';
+
+  // 8. Global paket dizini (node_modules altinda paketler)
+  if (markers.has('.bin') || markers.has('node_modules')) return 'global-packages';
+
+  // 9. Gecici / cokme
+  if (kinds.has('crash-dump')) return 'crash-artifacts';
+
+  // 10. Kullanici verisi sinyalleri (dokunma)
+  if (kinds.has('vpn-config')) return 'os-user-data';
+
+  void extCounts;
+  return 'unknown';
+}
+
+/** Gecici klasor yolu mu? (env degiskenleri uzerinden de kontrol edilir) */
+function isTempPath(root: string): boolean {
+  const e = process.env;
+  const temp = (e.TEMP ?? '').toLowerCase();
+  return temp !== '' && root.toLowerCase().startsWith(temp);
+}
+
+/**
+ * SDK / calisma zamani kurulumu mu?
+ *
+ * Bunlar "paket onbellegi" DEGILDIR; kaldirmak projeleri bozar.
+ * Tespit yolu daima tur bazlidir, adi bazli degil:
+ *   - .dotnet/sdk, .dotnet/shared      -> .NET SDK
+ *   - nvm/fnm/volta -> Node surum yoneticisi
+ *   - Python dizini + exe             -> yorumlayici
+ */
+function hasSdkMarker(markers: Set<string>, kinds: Set<FileKind>): boolean {
+  if (markers.has('sdk') || markers.has('shared') || markers.has('packs')) {
+    // "packs" ayni zamanda NuGet paket deposu olabilir; ancak
+    // "sdk"/"shared" birlikte gelirse bu bir SDK kurulumudur.
+    if (markers.has('sdk')) return true;
+  }
+  // Yorumlayici/servis alt klasoru olan bir yigin
+  if (markers.has('python-env') || kinds.has('venv')) return false;
+  return false;
+}
+
+/**
+ * Paket deposu kalibi: cogu dosya tek bir paket turunden (nupkg, .tar.gz,
+ * blob/indeks) ve karisik icerik yok. dizin adindan da anlasilir.
+ */
+function isPackageStoreDir(
+  root: string,
+  markers: Set<string>,
+  extCounts: Map<string, number>,
+): boolean {
+  const base = root.split('\\').filter(Boolean).pop()?.toLowerCase() ?? '';
+  if (/_cacache|^packs$|^archives$|^cache$|^pkgs$|^cache-b|store$/.test(base)) return true;
+  if (markers.has('_cacache') || markers.has('cachedir-tag') || markers.has('store')) return true;
+
+  // Uzanti dagilimi: tek tur baskin ise depo olabilir
+  const total = [...extCounts.values()].reduce((a, b) => a + b, 0);
+  if (total < 200) return false;
+  const storeExts = ['nupkg', 'tgz', 'whl', 'gz', 'zip', 'conda', 'json'];
+  const storeCount = storeExts.reduce((a, e) => a + (extCounts.get(e) ?? 0), 0);
+  return storeCount / total > 0.85;
+}
+
+/**
+ * Ne kadarinin gercekten silinebilecegini kestirir.
+ * Dizenin tamamini silmek cogu zaman dogru degildir: ornek .MuhasibPro'da
+ * 7.1 GB'nin sadece bir kismi gereksiz.
+ */
+export function estimateReclaimable(
+  archetype: Archetype,
+  totalBytes: number,
+  extCounts: Map<string, number>,
+): number {
+  switch (archetype) {
+    case 'pkg-manager-cache':
+    case 'crash-artifacts':
+    case 'temp-scratch':
+      return totalBytes; // tamami yeniden uretilebilir
+    case 'updater-staging':
+      return totalBytes;
+    case 'accelerator-runtime':
+      // Yalnizca cihazda GPU yoksa tamami artik sayilir; GPU varsa
+      // kullanici karar vermeli.
+      return GPU_STATE && !GPU_STATE.hasNvidia ? totalBytes : 0;
+    case 'virtual-disk':
+      return 0; // ASLA otomatik
+    case 'model-store':
+      // Tum model deposu silinmez: CPU modelleri kullaniliyor olabilir.
+      // Sadece altinda hesaplanan bilesik parcalar (GPU runtime/varyant)
+      // temizlenebilir. Bu yuzden burada 0 doner.
+      return 0;
+    case 'editor-extension-store':
+    case 'versioned-app-store':
+      // Yalnizca artik kalmis alt klasorler (eski uzanti/uygulama
+      // surumu) silinebilir; kok klasor hedeflenmez.
+      return 0;
+    case 'runtime-pool':
+      return totalBytes;
+    case 'global-packages':
+      // Global paket kurulumu bir ONBELLEK DEGILDIR; silmek kurulu
+      // araclari ve PATH baglantilarini bozar.
+      return 0;
+    case 'agent-workspace':
+      // Oturum gecmisi, beceriler ve hafiza kullanici degeridir;
+      // "bosta kalan bayt" gibi raporlanmasi yaniltici olur.
+      return 0;
+    case 'editor-workspace':
+    case 'os-user-data':
+    case 'unknown':
+    default: {
+      // Onarilabilir tahmin: agirlikli dosya turlerini hesapla
+      const del = (extCounts.get('log') ?? 0) + (extCounts.get('db') ?? 0);
+      const total = [...extCounts.values()].reduce((a, b) => a + b, 0) || 1;
+      return Math.round(totalBytes * Math.min(1, (del / total) * 2));
+    }
+  }
+}
+
+/** Kanitlari karara cevirir. */
+function decide(ctx: {
+  archetype: Archetype;
+  ev: Evidence;
+  root: string;
+  reclaimable: number;
+  totalBytes: number;
+  now: number;
+  minAgeDays: number;
+}): Verdict {
+  const { archetype, ev, root, reclaimable, totalBytes, now, minAgeDays } = ctx;
+  const name = displayName(ev, root);
+  const age = daysSince(ev.lastTouched ?? 0, now);
+  const because: string[] = [];
+  const logs = ev.logSignals ?? [];
+
+  const push = (s: string) => {
+    if (!because.includes(s)) because.push(s);
+  };
+
+  for (const l of logs.slice(0, 4)) push(`${l.means}: "${l.line}"`);
+
+  // ---- SANAL DISK: en riskli, sadece raporla ----
+  if (archetype === 'virtual-disk') {
+    return {
+      risk: 'high',
+      kind: 'report-only',
+      title: `${name} — sanal disk (WSL / Docker / VM)`,
+      what: 'Isletim sistemi veya dagitim sanal diski. Icerindeki tum Linux/VM verisi burada yasar.',
+      consequence: 'SILINMEZ. WSL dagitimi veya sanal makine tamamen bozulur.',
+      because: [...because, 'Icinde .vhdx/.vhd dosyasi tespit edildi'],
+      preconditions: ['Bu siniftan hicbir sey otomatik silinmez'],
+    };
+  }
+
+  // ---- HIZLANDIRICI RUNTIME: dongu/dongu kontrolu ile ----
+  if (archetype === 'accelerator-runtime') {
+    const gpu = GPU_STATE;
+    const cpuOnly = /CPUExecutionProvider|Device: CPU/i.test(
+      logs.map((l) => l.line).join(' '),
+    );
+    if (gpu && !gpu.hasNvidia) {
+      push(`Bu makinede NVIDIA CUDA surucusu yok (${gpu.note})`);
+    }
+    if (cpuOnly) {
+      push('Loglar "Device: CPU / CPUExecutionProvider" diyor: GPU saglayicisi kaydedilmemis');
+    }
+    const unused = cpuOnly || (gpu && !gpu.hasNvidia);
+    return {
+      risk: unused ? 'low' : 'medium',
+      kind: unused ? 'recommend' : 'ask',
+      title: `${name} — GPU hizlandirici runtime'i (kullanilamiyor)`,
+      what: 'cuBLAS / cuDNN / ONNX Runtime CUDA DLL kumesi. Yapay zeka modelini GPUda calistirmak icin indirilir.',
+      consequence: unused
+        ? 'Bu makinede kullanilamiyor. Silmek model dosyalarina dokunmaz, sadece ileride GPU ile calistirmak istersen yeniden indirilir.'
+        : 'Silmek, GPU hizlandirmasini bozar.',
+      because,
+      preconditions: ['Silmeden once kapatildigindan emin ol (calisan model varsa dosyalar kilitli kalir)'],
+    };
+  }
+
+  // ---- MODEL DEPOSU ----
+  if (archetype === 'model-store') {
+    const cpuOnly = /Device: CPU|CPUExecutionProvider/i.test(logs.map((l) => l.line).join(' '));
+    const gpuVariants = (ev.largeFiles ?? []).filter((f) => /gpu|cuda|trt/i.test(f.relPath));
+    const gpuAbsent = GPU_STATE ? !GPU_STATE.hasNvidia : false;
+    const hasCuda = (ev.fileKinds ?? []).includes('cuda-runtime');
+
+    const hasDeadGpu = hasCuda && (gpuAbsent || cpuOnly);
+    const deadBytes = gpuVariants.reduce((a, b) => a + b.bytes, 0);
+
+    if (hasDeadGpu || deadBytes > 0) {
+      push(
+        gpuAbsent
+          ? 'Bu makinede NVIDIA CUDA surucusu yok; GPU modelleri calistirilamaz'
+          : 'Loglar "Device: CPU / CPUExecutionProvider" diyor',
+      );
+      // Varyant sayisini SABIT bir yerden degil, olculmus alt
+      // parcalardan al: buyuk dosya listesi kirpilmis olabilir.
+      const subCount = (ev.markerSubpartCount ?? 0);
+      if (subCount > 0) push(`${subCount} kullanilamayan GPU parcasi tespit edildi`);
+      return {
+        risk: 'low',
+        kind: 'recommend',
+        title: `${name} — yerel model deposu (yari silinebilir)`,
+        what: 'Indirilmis yapay zeka model agirligi ve GPU calistirma kutuphaneleri. Uygulama bunlari yerel calistirmak icin saklar.',
+        consequence: `Sadece kullanilamayan kisim temizlenir: GPU runtime${hasCuda ? ' ve GPU varyantli modeller' : ''}. CPU modellerine (uygulamanin gercekten kullandigi kismi) dokunulmaz.`,
+        because,
+        preconditions: ['Uygulama kapali olmali; dosyalar kilitliyse atlanir'],
+      };
+    }
+
+    // Hepsi kullanilir durumda: silme
+    return {
+      risk: 'medium',
+      kind: 'ask',
+      title: `${name} — yerel model deposu`,
+      what: 'Indirilmis model agirliklari ve tokenizer dosyalari. Yerel olarak calistirilir.',
+      consequence: 'Tamamen silersen uygulama modelleri yeniden indirir (internet gerekir, saatler surebilir).',
+      because: [...because, `Toplam ${totalBytes} bayt, kullanilabilir cihaz uyumu tespit edilemedi`],
+      preconditions: ['Hangi modellerin kullanildigini bilmiyorsan silme'],
+    };
+  }
+
+  // ---- PAKET ONBELLEGI: en guvenli ----
+  if (archetype === 'pkg-manager-cache') {
+    // Onbellek silmek KURULU BIR PAKETI BOZMAZ; yalnizca bir sonraki
+    // kurulumda yeniden indirme gerektirir. Bu yuzden risk, "yeni
+    // kullanildi" bilgisiyle YUKSELMEZ. Oncelik her zaman mimari
+    // turden gelir; yas sadece aciklama metnini zenginlestirir.
+    const fresh = age < 7;
+    return {
+      risk: 'safe',
+      kind: fresh ? 'ask' : 'recommend',
+      title: `${name} — paket indirme onbellegi`,
+      what: 'Paket yoneticisinin indirdigi arsiv ve indeks dosyalari. Kaynak kod degil, sadece "hizli kurulum" kopyasi.',
+      consequence: 'Silmek hicbir kurulu paketi bozmaz. Bir sonraki kurulumda paket yeniden indirilir (biraz yavas).',
+      because: [
+        ...because,
+        `${formatAge(ev.lastTouched ?? 0, now)} son kullanildi`,
+        'Icerik yeniden uretilebilir',
+        ...(fresh ? ['Cok guncel: bir sonraki kurulum biraz gecikebilir'] : []),
+      ],
+      preconditions: [],
+    };
+  }
+
+  // ---- AGENT CALISMA ALANI: oturum gecmisi var ----
+  if (archetype === 'agent-workspace') {
+    const hasSessions = (ev.markers ?? []).some((m) => /session|memory|skill/i.test(m));
+    return {
+      risk: 'medium',
+      kind: 'ask',
+      title: `${name} — AI ajan calisma alani`,
+      what: 'Ajanin oturum gecmisi, becerileri, hafizasi ve onbellegi.',
+      consequence: hasSessions
+        ? 'SILMEZ: eski oturumlar ve ogrenilmis beceriler kaybolur.'
+        : 'Onbellek ve gunlukler silinir; ajan yeniden indirme yapar.',
+      because,
+      preconditions: ['Ajanin kapali oldugundan emin ol'],
+    };
+  }
+
+  // ---- GLOBAL PAKET KURULUMU: silinmez ----
+  //
+  // Buradaki node_modules/.bin bir "onbellek" degil, KURULU ARAclarin
+  // kendisidir. Klasoru silmek komutlari PATH'te baglantisiz birakir;
+  // dogru islem paket yoneticisinin uninstall akisidir.
+  if (archetype === 'global-packages') {
+    return {
+      risk: 'high',
+      kind: 'report-only',
+      title: `${name} — global paket kurulumu`,
+      what: 'Kurulu CLI araclarinin kendisi (komut dosyalari, paket klasorleri, baglantilar). Onbellek degil, kurulum.',
+      consequence:
+        'SILINMEZ. Klasoru silmek komutlari PATH uzerinde baglantisiz birakir; arac kaldirilmis gibi gorunur ama kalintilari farkli yerlerde kalir.',
+      because: [...because, 'node_modules / .bin yapisi bulundu (kurulum, onbellek degil)'],
+      preconditions: [
+        'Kaldirmak icin paket yoneticisinin uninstall komutunu kullan',
+        'Once hangi komutlarin buna bagli oldugunu kontrol et',
+      ],
+    };
+  }
+
+  // ---- RUNTIME HAVUZU ----
+  if (archetype === 'runtime-pool') {
+    // Ortam havuzunda risk SABIT: silmek projeleri bozabilir. Yalnizca
+    // "silme hedefi" yasla kisitlanir (90 gun). Risk, guncellige gore
+    // degismez — cunku bir "belirsizlik" degil, "yapisal risk"tir.
+    return {
+      risk: 'medium',
+      kind: 'ask',
+      title: `${name} — Python/Node ortam havuzu`,
+      what: 'Onceden derlenmis yorumlayici ortamlari (conda / pixi / uv / sanal ortam). Kaynak kod DEGIL, derlenmis ortam kopyalari.',
+      consequence: 'Silmek calisan projeleri bozabilir; ortamlar yeniden kurulur ve bu dakikalar/gunler surebilir.',
+      because: [...because, `Son kullanma: ${formatAge(ev.lastTouched ?? 0, now)}`],
+      preconditions: [
+        'Bu ortamlara bagli calisan bir is olmadigindan emin ol',
+        'Yalnizca 90 gunden eski ortamlar hedeflenir; yenileri korunur',
+      ],
+    };
+  }
+
+  // ---- EDITOR UZANTI DEPOSU ----
+  //
+  // Kurulu uzantilar bir "kurulum"dur; klasorun tamami SILINMEZ.
+  // Yalnizca editorun artik dedigi (extensions.json / .obsolete ile
+  // dogrulanan) eski surum klasorleri hedeflenir.
+  if (archetype === 'editor-extension-store') {
+    const count = ev.markerSubpartCount ?? 0;
+    return {
+      risk: 'low',
+      kind: count > 0 ? 'recommend' : 'report-only',
+      title: `${name} — editor uzanti deposu`,
+      what: 'Kurulu uzantilar ve surumleri. Editor her guncellemede eski surumu diskte birakabilir.',
+      consequence:
+        count > 0
+          ? `Yalnizca artik kalmis ${count} uzanti surumu silinir; aktif surumler ve ayarlar korunur.`
+          : 'Silinecek eski uzanti surumu bulunamadi; hicbir sey hedeflenmedi.',
+      because: [
+        ...because,
+        count > 0
+          ? `${count} kullanilmayan uzanti surumu tespit edildi`
+          : 'Tum uzanti surumleri aktif kayitli',
+      ],
+      preconditions: [
+        'Editor kapali olmali',
+        'Elle kurulmus uzantilar da yeniden kurulabilir; listeyi gozden gecir',
+      ],
+    };
+  }
+
+  // ---- SURUMLU UYGULAMA DEPOSU ----
+  //
+  // Guncelleyiciler yeni surumu yanina acar. En guncel surum korunur;
+  // eski app-<surum> klasorleri ayri parca olarak hedeflenir.
+  if (archetype === 'versioned-app-store') {
+    const count = ev.markerSubpartCount ?? 0;
+    return {
+      risk: 'low',
+      kind: count > 0 ? 'recommend' : 'report-only',
+      title: `${name} — cok surumlu uygulama deposu`,
+      what: 'Guncelleyicinin actigi surum klasorleri (app-<surum>). Guncelleme sonrasi eski surum diskte kalabilir.',
+      consequence:
+        count > 0
+          ? `Yalnizca eski ${count} surum klasoru silinir; uygulamanin kullandigi guncel surum ve ayarlar korunur.`
+          : 'Tek surum var (guncel); silinecek eski surum bulunamadi.',
+      because: [
+        ...because,
+        count > 0 ? `${count} eski surum klasoru tespit edildi` : 'Eski surum klasoru bulunamadi',
+      ],
+      preconditions: ['Uygulama kapali olmali'],
+    };
+  }
+
+  // ---- KULLANICI VERISI: dokunma ----
+  if (archetype === 'os-user-data') {
+    return {
+      risk: 'high',
+      kind: 'report-only',
+      title: `${name} — kullanici verisi`,
+      what: 'Sifreler, VPN ayarlari, oturum bilgileri veya oyun kayitlari.',
+      consequence: 'SILINMEZ. Silmek hesaplari ve ayarlari sifirlar.',
+      because: [...because, 'Yapilandirma/hesap dosyasi tespit edildi'],
+      preconditions: ['Bu siniftan hicbir sey otomatik silinmez'],
+    };
+  }
+
+  // ---- ELECTRON MASAUSTU UYGULAMA ----
+  if (archetype === 'electron-app-data') {
+    const cacheMarkers = (ev.markers ?? []).filter((m) =>
+      /^(Cache|Code Cache|GPUCache|DawnCache|DawnGraphiteCache|DawnWebGPUCache|ShaderCache|GrShaderCache|blob_storage|Service Worker|CacheStorage|Crashpad|logs)$/i.test(m),
+    );
+    return {
+      risk: 'safe',
+      kind: 'recommend',
+      title: `${name} — masaustu uygulama onbellegi`,
+      what: 'Electron/Chromium tabanli bir uygulamanin verisi. Icerinde hem yeniden uretilir onbellek hem de ayarlar ve oturum durumu var.',
+      consequence: `Sadece onbellek klasorleri (${cacheMarkers.slice(0, 4).join(', ')}) temizlenir. Ayarlar, oturumlar ve yerel veri KORUNUR.`,
+      because: [
+        ...because,
+        `${cacheMarkers.length} onbellek klasoru tespit edildi`,
+        'Chromium onbellegi yeniden uretilir, veri kaybi olmaz',
+      ],
+      preconditions: ['Uygulama kapali olmali'],
+    };
+  }
+
+  // ---- GECICI DOSYALAR ----
+  if (archetype === 'temp-scratch') {
+    // Sadece yasli dosyalar: 3 gunden eski gecici dosya zaten ise yaramaz,
+    // yeniden kullanilmaz. Yeni dosyalar (aktif kurulum/indirme) korunur.
+    return {
+      risk: 'safe',
+      kind: 'recommend',
+      title: `${name} — gecici dosyalar`,
+      what: 'Kurulum, guncelleme ve uygulamalarin biraktigi gecici dosyalar. Amacindan sonra bosaltilmamis olabilir.',
+      consequence: 'Yalnizca 3 gunden eski dosyalar temizlenir; kullanilabilir gecici dosyalara dokunulmaz. Calisan bir kurulum varsa dosyalar kilitlidir ve atlanir.',
+      because: [...because, `Son kullanma: ${formatAge(ev.lastTouched ?? 0, now)}`],
+      preconditions: ['Aktif kurulum/indirme surerken calistirma'],
+    };
+  }
+
+  // ---- COKME DOKUMLERI ----
+  if (archetype === 'crash-artifacts') {
+    return {
+      risk: 'safe',
+      kind: 'recommend',
+      title: `${name} — cokme dokumleri`,
+      what: 'Coken uygulamalarin bellek/veri dokumleri. Yalnizca hata ayiklama icin.',
+      consequence: 'Silmek uygulamayi etkilemez. Geçmiş hatalari analiz edemezsin.',
+      because: [...because, '.dmp/.mdmp dosyasi bulundu'],
+      preconditions: [],
+    };
+  }
+
+  // ---- GUNCELLEYICI ARTIKLARI ----
+  if (archetype === 'updater-staging') {
+    return {
+      risk: 'safe',
+      kind: 'recommend',
+      title: `${name} — guncelleyici artigi`,
+      what: 'Guncelleme icin indirilmis paket. Kurulum zaten yapildiysa bu klasor bos kalir.',
+      consequence: 'Silmek guncellemeyi etkilemez; guncelleme yeniden indirir.',
+      because: [...because, 'Klasor adi guncelleyici olarak isaretli'],
+      preconditions: [],
+    };
+  }
+
+  // ---- YAS POLITIKASI ----
+  if (minAgeDays > 0 && age < minAgeDays) {
+    return {
+      risk: 'low',
+      kind: 'report-only',
+      title: `${name} — ${formatAge(ev.lastTouched ?? 0, now)} kullanildi`,
+      what: 'Yeni kullanilmis bir klasor.',
+      consequence: `${minAgeDays} gunluk yas filtresi: silinmedi, sadece raporlandi.`,
+      because,
+      preconditions: [],
+    };
+  }
+
+  // ---- BILINMEYEN: kanit yetersiz ----
+  return {
+    risk: 'medium',
+    kind: 'ask',
+    title: `${name} — tanimlanamayan klasor`,
+    what: 'Icerigi incelendi ama anlamli bir tur isareti bulunamadi.',
+    consequence: 'Silmeden once icerigi `clicleaner explain` ile incele.',
+    because: [...because, `Toplam ${totalBytes} bayt, ${(ev.markers ?? []).length} isaret`],
+    preconditions: ['Kanit yetersiz: elle dogrula'],
+  };
+}
+
+/** Goruntulenecek baslik icin en iyi isim. */
+export function displayName(ev: Evidence, root: string): string {
+  if (ev.owner?.kind === 'packageJson') {
+    const scope = ev.owner.name.includes('/') ? ev.owner.name.split('/')[1] : ev.owner.name;
+    return scope ?? ev.owner.name;
+  }
+  if (ev.owner?.kind === 'logFile') return ev.owner.product;
+  if (ev.owner?.kind === 'binaryProduct') return ev.owner.product;
+  const base = root.split('\\').filter(Boolean).pop() ?? 'root';
+  return base.replace(/^\./, '') || base;
+}
+
+/** Tekrarlanan log sinyallerini indirger (TUI kalabaliklasin diye). */
+function dedupeLogSignals<T extends { means: string }>(signals: T[]): T[] {
+  const byMeans = new Map<string, T>();
+  for (const s of signals) {
+    if (!byMeans.has(s.means)) byMeans.set(s.means, s);
+  }
+  return [...byMeans.values()].slice(0, 6);
+}
+
+/** Global ortam durumu; bir kez doldurulur. */
+export let GPU_STATE: { hasNvidia: boolean; note: string } | null = null;
+export function setGpuState(s: { hasNvidia: boolean; note: string }): void {
+  GPU_STATE = s;
+}
+
+export { ownerFromName };
