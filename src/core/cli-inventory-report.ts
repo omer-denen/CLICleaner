@@ -69,6 +69,11 @@ function toolSection(t: CliTool): string[] {
     const ev = t.healthEvidence && t.healthEvidence.length > 0 ? ` — ${t.healthEvidence.join('; ')}` : '';
     lines.push(`- **Bozuk / yarım kurulum**${ev}`);
   }
+  if (t.installTrace) {
+    const at = t.installTrace.at > 0 ? formatDateTime(t.installTrace.at) : t.installTrace.logFile;
+    lines.push(`- Kurulum izi: ${code(t.installTrace.command)} (${at})${t.installTrace.cwd ? ` · cwd: ${code(t.installTrace.cwd)}` : ''}`);
+    if (t.installTrace.agentHint) lines.push(`- Ajan izi: ${t.installTrace.agentHint}`);
+  }
   lines.push('');
   if (t.evidence.length > 0) {
     lines.push('Kanıt:');
@@ -200,6 +205,42 @@ export function renderInventoryMarkdown(inv: CliInventory, generatedAt: number =
     L.push('');
     for (const s of stale) L.push(`- ${s.tool.command} (${src(s.tool)}) → ${code(s.path)}`);
     L.push('');
+  }
+
+  // ── Shim sorunlari (T17) ─────────────────────────────────────────
+  if (inv.shimIssues.length > 0) {
+    L.push('## Shim sorunları');
+    L.push('');
+    L.push('Shim ağı ile kurulumlar tutarsız. **SALT OKUNUR** kanıt; bu rapor hiçbir shim\'i silmez.');
+    L.push('');
+    for (const s of inv.shimIssues) {
+      const kind =
+        s.kind === 'orphan-shim'
+          ? 'Öksüz shim (hedef yok)'
+          : s.kind === 'missing-shim'
+            ? 'Shim yok (paket kurulu)'
+            : 'Boş scope';
+      L.push(`- **${kind}:** ${code(s.path)} — ${s.detail}`);
+    }
+    L.push('');
+  }
+
+  // ── PATH golgeleme (T17) ─────────────────────────────────────────
+  if (inv.pathShadows.length > 0) {
+    L.push('## PATH gölgeleme');
+    L.push('');
+    L.push('Aynı komut PATH\'te birden fazla kez bulunuyor; yalnızca ilki çalışır, kalanlar ölü ağırlıktır.');
+    L.push('');
+    for (const s of inv.pathShadows) {
+      L.push(`### ${code(s.command)}`);
+      L.push('');
+      L.push(s.detail);
+      L.push('');
+      s.entries.forEach((e, i) => {
+        L.push(`${i + 1}. ${i === 0 ? '**çalışır**' : 'gölgede'} — ${code(e.path)} (${e.label})`);
+      });
+      L.push('');
+    }
   }
 
   // ── Tum araclar tablosu ──────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, readFile, stat, utimes } from 'node:fs/promises';
+import { open, readdir, readFile, stat, utimes } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -34,6 +34,8 @@ import type {
   CliSource,
   CliStatus,
   CliTool,
+  PathShadow,
+  ShimIssue,
   UninstallSpec,
 } from './cli-inventory-types.ts';
 
@@ -44,6 +46,8 @@ export type {
   CliSource,
   CliStatus,
   CliTool,
+  PathShadow,
+  ShimIssue,
   UninstallSpec,
 } from './cli-inventory-types.ts';
 
@@ -91,6 +95,7 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
   const unusedDays = Math.max(1, opts.unusedDays ?? 21);
   const notes: string[] = [];
   const roots: string[] = [];
+  const shimIssues: ShimIssue[] = [];
   const hooks: ScanHooks = { emit: opts.onTool ?? (() => {}), signal: opts.signal };
 
   throwIfAborted(hooks.signal);
@@ -103,7 +108,9 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
 
   const found: CliTool[] = [];
 
-  found.push(...(await scanNpmGlobal(now, unusedDays, history, atime.reliable, roots, notes, hooks)));
+  const npm = await scanNpmGlobal(now, unusedDays, history, atime.reliable, roots, notes, hooks);
+  found.push(...npm.tools);
+  shimIssues.push(...npm.issues);
   throwIfAborted(hooks.signal);
   found.push(...(await scanUvTools(now, unusedDays, history, atime.reliable, roots, notes, hooks)));
   throwIfAborted(hooks.signal);
@@ -129,12 +136,29 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
   // uretilir; standalone icin yalnizca raporlanir.
   await annotateHealth(uniqueTools);
   const duplicates = findDuplicates(uniqueTools);
+
+  // T17: kurulum izi (npm _logs), oksuz shim taramasi ve PATH golgeleme.
+  // Hepsi SALT OKUNUR kanit uretir; hicbiri silme hedefi olmaz.
+  await applyInstallTraces(uniqueTools);
+  const npmPrefix = process.env.APPDATA ? join(process.env.APPDATA, 'npm') : '';
+  if (npmPrefix) shimIssues.push(...(await scanNpmShimOrphans(npmPrefix)));
+  const pathShadows = await scanPathShadowing(uniqueTools);
+
   const tools = uniqueTools.sort((a, b) => {
     const rank = statusRank(a.status) - statusRank(b.status);
     return rank !== 0 ? rank : b.totalBytes - a.totalBytes;
   });
 
-  return { scannedAt: now, unusedDays, tools, duplicates, roots: [...new Set(roots)], notes };
+  return {
+    scannedAt: now,
+    unusedDays,
+    tools,
+    duplicates,
+    roots: [...new Set(roots)],
+    notes,
+    shimIssues,
+    pathShadows,
+  };
 }
 
 function statusRank(s: CliStatus): number {
@@ -225,17 +249,18 @@ async function scanNpmGlobal(
   roots: string[],
   notes: string[],
   hooks: ScanHooks,
-): Promise<CliTool[]> {
+): Promise<{ tools: CliTool[]; issues: ShimIssue[] }> {
   const env = process.env;
   const prefix = env.APPDATA ? join(env.APPDATA, 'npm') : '';
-  if (!prefix) return [];
+  if (!prefix) return { tools: [], issues: [] };
   const modules = join(prefix, 'node_modules');
-  if (!(await isDirectory(modules))) return [];
+  if (!(await isDirectory(modules))) return { tools: [], issues: [] };
   roots.push(prefix);
 
   const npmCli = join(prefix, 'node_modules', 'npm', 'bin', 'npm-cli.js');
   const npmProgram = existsSync(longPath(npmCli)) ? process.execPath : findOnPath('npm.cmd');
   const out: CliTool[] = [];
+  const issues: ShimIssue[] = [];
 
   for (const pkgDir of await listPackageDirs(modules)) {
     throwIfAborted(hooks.signal);
@@ -252,7 +277,18 @@ async function scanNpmGlobal(
     for (const cmd of commands) {
       if (!validCommand(cmd)) continue;
       const shims = await shimPaths(prefix, cmd);
-      if (shims.length === 0) continue;
+      if (shims.length === 0) {
+        // T17: paket kurulu ve bin tanimli ama PATH'e shim birakilmamis.
+        // Silme hedefi DEGIL; yalnizca tutarsizlik kaniti.
+        issues.push({
+          kind: 'missing-shim',
+          path: join(prefix, `${cmd}.cmd`),
+          command: cmd,
+          packageName: name,
+          detail: 'paket kurulu ve bin tanimli, ancak PATH shimi bulunamadi',
+        });
+        continue;
+      }
 
       const installedAt = pre.mtime;
       // Yalnizca SHIM'lerin atime'i kullanilir. Manifesti biz okuyoruz;
@@ -321,7 +357,7 @@ async function scanNpmGlobal(
 
   await annotateNpmShims(out, prefix);
   if (out.length === 0) notes.push(`npm global prefix bulundu ama komut eslesmedi: ${prefix}`);
-  return out;
+  return { tools: out, issues };
 }
 
 /**
@@ -1426,4 +1462,271 @@ function fmtDate(ms: number): string {
   const d = new Date(ms);
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// ---------------------------------------------------------------------------
+// T17: shim tutarliligi + PATH golgeleme + kurulum izi
+// ---------------------------------------------------------------------------
+
+const MAX_LOG_HEAD = 96 * 1024;
+
+/**
+ * npm prefix'indeki shim'leri node_modules ile karsilastirir:
+ *  - orphan-shim : shim var ama gosterdigi hedef yok
+ *  - empty-scope : @scope klasoru bos (paket kalmamis)
+ *
+ * SALT OKUNUR; hicbir dosya silinmez veya tasinmaz.
+ */
+export async function scanNpmShimOrphans(prefix: string): Promise<ShimIssue[]> {
+  const issues: ShimIssue[] = [];
+  let entries;
+  try {
+    entries = await readdir(longPath(prefix), { withFileTypes: true });
+  } catch {
+    return issues;
+  }
+
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    const lower = e.name.toLowerCase();
+    const shimLike = lower.endsWith('.cmd') || lower.endsWith('.ps1') || !e.name.includes('.');
+    if (!shimLike) continue;
+    const p = join(prefix, e.name);
+    const target = await readShimTarget(p, prefix);
+    if (!target) continue;
+    if (!existsSync(longPath(target))) {
+      issues.push({
+        kind: 'orphan-shim',
+        path: p,
+        command: stripExe(e.name),
+        detail: `shim var ama hedefi yok: ${target}`,
+      });
+    }
+  }
+
+  const modules = join(prefix, 'node_modules');
+  try {
+    const scopes = (await readdir(longPath(modules), { withFileTypes: true })).filter(
+      (d) => d.isDirectory() && d.name.startsWith('@'),
+    );
+    for (const s of scopes) {
+      const dir = join(modules, s.name);
+      let kids;
+      try {
+        kids = await readdir(longPath(dir), { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      if (!kids.some((k) => k.isDirectory())) {
+        issues.push({ kind: 'empty-scope', path: dir, detail: 'scope klasoru bos (paket kalmamis)' });
+      }
+    }
+  } catch {
+    /* node_modules okunamadi */
+  }
+
+  return issues.slice(0, 100);
+}
+
+/**
+ * PATH'te ayni komutun birden fazla girdisini bulur (golgeleme).
+ *
+ * entries PATH sirasina gore dizilir: ilki gercekten calisan, kalanlar
+ * olu agirliktir. Yalnizca kanit uretir; karar vermez.
+ */
+export async function scanPathShadowing(
+  tools: CliTool[],
+  pathValue: string = process.env.PATH ?? '',
+): Promise<PathShadow[]> {
+  const dirs = pathValue.split(';').map((d) => d.trim()).filter(Boolean);
+  if (dirs.length === 0) return [];
+
+  const wanted = new Map<string, string>();
+  for (const t of tools) {
+    if (!wanted.has(t.command.toLowerCase())) wanted.set(t.command.toLowerCase(), t.command);
+  }
+
+  const hits = new Map<string, Array<{ dir: string; file: string }>>();
+  const seenFiles = new Set<string>();
+  for (const dir of dirs) {
+    let entries;
+    try {
+      entries = await readdir(longPath(dir), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    const seenHere = new Set<string>();
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      const base = stripExe(e.name).toLowerCase();
+      if (!wanted.has(base) || seenHere.has(base)) continue;
+      seenHere.add(base);
+      const file = join(dir, e.name);
+      // PATH'te ayni dizin birden fazla kez olabilir; ayni dosyayi
+      // iki kez "golgeleme" saymak yanlis pozitif uretir.
+      const key = normPath(file);
+      if (seenFiles.has(key)) continue;
+      seenFiles.add(key);
+      const arr = hits.get(base) ?? [];
+      arr.push({ dir, file });
+      hits.set(base, arr);
+    }
+  }
+
+  const labelFor = (file: string): string => {
+    const n = normPath(file);
+    const byShim = tools.find((tool) => tool.shims.some((s) => normPath(s) === n));
+    if (byShim) return `${byShim.packageName} [${byShim.source}]`;
+    const parent = normPath(dirname(n));
+    const byDir = tools.find((tool) => normPath(tool.installPath) === parent);
+    return byDir ? `${byDir.packageName} [${byDir.source}]` : 'PATH';
+  };
+
+  const out: PathShadow[] = [];
+  for (const [lower, arr] of hits) {
+    if (arr.length < 2) continue;
+    out.push({
+      command: wanted.get(lower) ?? lower,
+      entries: arr.map((a) => ({ path: a.file, label: labelFor(a.file) })),
+      detail: `PATH sirasinda ${arr.length} girdi: ilki calisir, kalanlar golgede`,
+    });
+  }
+  return out.sort((a, b) => a.command.localeCompare(b.command)).slice(0, 50);
+}
+
+/**
+ * npm kurulum gunluklerinden (`_logs`) kurulum izi cikarir.
+ *
+ * "Ajan kurmus olabilir" kaniti uygulama adindan DEGIL, kurulum
+ * cwd'sinin yapisal izlerinden gelir: skills/, sessions/, SKILL.md,
+ * .skill-lock.json. Kanit satiri olarak yazilir; silme hedefi olmaz.
+ */
+export async function applyInstallTraces(tools: CliTool[], logsDir?: string): Promise<void> {
+  const dir =
+    logsDir ??
+    (process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'npm-cache', '_logs') : '');
+  if (!dir || !(await isDirectory(dir))) return;
+
+  const wanted = new Map<string, CliTool>();
+  for (const t of tools) {
+    if (t.source === 'npm-global') wanted.set(t.packageName.toLowerCase(), t);
+  }
+  if (wanted.size === 0) return;
+
+  let names: string[];
+  try {
+    names = await readdir(longPath(dir));
+  } catch {
+    return;
+  }
+
+  const logs = names
+    .filter((n) => n.toLowerCase().endsWith('.log'))
+    .sort()
+    .reverse()
+    .slice(0, 400);
+  const seen = new Set<string>();
+
+  for (const name of logs) {
+    if (seen.size >= wanted.size) break;
+    const text = await readHead(join(dir, name), MAX_LOG_HEAD);
+    if (!text.includes('verbose argv')) continue;
+
+    const argv = parseNpmArgv(text);
+    if (!argv || !isGlobalInstall(argv)) continue;
+
+    const pkgs = argv.slice(1).filter((a) => !a.startsWith('-'));
+    if (pkgs.length === 0) continue;
+    const cwdMatch = /verbose cwd (.+)/.exec(text);
+    const cwd = cwdMatch?.[1]?.trim();
+    const at = logTime(name);
+
+    for (const pkg of pkgs) {
+      const tool = wanted.get(pkg.toLowerCase());
+      if (!tool || seen.has(tool.id)) continue;
+      seen.add(tool.id);
+      const hint = await agentHintFor(cwd);
+      tool.installTrace = {
+        at,
+        command: `npm install -g ${pkg}`,
+        ...(cwd ? { cwd } : {}),
+        ...(hint ? { agentHint: hint } : {}),
+        logFile: name,
+      };
+      tool.evidence.push(
+        `npm kurulum gunlugu: ${at > 0 ? fmtDate(at) : name}${cwd ? ` (cwd: ${cwd})` : ''}`,
+      );
+      if (hint) tool.evidence.push(hint);
+    }
+  }
+}
+
+function parseNpmArgv(text: string): string[] | null {
+  for (const line of text.split(/\r?\n/)) {
+    const i = line.indexOf('verbose argv');
+    if (i < 0) continue;
+    const rest = line.slice(i + 'verbose argv'.length).trim();
+    if (rest.startsWith('[')) {
+      try {
+        const arr: unknown = JSON.parse(rest);
+        if (Array.isArray(arr)) return arr.map(String);
+      } catch {
+        /* JSON degil; tirnakli bicimi dene */
+      }
+    }
+    const quoted = [...rest.matchAll(/"([^"]*)"/g)].map((m) => m[1] ?? '');
+    if (quoted.length > 0) return quoted;
+  }
+  return null;
+}
+
+function isGlobalInstall(argv: string[]): boolean {
+  const cmd = (argv[0] ?? '').toLowerCase();
+  if (cmd !== 'install' && cmd !== 'i' && cmd !== 'add') return false;
+  return argv.some((a) => a === '-g' || a === '--global');
+}
+
+function logTime(name: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})_(\d{2})_(\d{2})_(\d{3})Z/.exec(name);
+  if (!m) return 0;
+  return Date.UTC(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6]),
+    Number(m[7]),
+  );
+}
+
+async function agentHintFor(cwd: string | undefined): Promise<string | undefined> {
+  if (!cwd || !(await isDirectory(cwd))) return undefined;
+  const marks: string[] = [];
+  for (const name of ['skills', 'sessions', '.skill-lock.json', 'SKILL.md']) {
+    try {
+      await stat(longPath(join(cwd, name)));
+      marks.push(name);
+    } catch {
+      /* yok */
+    }
+  }
+  return marks.length > 0
+    ? `kurulum dizininde yapisal ajan izi: ${marks.join(', ')}`
+    : undefined;
+}
+
+async function readHead(file: string, bytes: number): Promise<string> {
+  try {
+    const fh = await open(longPath(file), 'r');
+    try {
+      const buf = Buffer.alloc(bytes);
+      const { bytesRead } = await fh.read(buf, 0, bytes, 0);
+      return buf.subarray(0, bytesRead).toString('utf8');
+    } finally {
+      await fh.close();
+    }
+  } catch {
+    return '';
+  }
 }

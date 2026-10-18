@@ -54,6 +54,8 @@ export interface CliTool {
   healthEvidence?: string[];
   /** Bozuk kurulumu paket yoneticisiyle onaracak komut. */
   repair?: UninstallSpec;
+  /** T17: npm kurulum gunlugunden kurulum izi (varsa). */
+  installTrace?: InstallTrace;
 }
 
 /**
@@ -71,6 +73,49 @@ export interface CliDuplicates {
   reason: string;
 }
 
+/**
+ * T17: shim agi ile kurulumlar arasindaki tutarsizliklar.
+ *
+ * Otomatik silme YOKTUR; yalnizca kanit olarak raporlanir.
+ */
+export interface ShimIssue {
+  kind: 'orphan-shim' | 'missing-shim' | 'empty-scope';
+  /** Sorunlu dosya ya da beklenen shim yolu. */
+  path: string;
+  command?: string;
+  packageName?: string;
+  detail: string;
+}
+
+/**
+ * T17: PATH'te ayni komutun birden fazla girdisi.
+ *
+ * entries PATH sirasina gore dizilmistir: ilki gercekten calisan,
+ * kalanlar golgede kalan olu agirliklardir.
+ */
+export interface PathShadow {
+  command: string;
+  entries: Array<{ path: string; label: string }>;
+  /** `where` ile dogrulanan gercek PATH sirasi (varsa). */
+  detail: string;
+}
+
+/**
+ * T17: npm kurulum gunlugunden (`_logs`) cikan kurulum izi.
+ *
+ * "Ajan kurmus olabilir" kaniti burada uretilir; uygulama adi gecmez,
+ * yalnizca kurulum saati, komut ve cwd (ve varsa yapisal izler) yazilir.
+ */
+export interface InstallTrace {
+  at: number;
+  /** Ornek: `npm install -g foo` */
+  command: string;
+  cwd?: string;
+  /** cwd icinde beceri/oturum gibi yapisal izler bulunduysa aciklama. */
+  agentHint?: string;
+  logFile: string;
+}
+
 export interface CliInventory {
   scannedAt: number;
   unusedDays: number;
@@ -78,6 +123,10 @@ export interface CliInventory {
   duplicates: CliDuplicates[];
   roots: string[];
   notes: string[];
+  /** T17: oksuz / eksik shim ve bos scope sorunlari. */
+  shimIssues: ShimIssue[];
+  /** T17: PATH'te golgede kalan komut girdileri. */
+  pathShadows: PathShadow[];
 }
 
 export interface CliInventoryOptions {

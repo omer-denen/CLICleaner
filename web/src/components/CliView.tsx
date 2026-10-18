@@ -475,6 +475,63 @@ export function CliView({ onError, onNotice }: Props) {
         </section>
       )}
 
+      {inventory && inventory.shimIssues.length > 0 && (
+        <section className="conflicts">
+          <h3>{t('Shim sorunları')}</h3>
+          <p className="dim small">
+            {t(
+              'Shim ağı ile kurulumlar tutarsız. Bu liste yalnızca kanıttır; hiçbir shim silinmez.',
+            )}
+          </p>
+          {inventory.shimIssues.map((s, i) => (
+            <div className="conflict" key={`${s.kind}:${s.path}:${i}`}>
+              <div className="conflict-main">
+                <div className="conflict-head">
+                  <strong>
+                    {s.kind === 'orphan-shim'
+                      ? t('Öksüz shim')
+                      : s.kind === 'missing-shim'
+                        ? t('Shim yok')
+                        : t('Boş scope')}
+                  </strong>
+                  <code>{s.path}</code>
+                </div>
+                <div className="conflict-versions">
+                  <span className="dim">{s.detail}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {inventory && inventory.pathShadows.length > 0 && (
+        <section className="conflicts">
+          <h3>{t('PATH gölgeleme')}</h3>
+          <p className="dim small">
+            {t("Aynı komut PATH'te birden fazla kez var; yalnızca ilki çalışır.")}
+          </p>
+          {inventory.pathShadows.map((s) => (
+            <div className="conflict" key={s.command}>
+              <div className="conflict-main">
+                <div className="conflict-head">
+                  <strong>{s.command}</strong>
+                  <span className="dim small">{s.detail}</span>
+                </div>
+                <div className="conflict-versions">
+                  {s.entries.map((e, i) => (
+                    <span key={e.path}>
+                      <span className="dim">{i === 0 ? t('Çalışır') : t('Gölgede')}: </span>
+                      <code>{e.path}</code>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       <div className="toolbar" style={{ display: inventory || loading ? undefined : 'none' }}>
         <div className="filters">
           {(

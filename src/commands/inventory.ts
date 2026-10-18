@@ -157,9 +157,35 @@ export async function runInventory(args: string[]): Promise<void> {
     console.log('');
   }
 
+  if (inv.shimIssues.length > 0) {
+    console.log(`${C.yellow}${C.bold}SHIM SORUNLARI${C.reset}`);
+    console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
+    for (const s of inv.shimIssues) {
+      const kind =
+        s.kind === 'orphan-shim' ? 'oksuz shim' : s.kind === 'missing-shim' ? 'shim yok' : 'bos scope';
+      console.log(`  ${C.yellow}${kind.padEnd(11)}${C.reset} ${s.path}`);
+      console.log(`              ${C.dim}${s.detail}${C.reset}`);
+    }
+    console.log(`${C.dim}  SALT OKUNUR: shim sorunlari silinmez; once raporlayin.${C.reset}`);
+    console.log('');
+  }
+
+  if (inv.pathShadows.length > 0) {
+    console.log(`${C.magenta}${C.bold}PATH GOLGELEME${C.reset}`);
+    console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
+    for (const s of inv.pathShadows) {
+      console.log(`  ${C.magenta}${s.command}${C.reset} — ${s.detail}`);
+      s.entries.forEach((e, i) => {
+        const tag = i === 0 ? `${C.green}calisir${C.reset}` : `${C.dim}golgede${C.reset}`;
+        console.log(`     ${tag}  ${e.path} ${C.dim}[${e.label}]${C.reset}`);
+      });
+    }
+    console.log('');
+  }
+
   console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
   console.log(
-    `${C.bold}  Atil: ${unused.length}${C.reset}${C.gray} · dogrulama: ${unknown.length} · yakin: ${recent.length} · korunan: ${protectedTools.length}${C.reset}`,
+    `${C.bold}  Atil: ${unused.length}${C.reset}${C.gray} · dogrulama: ${unknown.length} · yakin: ${recent.length} · korunan: ${protectedTools.length} · shim sorunu: ${inv.shimIssues.length}${C.reset}`,
   );
   console.log(`${C.dim}  Bu komut SALT OKUNUR; hicbir sey silinmedi.${C.reset}`);
   console.log(`${C.dim}  Kaldirma icin: clicleaner cli-remove <ad> (gelecek surum)${C.reset}\n`);

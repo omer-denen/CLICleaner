@@ -242,6 +242,18 @@ const EN: Record<string, string> = {
   Gölgede: 'Shadowed',
   'Eski sürümü planla': 'Plan removal of the old version',
 
+  // --- T17: shim sorunlari + PATH golgeleme ---
+  'Shim sorunları': 'Shim issues',
+  'Shim ağı ile kurulumlar tutarsız. Bu liste yalnızca kanıttır; hiçbir shim silinmez.':
+    'The shim network and installations are inconsistent. This list is evidence only; no shim is deleted.',
+  'Öksüz shim': 'Orphan shim',
+  'Shim yok': 'Missing shim',
+  'Boş scope': 'Empty scope',
+  'PATH gölgeleme': 'PATH shadowing',
+  "Aynı komut PATH'te birden fazla kez var; yalnızca ilki çalışır.":
+    'The same command appears more than once on PATH; only the first one runs.',
+  Çalışır: 'Active',
+
   // --- bozuk / yarim kurulum onarimi ---
   'Bozuk / yarım kurulumlar': 'Broken / partial installations',
   'Bin dosyası stub kalmış; kurulum betiği engellenmiş olabilir. Onarım paket yöneticisinin kendisiyle yapılır.':

@@ -3,6 +3,19 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
+## [Unreleased]
+
+### Eklendi
+
+- **Ajan kurulum izi (T17):** npm `_logs` günlüklerinden `install -g` satırı,
+  kurulum saati ve çalışma dizini (cwd) okunur. cwd içinde `skills/`,
+  `sessions/`, `SKILL.md`, `.skill-lock.json` gibi **yapısal** izler varsa
+  "ajan izi" kanıtı yazılır; uygulama adı aranmaz.
+- **Öksüz / eksik shim taraması:** shim var ama hedefi yok; paket kurulu ama
+  shim yok; boş `@scope` klasörü. Hepsi yalnızca **raporlanır**, silinmez.
+- **PATH gölgeleme:** aynı komut PATH'te birden fazla kez bulunuyorsa ilki
+  çalışır, kalanlar gölgede listelenir; yinelenen PATH dizinleri tekilleştirilir.
+
 ## [0.3.0] - 2026-10-18
 
 ### Eklendi
