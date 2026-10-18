@@ -16,6 +16,14 @@
     "npm-cache",
     "onnx"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omer-denen/CLICleaner.git"
+  },
+  "homepage": "https://github.com/omer-denen/CLICleaner#readme",
+  "bugs": {
+    "url": "https://github.com/omer-denen/CLICleaner/issues"
+  },
   "os": [
     "win32"
   ],
