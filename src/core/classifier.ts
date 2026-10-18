@@ -136,7 +136,16 @@ export async function probeDir(path: string): Promise<Probe> {
       if (n === 'node_modules') p.fileKinds.push('node-modules');
       if (n === 'pyvenv.cfg') p.fileKinds.push('python-env');
       // Pac yoneticisi onbellegi semasi: _cacache, pkgs, repodata, store
-      if (/^(_cacache|pkgs|repodata|archives|packs|simple-v|wheels|conda-meta)$/.test(n)) {
+      // (_npx: npm'in "bir kez calistirilan" paket deposu; yeniden uretilir.)
+      if (/^(_cacache|_npx|pkgs|repodata|archives|packs|simple-v|wheels|conda-meta)$/.test(n)) {
+        p.markers.push('store');
+      }
+      // NuGet HTTP onbellegi (v3-cache / plugins-cache): ad NuGet'e
+      // ozgudur ama TEK BASINA yetmez; klasorun icinde dosya olmali.
+      // ("http-cache" gibi genel adlar bilerek sayilmaz: her uygulamada
+      // gecebilir ve yanlis silme hedefine yol acardi.)
+      if (NUGET_CACHE_DIR_RE.test(n) && (await probeNuGetHttpCache(`${path}\\${e.name}`))) {
+        p.markers.push('cachedir-tag');
         p.markers.push('store');
       }
       // Electron/Chromium onbellegi
@@ -338,7 +347,7 @@ async function deepProbe(dir: string, p: Probe, depth: number): Promise<void> {
       p.markers.push(e.name);
     }
     // Alt dizin adlari da isaret olabilir (rattler/pkgs, uv/cache...)
-    if (/^(_cacache|pkgs|repodata|archives|packs|simple-v|wheels)$/.test(n)) {
+    if (/^(_cacache|_npx|pkgs|repodata|archives|packs|simple-v|wheels)$/.test(n)) {
       p.markers.push('store');
     }
   }
@@ -353,6 +362,14 @@ async function deepProbe(dir: string, p: Probe, depth: number): Promise<void> {
     if (n === 'packages') {
       await probePackageStore(`${dir}\\${d.name}`, p);
       if (p.fileKinds.includes('nuget-package')) return;
+      continue;
+    }
+
+    if (NUGET_CACHE_DIR_RE.test(n)) {
+      if (await probeNuGetHttpCache(`${dir}\\${d.name}`)) {
+        p.markers.push('cachedir-tag');
+        p.markers.push('store');
+      }
       continue;
     }
 
@@ -468,6 +485,21 @@ async function probeExtensionStore(dir: string, p: Probe): Promise<void> {
   }
   p.editorExtensions = true;
   p.markers.push('extensions-store');
+}
+
+/** NuGet HTTP onbellegi klasor adlari (ad tek basina kanit DEGILDIR). */
+const NUGET_CACHE_DIR_RE = /^(v3-cache|plugins-cache)$/i;
+
+/**
+ * NuGet HTTP onbellegi (v3-cache / plugins-cache) mi?
+ *
+ * Kanit: ad NuGet'e ozgu olsa bile klasorun icinde gercek bir dosya
+ * bulunmasi gerekir. Bos bir klasor "onbellek kaniti" degildir.
+ */
+async function probeNuGetHttpCache(dir: string): Promise<boolean> {
+  const entries = await readdirSafe(dir);
+  if (!entries) return false;
+  return entries.some((e) => e.isFile());
 }
 
 async function readdirSafe(dir: string): Promise<Dirent[] | null> {

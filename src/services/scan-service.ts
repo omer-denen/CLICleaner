@@ -34,6 +34,7 @@ export interface ScanArgs {
   profile?: string;
   exclude: string[];
   minAgeDays: number;
+  root?: string;
 }
 
 export class ScanService {
@@ -121,6 +122,7 @@ export class ScanService {
         envs: args.envs,
         profile: args.profile,
         minAgeDays: args.minAgeDays,
+        root: args.root,
         json: true,
         includeBytes: true,
         exclude: args.exclude,
@@ -156,11 +158,17 @@ export class ScanService {
 
       job.status = 'done';
       job.result = result;
-      this.lastScan = { scan: result, at: Date.now() };
       this.cacheLoaded = true;
-      // Sonraki sunucu baslangicinda / sayfa yenilemesinde kullanilir.
-      // Testler kismi taramalari onbellege yazmasin (persistScan: false).
-      if (this.persistScan) await saveScanCache(result);
+      // Proje ici (--root) tarama SISTEM onbellegini temsil etmez:
+      // ne son tarama olarak saklanir ne de 24 saatlik diske yazilir.
+      // Aksi halde 27 kumelik kismi bir proje taramasi "son tam
+      // tarama" gibi gorunurdu.
+      if (!args.root) {
+        this.lastScan = { scan: result, at: Date.now() };
+        // Sonraki sunucu baslangicinda / sayfa yenilemesinde kullanilir.
+        // Testler kismi taramalari onbellege yazmasin (persistScan: false).
+        if (this.persistScan) await saveScanCache(result);
+      }
       this.emit(job.id, { type: 'done', result });
     } catch (err) {
       if (controller.signal.aborted) {

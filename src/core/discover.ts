@@ -102,6 +102,32 @@ export interface DiscoveryResult {
 }
 
 /**
+ * Aracin KENDI veri dizinleri (gunluk, kasa, karantina, tarama onbellegi).
+ *
+ * Bunlar tarama hedefi OLAMAZ: kullanici "artik" sanip silerse yedek
+ * kasasi, gunluk defteri ve geri donus adimlari kaybolur. Yol adi
+ * sabit kodlanmaz; ortam degiskenlerinden turetilir.
+ */
+export function ownDataDirs(env: NodeJS.ProcessEnv = process.env): string[] {
+  const out: string[] = [];
+  const local = env.LOCALAPPDATA ?? '';
+  const home = env.USERPROFILE ?? env.HOME ?? '';
+  if (local) out.push(join(local, 'clicleaner'));
+  if (home) out.push(join(home, '.clicleaner'));
+  return out;
+}
+
+/** Yol, aracin kendi veri dizini mi (kendisi veya altinda)? */
+export function isOwnDataPath(path: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  const strip = (s: string) => s.toLowerCase().replace(/[\\/]+$/, '');
+  const p = strip(path);
+  return ownDataDirs(env).some((d) => {
+    const dir = strip(d);
+    return p === dir || p.startsWith(dir + '\\') || p.startsWith(dir + '/');
+  });
+}
+
+/**
  * Kesif: taranacak kokleri bul.
  *
  * Onemli: burada HICBIR uygulama adi sabit kodlu degildir. Tum
@@ -126,6 +152,7 @@ export async function discover(envs: Env[], opts: { exclude?: string[] } = {}): 
     for (const name of await listDirs(home)) {
       if (!name.startsWith('.')) continue;
       if (excluded.has(name.toLowerCase())) continue;
+      if (isOwnDataPath(join(home, name))) continue;
       stats.dotDirs++;
       targets.push({ path: join(home, name), origin: 'home' });
     }
@@ -136,6 +163,7 @@ export async function discover(envs: Env[], opts: { exclude?: string[] } = {}): 
     for (const name of await listDirs(local)) {
       if (excluded.has(name.toLowerCase())) continue;
       if (PROTECTED_ROOTS.has(name.toLowerCase())) continue;
+      if (isOwnDataPath(join(local, name))) continue;
       stats.localDirs++;
       targets.push({ path: join(local, name), origin: 'localappdata' });
     }

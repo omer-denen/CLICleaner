@@ -3,6 +3,8 @@ import type { Dirent } from 'node:fs';
 import { longPath } from '../util/longpath.ts';
 import { debug, warn } from '../util/log.ts';
 import { probeDir, ownerFromName } from './classifier.ts';
+import { isOwnDataPath } from './discover.ts';
+import { isGitTracked } from './git.ts';
 import { walk } from './walker.ts';
 import type {
   Archetype,
@@ -49,6 +51,13 @@ export async function classifyPath(
   origin: Part['origin'],
   opts: ClassifyOptions = {},
 ): Promise<Cluster | null> {
+  // Aracin kendi veri dizini (kasa, gunluk, tarama onbellegi) hicbir
+  // kosulda "artik" olarak gosterilmez; tarama kapsamina da girmez.
+  if (isOwnDataPath(root)) {
+    debug('kendi veri dizini atlandi', { root, origin });
+    return null;
+  }
+
   const now = opts.now ?? Date.now();
   const probe = await probeDir(root);
   const w = await walk({
@@ -150,22 +159,29 @@ export async function classifyPath(
   // --- Gercek silme hedefleri ---
   // Kume seviyesindeki "silinebilir" bayt tek basina yeterli degildir;
   // hangi YOLUN ne kadarinin silineceği burada belirlenir.
-  const targets = buildDeleteTargets(root, archetype, sub, w.bytes, now, ev);
+  const rawTargets = buildDeleteTargets(root, archetype, sub, w.bytes, now, ev);
+  // Git farkindaligi (T27): tracked yollar silme hedefinden cikarilir.
+  const targets: DeleteTarget[] = [];
+  let gitSkipped = 0;
+  for (const t of rawTargets) {
+    if (isGitTracked(t.path)) {
+      gitSkipped++;
+      continue;
+    }
+    targets.push(t);
+  }
+  if (gitSkipped > 0) {
+    verdict.preconditions.push(
+      `${gitSkipped} git tarafindan takip edilen yol atlandi (tracked dosyalar silinmez)`,
+    );
+    if (!ev.markers) ev.markers = [];
+    if (!ev.markers.includes('git-tracked')) ev.markers.push('git-tracked');
+  }
 
   // TUTARLILIK KURALI: Silme hedefi olmayan bir kume "onerilen"
   // OLABILMEZ. Aksi halde kullanici "sil" derse hicbir sey olmaz ve
   // arac bozuk gorunur. Hedef yoksa karar en kotu "dogrulama"ya iner.
-  if (targets.length === 0 && verdict.kind === 'recommend') {
-    verdict.kind = 'ask';
-    verdict.risk = verdict.risk === 'safe' ? 'low' : verdict.risk;
-    verdict.consequence += ' (silinecek yol belirlenemedi, bu yuzden otomatik secilmedi)';
-    verdict.preconditions.push('Silme hedefi uretilemedi — icerik elle incelenmeli');
-    warn('hedefsiz kume oneriliyordu, guvenli tarafa cekildi', {
-      root,
-      archetype,
-      hedef: 0,
-    });
-  }
+  if (targets.length === 0) enforceTargetConsistency(verdict, root, archetype);
 
   // Electron onbellegi hedeflerinin gercek boyutunu olc
   if (archetype === 'electron-app-data' && targets.length > 0) {
@@ -175,15 +191,19 @@ export async function classifyPath(
         return { ...t, bytes: cw.bytes };
       }),
     );
+    const alive = measured.filter((t) => t.bytes > 0);
+    // Olcum sonucu hedef kalmadiysa karar da "onerilen" kalamaz:
+    // aksi halde kullaniciya silinecek yol yokken "onerilen" denirdi.
+    if (alive.length === 0) enforceTargetConsistency(verdict, root, archetype);
     return {
       key,
       title: verdict.title,
       archetype,
       parts: [part],
       subparts: sub,
-      deleteTargets: measured.filter((t) => t.bytes > 0),
+      deleteTargets: alive,
       totalBytes: w.bytes,
-      reclaimableBytes: measured.reduce((a, b) => a + b.bytes, 0),
+      reclaimableBytes: alive.reduce((a, b) => a + b.bytes, 0),
       lastTouched: w.lastTouched,
       evidence: ev,
       verdict,
@@ -203,6 +223,26 @@ export async function classifyPath(
     evidence: ev,
     verdict,
   };
+}
+
+/**
+ * TUTARLILIK KURALI (tek kaynak).
+ *
+ * "Onerilen" karar, silinecek bir yol varsa anlamlidir. Hedef yoksa
+ * karar "dogrulama"ya iner ve gerekceye not dusulur; boylece arayuzde
+ * kilitli gorunen bir "onerilen" satir olusmaz.
+ */
+function enforceTargetConsistency(verdict: Verdict, root: string, archetype: Archetype): void {
+  if (verdict.kind !== 'recommend') return;
+  verdict.kind = 'ask';
+  verdict.risk = verdict.risk === 'safe' ? 'low' : verdict.risk;
+  verdict.consequence += ' (silinecek yol belirlenemedi, bu yuzden otomatik secilmedi)';
+  verdict.preconditions.push('Silme hedefi uretilemedi — icerik elle incelenmeli');
+  warn('hedefsiz kume oneriliyordu, guvenli tarafa cekildi', {
+    root,
+    archetype,
+    hedef: 0,
+  });
 }
 
 /**
@@ -856,7 +896,10 @@ function isPackageStoreDir(
   extCounts: Map<string, number>,
 ): boolean {
   const base = root.split('\\').filter(Boolean).pop()?.toLowerCase() ?? '';
-  if (/_cacache|^packs$|^archives$|^cache$|^pkgs$|^cache-b|store$/.test(base)) return true;
+  // Ad, tek basina yalnizca PAKET DEPOSUNA OZGU adlar icin kanit sayilir.
+  // "cache" gibi genel adlar BILEREK listede degil: her uygulama "cache"
+  // klasoru kullanir ve kanitsiz silme hedefi uretirdi.
+  if (/_cacache$|^packs$|^archives$|^pkgs$|^store$|^pnpm-store$/.test(base)) return true;
   if (markers.has('_cacache') || markers.has('cachedir-tag') || markers.has('store')) return true;
 
   // Uzanti dagilimi: tek tur baskin ise depo olabilir
@@ -1250,7 +1293,7 @@ function decide(ctx: {
     kind: 'ask',
     title: `${name} — tanimlanamayan klasor`,
     what: 'Icerigi incelendi ama anlamli bir tur isareti bulunamadi.',
-    consequence: 'Silmeden once icerigi `clicleaner explain` ile incele.',
+    consequence: 'Silmeden once `clicleaner explain` ile incele.',
     because: [...because, `Toplam ${totalBytes} bayt, ${(ev.markers ?? []).length} isaret`],
     preconditions: ['Kanit yetersiz: elle dogrula'],
   };

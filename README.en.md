@@ -7,15 +7,29 @@
 
 [Türkçe (varsayılan)](README.md) · **English**
 
-**Finds the files that fill your Windows disk but never appear in "Add or
-remove programs" — shows you the evidence, and deletes nothing without your
-approval.**
-
-Caches, model files, Python environments, updater leftovers, unused CLIs…
-It is hard to know which ones are safe to remove. CLICleaner decides from
-markers observed on disk, not from guesses.
+**Evidence-based analyzer for developer and AI tool leftovers.** AI coding
+tools and developer tooling leave caches, models, virtual environments,
+sessions and updater leftovers behind — none of them show up in the Windows
+"Add or remove programs" list. CLICleaner recognises these folders **by the
+evidence inside them, not by their names**: it tells you what each folder is,
+what exactly deletion would cost, and why it decided that way. It deletes
+nothing without your approval.
 
 > **Nothing is deleted without your approval.** The first scan only lists.
+
+---
+
+## This is not a generic "Windows disk cleaner"
+
+| It does not | Why |
+|---|---|
+| Touch the registry, PATH or uninstall entries | It focuses on developer and AI leftovers |
+| Delete your documents, photos or projects "to free space" | Those folders are never decisions |
+| Delete a folder just because of its name | Without evidence it says "unidentified" and **reports only** |
+| Delete models, agent sessions or skills | That is your data; they never become delete targets |
+| Delete its own data (logs, backup vault) | The tool never targets its own data directory |
+
+It answers one question with evidence: **"What is this folder, and what happens if I delete it?"**
 
 ---
 
@@ -103,18 +117,45 @@ regenerated and what is **your data**.
 | Documents, photos, projects | never scanned |
 | Application settings | only cache folders are targeted |
 | Agent sessions and skills | user value |
+| Files tracked by Git | version-controlled files are never deleted |
 | Virtual disks | report only |
 | SDK installations | report only |
+| The tool's own data directory | journals and the backup vault live there |
+
+---
+
+## Project scan: leftovers inside your own project
+
+To look at `node_modules`, `.venv` or `dist` inside a project, you choose the
+folder to scan:
+
+```bash
+clicleaner scan --root C:\projects\myapp
+```
+
+In the browser UI: **Scan a project** → choose the folder → scan.
+
+In this mode:
+
+- Results are **report-only**: no delete target is ever produced.
+- The `.git` folder is not scanned, and files **tracked** by Git can never be
+  targeted. Only untracked or `.gitignore`d paths are considered.
+- A project scan does not touch your 24-hour system scan cache.
 
 ---
 
 ## Why it is safe
 
-- **Evidence:** every decision says why it was made.
+- **Evidence:** every decision says why it was made; when evidence is missing
+  the tool says "unidentified" and only reports.
 - **Two steps:** a plan first, then a written `SIL` approval. `--yes` cannot
   bypass it.
 - **Recycle Bin:** default mode; undo a mistake.
 - **Targeted deletion:** not the whole folder — only the safe part.
+- **Git awareness:** tracked files can never be targeted; project scans are
+  report-only.
+- **Last line of defence:** if the delete layer is asked to remove an ancestor of
+  a protected path, or the tool's own data directory, it refuses.
 - **Local and open:** the UI runs only on this machine; no telemetry, MIT
   licensed.
 
@@ -129,6 +170,10 @@ shows the plan only.
 **Will it delete my AI agent's chats, skills or model?**
 No. Agent sessions and skills count as user data. Models are kept; only GPU
 leftovers proven unusable become candidates.
+
+**Will it delete `node_modules` inside my project?**
+A project scan (`--root`) never produces delete targets; it only reports. Files
+tracked by Git are protected in every mode anyway.
 
 **I deleted something by mistake.**
 Restore from the Recycle Bin: `clicleaner undo --restore`.
@@ -184,7 +229,8 @@ npm start
 
 **Uninstall:** `npm uninstall -g clicleaner`.
 Tool data lives under `%LOCALAPPDATA%\clicleaner` (logs, scan cache, backup
-vault); it is safe to delete.
+vault). **The tool never lists or deletes this directory in its own scans**;
+because the backup vault lives there, do not delete it by hand either.
 
 | Problem | Fix |
 |---|---|
@@ -200,6 +246,7 @@ vault); it is safe to delete.
 ```bash
 clicleaner                     # browser UI (recommended)
 clicleaner scan                # scan and list in the terminal
+clicleaner scan --root .       # report project-internal leftovers only
 clicleaner clean --dry-run     # show the plan only, delete nothing
 clicleaner clean               # two-step confirmation + Recycle Bin
 clicleaner undo --restore      # restore from the Recycle Bin

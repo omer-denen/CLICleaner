@@ -40,6 +40,7 @@ export const VERDICT_HINT: Record<string, string> = {
   ask: 'Silmeden önce içeriği incelemen gerekiyor.',
   'report-only': 'Otomatik silinmez; yalnızca raporlanır.',
   keep: 'Korunuyor.',
+  git: 'Git tarafından takip edilen yollar atlandı (tracked dosyalar silinmez).',
 };
 
 /** Yolu kısalt: ev dizini ve AppData önekleri tanıdık hale gelir. */

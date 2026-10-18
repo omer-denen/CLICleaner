@@ -1,9 +1,10 @@
-import { rename, rm, stat, readdir } from 'node:fs/promises';
+import { lstat, rename, rm, stat, readdir } from 'node:fs/promises';
 import type { ChildProcess } from 'node:child_process';
 import { longPath, isDenied, isLongPathError } from '../util/longpath.ts';
 import { debug, error as logError, info, warn } from '../util/log.ts';
 import type { DeleteTarget, Cluster } from '../core/types.ts';
 import { assertSafeTarget } from './guard.ts';
+import { gitTrackerFor } from '../core/git.ts';
 
 /**
  * Silme katmani.
@@ -103,6 +104,22 @@ export interface JournalEntry {
   reason?: string;
 }
 
+/**
+ * Sembolik bag veya junction (reparse point) mi?
+ *
+ * KRITIK: boyle bir yolun "icerigi" hedef klasordur. Silme islemi
+ * hedefi degil, bagin kendisini kaldirmali — hatta en guvenlisi hic
+ * dokunmamaktir. `npm link`, `pnpm` ve gelistirici kurulumlari bunu
+ * yaygin kullanir; yanlis davranis BASKA bir projenin kodunu siler.
+ */
+async function isReparsePoint(path: string): Promise<boolean> {
+  try {
+    return (await lstat(longPath(path))).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 /** Klasor kilit mi? Atomik rename dener (dosya sistemi bunu garantiler). */
 export async function isLocked(path: string): Promise<boolean> {
   const tmp = `${path}.clicleaner-locktest-${Date.now()}`;
@@ -139,6 +156,22 @@ export async function deleteTarget(
   assertSafeTarget(target);
 
   const res: DeleteResult = { target, removed: 0, bytesFreed: 0, skipped: [], failed: [] };
+
+  // Git farkindaligi (T27): tek depo cozumu + bellekteki kume.
+  // Dosya basina yukari yurume veya git sureci BASLATILMAZ.
+  const git = gitTrackerFor(target.path);
+  if (target.kind === 'whole' && git.isTrackedAnyUnder(target.path)) {
+    res.skipped.push({ path: target.path, reason: 'git tarafindan takip ediliyor (tracked)' });
+    return res;
+  }
+
+  // Sembolik bag / junction: hedefi degil bagin kendisini silmek
+  // gerekir; en guvenlisi hic dokunmamaktir. npm link ile bagli bir
+  // kaynak projenin kodu bu yolla korunur.
+  if (await isReparsePoint(target.path)) {
+    res.skipped.push({ path: target.path, reason: 'sembolik bag/junction (hedef korunur)' });
+    return res;
+  }
 
   if (target.kind === 'whole') {
     const w = await measure(target.path);
@@ -190,7 +223,11 @@ export async function deleteTarget(
       let quotaChecked = false;
       for (const f of files) {
         try {
-          const st = await stat(longPath(f));
+          const st = await lstat(longPath(f));
+          if (st.isSymbolicLink()) {
+            res.skipped.push({ path: f, reason: 'sembolik bag/junction (hedef korunur)' });
+            continue;
+          }
           if (!quotaChecked) {
             quotaChecked = true;
             if (!(await recycleBinHasRoom(0))) {
@@ -242,7 +279,17 @@ export async function deleteTarget(
   const eligible: Array<{ path: string; size: number }> = [];
   for (const f of files) {
     try {
-      const st = await stat(longPath(f));
+      const st = await lstat(longPath(f));
+      // Reparse point: boyutu/mtime'i HEDEFE ait olur; silmek de
+      // hedefi etkileyebilir. Dokunulmaz.
+      if (st.isSymbolicLink()) {
+        res.skipped.push({ path: f, reason: 'sembolik bag/junction (hedef korunur)' });
+        continue;
+      }
+      if (git.isTracked(f)) {
+        res.skipped.push({ path: f, reason: 'git tarafindan takip ediliyor (tracked)' });
+        continue;
+      }
       if (now - st.mtimeMs < minMs) {
         res.skipped.push({ path: f, reason: 'cok yeni' });
         continue;

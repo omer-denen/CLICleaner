@@ -1,4 +1,4 @@
-import type { Cluster, Part, ScanResult, ScanStats, SkippedEntry } from './types.ts';
+import type { Cluster, DeleteTarget, Part, ScanResult, ScanStats, SkippedEntry } from './types.ts';
 
 /**
  * Kumelestirme: ayni uygulamanin/env'in bosta kalan parcalarini birlestirir.
@@ -27,6 +27,15 @@ export function mergeClusters(clusters: Cluster[]): Cluster[] {
     existing.totalBytes += c.totalBytes;
     existing.reclaimableBytes += c.reclaimableBytes;
     existing.lastTouched = Math.max(existing.lastTouched, c.lastTouched);
+
+    // SILME HEDEFLERI DE BIRLESIR. Aksi halde ikinci parcanin hedefleri
+    // sessizce kaybolur: kullanici kumeyi siler, yalnizca ilk parca
+    // temizlenir. Ayni yol iki kez eklenmez.
+    const merged = new Map<string, DeleteTarget>();
+    for (const t of [...(existing.deleteTargets ?? []), ...(c.deleteTargets ?? [])]) {
+      merged.set(`${t.path.toLowerCase()}|${t.kind}`, t);
+    }
+    existing.deleteTargets = [...merged.values()];
 
     // Kanitlari birlestir (yinelenmeden)
     existing.evidence = {

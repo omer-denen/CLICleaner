@@ -51,6 +51,8 @@ ${C.bold}Secenekler${C.reset}
   --profile <ad>     Kayitli profil kullan (lean, audit, full)
   --min-age <gun>    Bu yastan eskiyse sadece raporla
   --exclude <ad>     Haric tut (nokta klasoru veya AppData adi)
+  --root <dir>       Proje ici artiklar: yalnizca bu dizinin alt klasorleri
+                     taranir; sonuclar report-only olur (silme hedefi yok)
   --all              Tum kumeleri goster (varsayilan ilk 25)
   --json             Makine okunur JSON
   --quiet            Ilerleme cubugu gosterme
@@ -82,6 +84,7 @@ ${C.bold}Ornekler${C.reset}
   clicleaner inventory --unused 21 --verbose
   clicleaner inventory --report envanter.md
   clicleaner scan --profile audit --json
+  clicleaner scan --root C:\\projeler\\uygulamam    Proje ici artiklari tara (rapor)
 `);
 }
 
@@ -105,6 +108,7 @@ async function main(): Promise<void> {
     let showAll = false;
     let quiet = false;
     const exclude: string[] = [];
+    let root: string | undefined;
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
@@ -112,12 +116,20 @@ async function main(): Promise<void> {
       else if (a === '--profile') profile = rest[++i];
       else if (a === '--min-age') minAgeDays = Number(rest[++i]);
       else if (a === '--exclude') exclude.push(rest[++i]!);
-      else if (a === '--json') json = true;
+      else if (a === '--root') {
+        const v = rest[++i];
+        // Eksik deger sessizce tam taramaya donusmemeli: kullanici
+        // proje taramasi beklerken tum diski taramis olurdu.
+        if (!v || v.startsWith('-')) {
+          throw new Error('--root bir dizin yolu ister. Ornek: clicleaner scan --root C:\\proje');
+        }
+        root = v;
+      } else if (a === '--json') json = true;
       else if (a === '--all') showAll = true;
       else if (a === '--quiet') quiet = true;
     }
 
-    const result = await runScan({ envs, profile, minAgeDays, json, includeBytes: true, exclude, quiet });
+    const result = await runScan({ envs, profile, minAgeDays, json, includeBytes: true, exclude, quiet, root });
 
     if (json) {
       console.log(JSON.stringify(toJson(result), null, 2));
@@ -258,6 +270,22 @@ function toJson(r: Awaited<ReturnType<typeof runScan>>) {
         bytes: p.bytes,
         files: p.files,
         origin: p.origin,
+      })),
+      // Silme hedefleri ve alt parcalar da makine okunur ciktida
+      // bulunmali; aksi halde "onerilen ama hedefsiz" gibi gorunur.
+      deleteTargets: (c.deleteTargets ?? []).map((t) => ({
+        path: t.path,
+        kind: t.kind,
+        bytes: t.bytes,
+        label: t.label,
+        minAgeDays: t.minAgeDays,
+      })),
+      subparts: (c.subparts ?? []).map((s) => ({
+        path: s.path,
+        label: s.label,
+        bytes: s.bytes,
+        verdictKind: s.verdictKind,
+        reason: s.reason,
       })),
     })),
   };

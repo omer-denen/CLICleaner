@@ -7,15 +7,28 @@
 
 **Türkçe (varsayılan)** · [English](README.en.md)
 
-**Windows'ta diskini dolduran ama "Program ekle/kaldır" listesinde görünmeyen
-dosyaları bulur; ne olduğunu kanıtıyla gösterir; sen onaylamadan hiçbir şeyi
-silmez.**
-
-Önbellekler, model dosyaları, Python ortamları, güncelleyici artıkları,
-kullanılmayan CLI'lar… Hangisinin silinebileceğini bilmek zordur. CLICleaner
-bunu tahminle değil, diskte gördüğü işaretlerle yapar.
+**Kanıt tabanlı geliştirici ve AI artığı analizcisi.** AI kod araçları ve
+geliştirici araçları arkalarında önbellek, model, sanal ortam, oturum ve
+güncelleyici artığı bırakır; bunlar Windows "Program ekle/kaldır" listesinde
+**görünmez**. CLICleaner bu klasörleri **adına göre değil, içindeki kanıta
+göre** tanır: ne olduğunu, silersen tam olarak ne olacağını ve kararın
+gerekçesini gösterir. Sen onaylamadan hiçbir şeyi silmez.
 
 > **Hiçbir şey sen onaylamadan silinmez.** İlk tarama yalnızca listeler.
+
+---
+
+## Bu bir "Windows disk temizleme aracı" değil
+
+| Yapmaz | Neden |
+|---|---|
+| Kayıt defteri / PATH / "Program ekle-kaldır" girdilerine dokunmaz | Geliştirici ve AI artıklarına odaklanır |
+| Belgelerini, fotoğraflarını, projelerini "yer açmak için" silmez | Bu klasörler karar kapsamına girmez |
+| Tanımadığı klasörü adına bakarak silmez | Kanıt yoksa "tanımlanamayan" der ve **yalnızca raporlar** |
+| Model, ajan oturumu ve becerileri silmez | Senin verindir; silme hedefi üretilmez |
+| Kendi verisini (günlük, yedek kasası) silmez | Araç kendi veri dizinini hedeflemez |
+
+Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem ne olur?"**
 
 ---
 
@@ -105,17 +118,43 @@ hangisinin **senin verin** olduğunu bilmek zordur.
 | Belgeler, fotoğraflar, projeler | taranmaz |
 | Uygulama ayarları | yalnız önbellek klasörleri hedeflenir |
 | Ajan oturumları ve becerileri | kullanıcı değeri taşır |
+| Git tarafından takip edilen dosyalar | sürüm kontrolündeki dosya asla silinmez |
 | Sanal diskler | yalnız raporlanır |
 | SDK kurulumları | yalnız raporlanır |
+| Aracın kendi veri dizini | günlük ve yedek kasası orada yaşar |
+
+---
+
+## Proje taraması: kendi projenin artıkları
+
+Bir projenin içindeki `node_modules`, `.venv`, `dist` gibi artıkları görmek
+istersen taranacak klasörü sen seçersin:
+
+```bash
+clicleaner scan --root C:\projeler\uygulamam
+```
+
+Web arayüzünde **Projeyi Tara** → klasörü seç → tara.
+
+Bu modda:
+
+- Sonuçlar **salt rapordur**: hiçbir silme hedefi üretilmez.
+- `.git` klasörü taranmaz; Git tarafından **takip edilen (tracked)** dosyalar
+  hedef olamaz. Yalnız untracked veya `.gitignore` içindeki yollar değerlendirilir.
+- Proje taraması, sisteminizin 24 saatlik tarama önbelleğini değiştirmez.
 
 ---
 
 ## Neden güvenli?
 
-- **Kanıt:** her kararın yanında "bunu neden öneriyorum" yazar.
+- **Kanıt:** her kararın yanında "bunu neden öneriyorum" yazar; kanıt yetersizse
+  araç "tanımlanamayan" der ve yalnızca raporlar.
 - **İki aşama:** önce plan, sonra yazılı `SIL` onayı. `--yes` bunu atlayamaz.
 - **Geri dönüşüm kutusu:** varsayılan mod; yanlışsa geri alabilirsin.
 - **Hedefli silme:** klasörün tamamı değil, yalnız güvenli kısım silinir.
+- **Git farkındalığı:** tracked dosya hedef olamaz; proje taramaları salt rapordur.
+- **Son savunma hattı:** silme katmanı, korunan bir yolun üstünü veya aracın
+  kendi veri dizinini hedef almışsa silmeyi reddeder.
 - **Yerel ve açık:** arayüz yalnız bu bilgisayarda çalışır; telemetri yoktur,
   kod MIT lisanslıdır.
 
@@ -130,6 +169,10 @@ planı gösterir.
 **AI ajanımın sohbetleri, becerileri veya modeli silinir mi?**
 Hayır. Ajan oturumları ve beceriler kullanıcı verisi sayılır. Modeller korunur;
 yalnız kanıtla "kullanılamayan" GPU artıkları aday olur.
+
+**Projemin içindeki `node_modules` silinir mi?**
+Proje taraması (`--root`) hiçbir zaman silme hedefi üretmez; yalnız raporlar.
+Git tarafından takip edilen dosyalar zaten her koşulda korunur.
 
 **Yanlış sildim.**
 Geri dönüşüm kutusundan geri al: `clicleaner undo --restore`.
@@ -183,7 +226,9 @@ npm start
 
 **Kaldırma:** `npm uninstall -g clicleaner`.
 Araç verileri `%LOCALAPPDATA%\clicleaner` altındadır (günlükler, tarama
-önbelleği, yedek kasası); silmekte sakınca yoktur.
+önbelleği, yedek kasası). **Araç bu dizini kendi taramalarında hedef olarak
+göstermez ve silmez**; yedek kasası orada yaşadığı için elle de silmemek
+gerekir.
 
 | Sorun | Çözüm |
 |---|---|
@@ -199,6 +244,7 @@ Araç verileri `%LOCALAPPDATA%\clicleaner` altındadır (günlükler, tarama
 ```bash
 clicleaner                     # tarayıcı arayüzü (önerilen)
 clicleaner scan                # terminalde tara ve listele
+clicleaner scan --root .       # proje içi artıkları yalnız raporla
 clicleaner clean --dry-run     # yalnızca planı göster, hiçbir şey silme
 clicleaner clean               # iki aşamalı onay + geri dönüşüm kutusu
 clicleaner undo --restore      # geri dönüşüm kutusundan geri al

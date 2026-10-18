@@ -30,7 +30,7 @@ import { useI18n } from './i18n.tsx';
 import { VERDICT_HINT } from './labels.ts';
 
 type Phase = 'idle' | 'scanning' | 'review' | 'planning' | 'confirm' | 'deleting' | 'done';
-type KindFilter = 'all' | 'recommend' | 'ask' | 'report-only' | 'keep';
+type KindFilter = 'all' | 'recommend' | 'ask' | 'report-only' | 'keep' | 'git';
 type SortMode = 'size' | 'risk' | 'recent' | 'name';
 
 /** Risk siralama: once yuksek risk, en sonda guvenli. */
@@ -84,6 +84,7 @@ const SECTION_ORDER: Array<{ key: 'recommend' | 'ask' | 'report-only' | 'keep'; 
 const LIST_TABS: Array<{ key: KindFilter; title: string }> = [
   { key: 'all', title: 'Tümü' },
   ...SECTION_ORDER.map((s) => ({ key: s.key, title: s.title })),
+  { key: 'git', title: 'Git' },
 ];
 
 export default function App() {
@@ -97,6 +98,48 @@ export default function App() {
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [scan, setScan] = useState<ScanResult | null>(null);
+  const [projectRoot, setProjectRoot] = useState<string>('');
+  const [pickerOpen, setPickerOpen] = useState<boolean>(false);
+  const [pickerPath, setPickerPath] = useState<string>('');
+  const [pickerDirs, setPickerDirs] = useState<Array<{ name: string; path: string }>>([]);
+  const [pickerLoading, setPickerLoading] = useState<boolean>(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [pickerParent, setPickerParent] = useState<string | null>(null);
+  /** Yarisan klasor istekleri: ekrana yalnizca son cevap yazilir. */
+  const pickerSeq = useRef(0);
+
+  const loadPicker = useCallback(async (path: string) => {
+    const seq = ++pickerSeq.current;
+    setPickerLoading(true);
+    setPickerError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/fs/dirs?path=${encodeURIComponent(path)}`, {
+        headers: token ? { 'x-clicleaner-token': token } : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as {
+        path: string;
+        parent: string | null;
+        dirs: Array<{ name: string; path: string }>;
+      };
+      if (seq !== pickerSeq.current) return;
+      setPickerPath(data.path);
+      setPickerDirs(data.dirs ?? []);
+      setPickerParent(data.parent);
+    } catch (e) {
+      if (seq !== pickerSeq.current) return;
+      setPickerError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (seq === pickerSeq.current) setPickerLoading(false);
+    }
+  }, []);
+
+  const openPicker = useCallback(() => {
+    setPickerOpen(true);
+    void loadPicker(pickerPath || projectRoot || '');
+  }, [loadPicker, pickerPath, projectRoot]);
+
   const [lastScanAt, setLastScanAt] = useState<number | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0, bytes: 0 });
@@ -163,7 +206,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [scanDone]);
 
-  const beginScan = useCallback(async () => {
+  const beginScan = useCallback(async (rootOverride?: string) => {
+    // Proje taramasi: secilen kok korunur. Argumansiz cagri = tam
+    // tarama; onceki proje koku temizlenir (ust bar yaniltici olmasin).
+    const root = rootOverride?.trim() || '';
+    setProjectRoot(root);
     closeStream();
     setError(null);
     setNotice(null);
@@ -182,7 +229,10 @@ export default function App() {
     try {
       let id: string;
       try {
-        const r = await startScan({ envs: ['dotfolders', 'localappdata', 'roamingappdata'] });
+        const r = await startScan({
+          envs: ['dotfolders', 'localappdata', 'roamingappdata'],
+          root: root || undefined,
+        });
         id = r.scanId;
       } catch (e) {
         // Ayni anda calisan tarama varsa ona baglan.
@@ -242,6 +292,8 @@ export default function App() {
           setSelected(defaultSelection(data.result));
           setLastScanAt(Date.now());
           setPhase('review');
+          // Proje taramasi rapor-only'dir; bunu sessizce yapmayalim.
+          if (root) notify(t('Proje taraması salt rapordur; silme hedefi üretilmez.'));
           // Kalici bir isaret degil: "Tamam" denince liste gorunur.
           setScanDone({
             clusters: data.result.clusters.length,
@@ -331,7 +383,10 @@ export default function App() {
       c.verdict.what.toLowerCase().includes(f) ||
       c.parts.some((p) => p.path.toLowerCase().includes(f));
 
-    const base = kindFilter === 'all' ? scan.clusters : (groups?.[kindFilter] ?? []);
+    let base: Cluster[];
+    if (kindFilter === 'all') base = scan.clusters;
+    else if (kindFilter === 'git') base = scan.clusters.filter((c) => (c.evidence.markers ?? []).includes('git-tracked'));
+    else base = (groups?.[kindFilter] ?? []);
     return [...base].filter(match).sort((a, b) => compareClusters(a, b, sortMode));
   }, [scan, groups, filter, kindFilter, sortMode]);
 
@@ -584,14 +639,31 @@ export default function App() {
               EN
             </button>
           </div>
+          {view === 'disk' && projectRoot && (
+            <span className="dim" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={projectRoot}>
+              {projectRoot}
+            </span>
+          )}
+
           {view === 'disk' && (
             <button
               className="btn"
               onClick={() => void beginScan()}
               disabled={phase === 'scanning' || phase === 'deleting'}
-              title={t('İncele (tara ve kanıtları göster)')}
+              title={t('İncele (tüm yapıyı tara)')}
             >
               {scan ? t('Yeniden tara') : t('İncele')}
+            </button>
+          )}
+
+          {view === 'disk' && (
+            <button
+              className="btn btn-primary"
+              onClick={openPicker}
+              disabled={phase === 'scanning' || phase === 'deleting'}
+              title={t('Projeyi tara (klasör seç ve tara)')}
+            >
+              {t('Projeyi Tara')}
             </button>
           )}
 
@@ -760,7 +832,11 @@ export default function App() {
               >
                 {t(s.title)}
                 <span className="tab-count">
-                  {s.key === 'all' ? scan.clusters.length : (groups?.[s.key]?.length ?? 0)}
+                  {s.key === 'all'
+                    ? scan.clusters.length
+                    : s.key === 'git'
+                      ? scan.clusters.filter((c) => (c.evidence.markers ?? []).includes('git-tracked')).length
+                      : (groups?.[s.key]?.length ?? 0)}
                 </span>
               </button>
             ))}
@@ -870,6 +946,73 @@ export default function App() {
       <div style={{ display: view === 'cli' ? undefined : 'none' }}>
         <CliView onError={setError} onNotice={notify} />
       </div>
+
+      {pickerOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('Proje klasörü seç')}
+          onClick={() => setPickerOpen(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-head">
+              <h2>{t('Proje klasörü seç')}</h2>
+              <button
+                className="icon-btn"
+                onClick={() => setPickerOpen(false)}
+                aria-label={t('Kapat')}
+              >
+                ×
+              </button>
+            </header>
+            <p className="modal-lead dim">
+              {t('Seçilen klasörün doğrudan alt klasörleri taranacak (proje kökünü seçin).')}
+            </p>
+            <div className="picker-path" title={pickerPath}>
+              {pickerPath || t('Yükleniyor...')}
+            </div>
+            {pickerError && <div className="error">{pickerError}</div>}
+            <div className="modal-list picker-list">
+              {pickerLoading && <div className="dim">{t('Yükleniyor...')}</div>}
+              {!pickerLoading && pickerDirs.length === 0 && (
+                <div className="dim">{t('Alt klasör yok')}</div>
+              )}
+              {!pickerLoading &&
+                pickerDirs.map((d) => (
+                  <button
+                    key={d.path}
+                    type="button"
+                    className="picker-item"
+                    onClick={() => void loadPicker(d.path)}
+                  >
+                    {d.name}
+                  </button>
+                ))}
+            </div>
+            <footer className="modal-actions">
+              {pickerParent && (
+                <button className="btn small" onClick={() => void loadPicker(pickerParent)}>
+                  {t('Üst klasör')}
+                </button>
+              )}
+              <button className="btn" onClick={() => setPickerOpen(false)}>
+                {t('İptal')}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const root = pickerPath.trim();
+                  setPickerOpen(false);
+                  if (root) void beginScan(root);
+                }}
+              >
+                {t('Seç ve Tara')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

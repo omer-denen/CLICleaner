@@ -5,12 +5,13 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { extname, join, resolve, sep } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { closeRecycle } from '../actions/delete.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
+import { longPath } from '../util/longpath.ts';
 import { ScanService } from '../services/scan-service.ts';
 import { DeleteService } from '../services/delete-service.ts';
 import { CliInventoryService } from '../services/cli-inventory-service.ts';
@@ -51,8 +52,11 @@ import type {
  *  - Sunucu YALNIZCA 127.0.0.1 uzerinde dinler; aga acilmaz.
  *  - Her baslatmada rastgele bir token uretilir; API cagrilari bu
  *    token olmadan reddedilir.
- *  - Istemci YOL gondermez. Yollar sunucudaki tarama sonucundan
- *    gelir; istemci yalnizca kume anahtari secer.
+ *  - Istemci SILME icin yol gondermez; yalnizca kume anahtari secer.
+ *    Yollar sunucudaki tarama sonucundan gelir.
+ *  - Proje taramasi (root) icin istemci yalnizca TARANACAK klasoru
+ *    secebilir: /api/fs/dirs salt okunur klasor listesi doner,
+ *    proje taramasi report-only sonuclanir ve silme hedefi uretmez.
  *  - Silme iki asamalidir: once plan (kimlik), sonra onay. Plan
  *    10 dakika sonra duser. Orta/yuksek risk "SIL" yazili onayi
  *    olmadan yurutulmez.
@@ -244,6 +248,11 @@ async function handleRequest(
     return;
   }
 
+  if (req.method === 'GET' && pathname === '/api/fs/dirs') {
+    await handleListDirs(req, res);
+    return;
+  }
+
   if (route === 'GET /api/latest') {
     await ctx.scan.ensureCacheLoaded();
     const last = ctx.scan.last();
@@ -376,6 +385,40 @@ async function handleRequest(
 // Tarama adaptoru
 // ---------------------------------------------------------------------------
 
+async function handleListDirs(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://' + (req.headers.host ?? '127.0.0.1'));
+  const raw = (url.searchParams.get('path') ?? '').trim();
+  const requested = resolve(raw || process.env.USERPROFILE || 'C:\\');
+
+  let st;
+  try {
+    st = await stat(longPath(requested));
+  } catch {
+    sendJson(res, 404, { error: 'Dizin bulunamadi' });
+    return;
+  }
+  if (!st.isDirectory()) {
+    sendJson(res, 400, { error: 'Klasor degil' });
+    return;
+  }
+
+  let dirs: Array<{ name: string; path: string }> = [];
+  try {
+    const ents = await readdir(longPath(requested), { withFileTypes: true });
+    dirs = ents
+      .filter((e) => e.isDirectory())
+      .map((e) => ({ name: e.name, path: join(requested, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    dirs = [];
+  }
+
+  // Surucu koku disinda ust klasor her zaman vardir.
+  const up = dirname(requested);
+  const parent = up === requested ? null : up;
+  sendJson(res, 200, { path: requested, parent, dirs });
+}
+
 async function handleStartScan(
   req: IncomingMessage,
   res: ServerResponse,
@@ -391,9 +434,13 @@ async function handleStartScan(
     typeof body.minAgeDays === 'number' && Number.isFinite(body.minAgeDays)
       ? Math.max(0, Math.floor(body.minAgeDays))
       : (ctx.opts.minAgeDays ?? 0);
+  // Proje taramasi: istemci yalnizca klasor secer; yol sunucuda
+  // normalize edilir. Bos/gecersiz deger yok sayilir.
+  const rawRoot = typeof body.root === 'string' ? body.root.trim() : '';
+  const root = rawRoot.length > 0 ? resolve(rawRoot) : undefined;
 
   try {
-    const job = ctx.scan.start({ envs, profile, exclude, minAgeDays });
+    const job = ctx.scan.start({ envs, profile, exclude, minAgeDays, root });
     const out: ScanStartResponse = { scanId: job.id };
     sendJson(res, 202, out);
   } catch (err) {

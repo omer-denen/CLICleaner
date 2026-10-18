@@ -10,6 +10,9 @@
 export function longPath(p: string): string {
   if (p.startsWith('\\\\?\\')) return p;
   if (p.startsWith('\\\\')) return '\\\\?\\UNC\\' + p.slice(2);
+  // Surucu koku ("C:\"): "\\?\" oneki Windows'ta EISDIR verir —
+  // stat/readdir "C:" sanip reddeder. Bu yuzden onek EKLENMEZ.
+  if (/^[A-Za-z]:[\\/]*$/.test(p)) return p.slice(0, 2) + '\\';
   // Relative yollari mutlaklastir, on ek ancak mutlak yolda anlamli.
   if (!/^[A-Za-z]:[\\/]/.test(p) && !p.startsWith('\\\\')) return p;
   return '\\\\?\\' + p;

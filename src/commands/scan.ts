@@ -1,11 +1,14 @@
 import { performance } from 'node:perf_hooks';
+import { readdir, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { classifyPath, detectGpu, setGpuState } from '../core/analyze.ts';
 import { mergeClusters, groupByVerdict, summarize } from '../core/merge.ts';
-import { discover, BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
+import { discover, BUILTIN_PROFILES, ENVS, isOwnDataPath } from '../core/discover.ts';
 import { walk } from '../core/walker.ts';
+import { longPath } from '../util/longpath.ts';
 import { formatBytes, formatAge, padEnd, padStart } from '../util/format.ts';
 import { info, warn, debug } from '../util/log.ts';
-import type { Cluster, Env, ScanResult, SkippedEntry } from '../core/types.ts';
+import type { Cluster, Env, Part, ScanResult, SkippedEntry } from '../core/types.ts';
 
 export interface ScanArgs {
   envs: Env[];
@@ -15,6 +18,8 @@ export interface ScanArgs {
   includeBytes: boolean;
   exclude: string[];
   quiet: boolean;
+  /** Proje ici artiklar icin ayri kok (T10). Verilen dizinin cocuklari taranir. */
+  root?: string;
   /** TUI icin canli ilerleme bildirimi */
   onProgress?: (done: number, total: number, bytes: number) => void;
   /** Kesif bitince taranacak alanlarin tam listesi (web: sol sutun). */
@@ -55,7 +60,39 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
   setGpuState(gpu);
   debug('gpu durumu', gpu);
 
-  const { targets, stats: dStats } = await discover(envs, { exclude });
+  // T10: --root verildiyse yalnizca o kokun cocuklari taranir. Varsayilan
+  // kesif atlanir; proje ici artiklar (node_modules, .venv, dist) icin.
+  // Yol once normalize edilir: ayirici ve son egik cizgi farki sorun olmaz.
+  const root = args.root ? resolve(args.root) : undefined;
+  let targets: Array<{ path: string; origin: Part['origin'] }>;
+  let dStats: { dotDirs: number; localDirs: number; roamingDirs: number; denied: number };
+  if (root) {
+    const st = await stat(longPath(root)).catch(() => null);
+    if (!st || !st.isDirectory()) {
+      throw new Error(`--root dizini bulunamadi veya klasor degil: ${root}`);
+    }
+    const ents = await readdir(longPath(root), { withFileTypes: true });
+    targets = ents
+      .filter((e) => {
+        // .git bir artik degil, deponun kendisidir; hic taranmaz.
+        if (e.name.toLowerCase() === '.git') return false;
+        // Aracin kendi veri dizini (kasa/gunluk) hedef olamaz.
+        if (isOwnDataPath(join(root, e.name))) return false;
+        try {
+          return e.isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .map((e) => ({ path: join(root, e.name), origin: 'custom' as Part['origin'] }));
+    if (targets.length === 0) targets = [{ path: root, origin: 'custom' as Part['origin'] }];
+    dStats = { dotDirs: 0, localDirs: targets.length, roamingDirs: 0, denied: 0 };
+    info('root taramasi', { root, hedef: targets.length });
+  } else {
+    const discovered = await discover(envs, { exclude });
+    targets = discovered.targets;
+    dStats = discovered.stats;
+  }
   args.onTargets?.(targets.map((t) => t.path));
 
   info('kesif tamamlandi', {
@@ -70,7 +107,7 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
     : (msg: string) => process.stderr.write(msg);
 
   log(`\n  CLICleaner taramasi\n`);
-  log(`  Ortam      : ${envs.join(', ')}`);
+  log(`  Ortam      : ${root ? `proje: ${root}` : envs.join(', ')}`);
   if (args.profile) log(`  Profil     : ${args.profile}`);
   log(`  Dizinler   : ${targets.length} aday`);
   log(`  GPU        : ${gpu.hasNvidia ? 'NVIDIA bulundu' : 'NVIDIA yok'}\n`);
@@ -116,6 +153,21 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
   if (!args.quiet) process.stderr.write('\r' + ' '.repeat(60) + '\r');
 
   const merged = mergeClusters(results);
+
+  // T10: --root modunda varsayilan report-only. Proje ici artiklar
+  // otomatik silinmez; kullanici elle karar verir. 'keep' karari
+  // korunur: "korunuyor" bilgisi kaybolmasin. Risk DEGISTIRILMEZ;
+  // risk yapisaldir, karar yalnizca kullaniciya kalir.
+  if (root) {
+    for (const c of merged) {
+      if (c.verdict.kind !== 'keep') c.verdict.kind = 'report-only';
+      c.deleteTargets = [];
+      c.reclaimableBytes = 0;
+      const note = 'Proje ici tarama: varsayilan report-only (silme hedefi uretilmez)';
+      if (!c.verdict.preconditions.includes(note)) c.verdict.preconditions.push(note);
+    }
+  }
+
   const finished = Date.now();
 
   // Silme hedefi olmayan ama onerilen kumeler varsa, bu bir

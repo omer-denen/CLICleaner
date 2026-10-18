@@ -56,6 +56,11 @@ export function ClusterRow({ cluster, selected, expanded, selectable, onToggle, 
           <div className="subtitle">
             <span className={`tag tag-risk-${v.risk}`}>{t(RISK_LABEL[v.risk])}</span>
             <span className="tag">{t(ARCHETYPE_LABEL[cluster.archetype] ?? cluster.archetype)}</span>
+            {evidence.markers?.includes('git-tracked') && (
+              <span className="tag tag-git" title={t('Git tarafından takip edilen yollar atlandı')}>
+                git
+              </span>
+            )}
             <span className="dim">{cluster.key}</span>
           </div>
         </div>

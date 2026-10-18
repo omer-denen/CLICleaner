@@ -51,6 +51,7 @@ export interface ScanRequest {
   profile?: string;
   minAgeDays?: number;
   exclude?: string[];
+  root?: string;
 }
 
 export interface ScanStartResponse {

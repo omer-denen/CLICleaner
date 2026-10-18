@@ -3,6 +3,26 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
+## [0.6.0] - 2026-10-19
+
+### Eklendi
+
+- **Proje taraması:** web arayüzünde **Projeyi Tara** ile klasör seçip tara;
+  terminalde `clicleaner scan --root <dizin>`. Sonuçlar salt rapordur ve
+  yalnızca seçilen klasörün alt klasörleri incelenir.
+- **Git farkındalığı:** sürüm kontrolü altındaki (tracked) dosyalar hiçbir
+  modda silinmez; yalnızca untracked veya `.gitignore` içindeki yollar
+  değerlendirilir. Web listesinde `Git` sekmesi ve `git` etiketi bulunur.
+- Silme güvenliği iyileştirildi: sembolik bağ ve junction'lar hedefiyle
+  birlikte değil, atlanarak işlenir; aracın kendi veri dizini hiçbir taramada
+  aday gösterilmez.
+
+### İyileştirildi
+
+- Tarama ve listeleme işlemi düzeltildi ve iyileştirildi; proje taraması
+  sisteminizin son tarama sonucunu etkilemez.
+- Klasör seçici ve kart görünümü iyileştirildi.
+
 ## [0.5.0] - 2026-10-18
 
 ### Eklendi

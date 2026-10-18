@@ -1,5 +1,6 @@
 import { resolve, sep } from 'node:path';
 import type { DeleteTarget } from '../core/types.ts';
+import { isOwnDataPath } from '../core/discover.ts';
 
 /**
  * Silme hedefi guvenlik kapisi.
@@ -56,6 +57,10 @@ export function unsafeTargetReason(target: string): string | null {
 
   // Surucu koku (C:\, D:\) hicbir zaman silinmez.
   if (/^[a-z]:$/.test(t)) return 'surucu koku hedeflenemez';
+
+  // Aracin KENDI veri dizini (kasa, gunluk, karantina) ve ALTINDAKI
+  // her sey korunur: kullanicinin geri donus adimlari orada yasar.
+  if (isOwnDataPath(t)) return 'aracin kendi veri dizini (kasa/gunluk) korunur';
 
   for (const p of protectedPaths()) {
     const pp = norm(p);

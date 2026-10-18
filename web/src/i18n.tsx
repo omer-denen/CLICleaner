@@ -44,6 +44,24 @@ const EN: Record<string, string> = {
   'Dil': 'Language',
   'Silme modu': 'Deletion mode',
 
+  // --- proje taramasi (--root) ---
+  'İncele (tüm yapıyı tara)': 'Inspect (scan the whole system)',
+  'Projeyi Tara': 'Scan a project',
+  'Projeyi tara (klasör seç ve tara)': 'Scan a project (choose a folder and scan)',
+  'Proje klasörü seç': 'Choose the project folder',
+  'Seçilen klasörün doğrudan alt klasörleri taranacak (proje kökünü seçin).':
+    'The direct subfolders of the selected folder are scanned (choose the project root).',
+  'Yükleniyor...': 'Loading...',
+  'Alt klasör yok': 'No subfolders',
+  'Üst klasör': 'Parent folder',
+  'İptal': 'Cancel',
+  'Seç ve Tara': 'Select and scan',
+  'Proje taraması salt rapordur; silme hedefi üretilmez.':
+    'A project scan is report-only; it never produces delete targets.',
+  'Git tarafından takip edilen yollar atlandı (tracked dosyalar silinmez).':
+    'Git-tracked paths were skipped (tracked files are never deleted).',
+  'Git tarafından takip edilen yollar atlandı': 'Git-tracked paths were skipped',
+
   // --- overlay ---
   'Plan hazırlanıyor…': 'Preparing plan…',
   'Seçilen kümeler ve silinecek yollar doğrulanıyor.': 'Verifying the selected clusters and delete paths.',
