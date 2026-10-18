@@ -7,14 +7,23 @@
   "author": "CLICleaner contributors",
   "keywords": [
     "disk",
+    "disk-space",
+    "cleaner",
     "cleanup",
     "cache",
     "windows",
     "cli",
     "developer-tools",
+    "devtools",
     "nuget",
     "npm-cache",
-    "onnx"
+    "conda",
+    "python",
+    "ai",
+    "ai-agents",
+    "ai-tools",
+    "onnx",
+    "cuda"
   ],
   "repository": {
     "type": "git",

@@ -5,6 +5,15 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-18
+
+### Belgelendirme
+
+- README: AI araçlarında yeni olanlar için sade anlatım — "AI kod araçları
+  kullanıyorsan", ne bulur / neye dokunmaz, güvenlik, SSS ve basit sözlük.
+- GitHub deposuna açıklama, web sitesi ve 20 **topic** eklendi; npm anahtar
+  kelimeleri genişletildi (AI, disk-space, conda, cuda, devtools…).
+
 ## [0.2.0] - 2026-10-18
 
 ### Değişti
