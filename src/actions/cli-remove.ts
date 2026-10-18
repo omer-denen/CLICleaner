@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { longPath } from '../util/longpath.ts';
-import type { CliTool } from '../core/cli-inventory-types.ts';
+import type { CliTool, UninstallSpec } from '../core/cli-inventory-types.ts';
 import {
   executeToolBackup,
   planToolBackup,
@@ -26,6 +26,11 @@ export interface CliRemovalItem {
   manual: boolean;
   uninstallCommand: string;
   reinstallCommand: string;
+  /**
+   * Golgede kalan bir paket kaldirildiginda npm shim'i de silebilir.
+   * Bu durumda komutu geri getirmek icin aktif paketi yeniden baglar.
+   */
+  repair?: UninstallSpec;
 }
 
 export interface CliRemovalPlan {
@@ -52,7 +57,11 @@ export interface CliRemovalResult {
 const PLAN_TTL_MS = 10 * 60_000;
 const MAX_OUTPUT = 4096;
 
-export async function planCliRemoval(tools: CliTool[], backup: boolean): Promise<CliRemovalPlan> {
+export async function planCliRemoval(
+  tools: CliTool[],
+  backup: boolean,
+  repairs: Map<string, UninstallSpec> = new Map(),
+): Promise<CliRemovalPlan> {
   const items: CliRemovalItem[] = [];
   let totalBytes = 0;
   let backupBytes = 0;
@@ -67,12 +76,14 @@ export async function planCliRemoval(tools: CliTool[], backup: boolean): Promise
     seenPackages.add(packageKey);
 
     const backupPlan = await planToolBackup(tool, backup);
+    const repair = repairs.get(tool.id);
     items.push({
       tool,
       backup: backupPlan,
       manual: tool.uninstall === null,
       uninstallCommand: tool.uninstall?.display ?? 'elle kaldir',
       reinstallCommand: reinstallCommand(tool),
+      ...(repair ? { repair } : {}),
     });
     totalBytes += tool.totalBytes;
     backupBytes += backupPlan.totalBytes;
@@ -88,6 +99,67 @@ export async function planCliRemoval(tools: CliTool[], backup: boolean): Promise
     totalBytes,
     backupBytes,
   };
+}
+
+/**
+ * Golgede kalan paket kaldirildiktan sonra komutu geri baglamak icin
+ * aktif paketi yeniden kurar/relink eder. `--force` shim'lerin yeniden
+ * yazilmasini garanti eder.
+ */
+export function reinstallSpec(tool: CliTool): UninstallSpec | null {
+  if (!tool.uninstall) return null;
+  const program = tool.uninstall.program;
+  const name = tool.packageName;
+  const version = tool.version;
+
+  switch (tool.uninstall.kind) {
+    case 'npm': {
+      const npmCli = tool.uninstall.args[0]?.endsWith('.js') ? tool.uninstall.args[0] : null;
+      const pkg = version ? `${name}@${version}` : name;
+      return {
+        kind: 'npm',
+        program,
+        args: npmCli
+          ? [npmCli, 'install', '-g', pkg, '--force']
+          : ['install', '-g', pkg, '--force'],
+        display: `npm install -g ${pkg} --force`,
+      };
+    }
+    case 'uv': {
+      const pkg = version ? `${name}==${version}` : name;
+      return {
+        kind: 'uv',
+        program,
+        args: ['tool', 'install', '--force', pkg],
+        display: `uv tool install --force ${pkg}`,
+      };
+    }
+    case 'dotnet':
+      return {
+        kind: 'dotnet',
+        program,
+        args: [
+          'tool',
+          'install',
+          '--global',
+          name,
+          ...(version ? ['--version', version] : []),
+          '--force',
+        ],
+        display: `dotnet tool install --global ${name}${version ? ` --version ${version}` : ''} --force`,
+      };
+    case 'pip': {
+      const pkg = version ? `${name}==${version}` : name;
+      return {
+        kind: 'pip',
+        program,
+        args: ['-m', 'pip', 'install', '--force-reinstall', pkg],
+        display: `python -m pip install --force-reinstall ${pkg}`,
+      };
+    }
+    case 'manual':
+      return null;
+  }
 }
 
 export async function executeCliRemoval(plan: CliRemovalPlan): Promise<CliRemovalResult[]> {
@@ -126,6 +198,25 @@ export async function executeCliRemoval(plan: CliRemovalPlan): Promise<CliRemova
     }
 
     const r = await runProcess(tool.uninstall.program, tool.uninstall.args);
+
+    // Golgede kalan paket kaldirildiginda npm, paylasilan shim'i de
+    // silebilir. Bu durumda aktif paketi yeniden baglayip komutu
+    // geri getir; aksi halde "basarili" gorunen kaldirma komutu bozar.
+    let repairOutput = '';
+    if (item.repair) {
+      const shimsAlive = tool.shims.some((p) => existsSync(longPath(p)));
+      const still = await Promise.all(
+        tool.shims.map((p) => shimPointsTo(p, tool.installPath)),
+      );
+      if (!shimsAlive || still.some(Boolean)) {
+        const rr = await runProcess(item.repair.program, item.repair.args);
+        repairOutput = truncate(
+          [rr.stdout, rr.stderr].filter(Boolean).join('\n').trim() ||
+            `onarim cikis kodu ${rr.code ?? '?'}`,
+        );
+      }
+    }
+
     // Ayni komutu baska bir paket de sagliyorsa shim SILINMEZ; hedefi
     // degisir. Bu yuzden "shim yok" yerine "paket gitti ve shim artik
     // bu paketi gostermiyor" kontrol edilir.
@@ -133,12 +224,20 @@ export async function executeCliRemoval(plan: CliRemovalPlan): Promise<CliRemova
     const stillPoints = await Promise.all(
       tool.shims.map((p) => shimPointsTo(p, tool.installPath)),
     );
-    const verified = packageGone && !stillPoints.some(Boolean);
+    const shimsAliveAfter = tool.shims.some((p) => existsSync(longPath(p)));
+    const verified =
+      packageGone && !stillPoints.some(Boolean) && (!item.repair || shimsAliveAfter);
+
+    const output = [r.stdout, r.stderr, repairOutput ? `shim onarimi: ${repairOutput}` : '']
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+
     out.push({
       command: tool.command,
       ok: r.code === 0,
       manual: false,
-      output: truncate([r.stdout, r.stderr].filter(Boolean).join('\n').trim() || `cikis kodu ${r.code ?? '?'}`),
+      output: truncate(output || `cikis kodu ${r.code ?? '?'}`),
       ...(r.code !== 0 ? { error: `cikis kodu ${r.code ?? '?'}${r.timedOut ? ' (zaman asimi)' : ''}` } : {}),
       ...(backupDir ? { backupDir } : {}),
       verified,
@@ -148,14 +247,18 @@ export async function executeCliRemoval(plan: CliRemovalPlan): Promise<CliRemova
   return out;
 }
 
-interface ProcessResult {
+export interface ProcessResult {
   code: number | null;
   stdout: string;
   stderr: string;
   timedOut: boolean;
 }
 
-function runProcess(program: string, args: string[]): Promise<ProcessResult> {
+export function runProcess(
+  program: string,
+  args: string[],
+  timeoutMs = 120_000,
+): Promise<ProcessResult> {
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
@@ -176,7 +279,7 @@ function runProcess(program: string, args: string[]): Promise<ProcessResult> {
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill();
-    }, 120_000);
+    }, timeoutMs);
 
     child.stdout?.on('data', (c: Buffer | string) => {
       if (stdout.length < MAX_OUTPUT) stdout += String(c);

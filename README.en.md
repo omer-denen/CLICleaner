@@ -197,6 +197,8 @@ clicleaner scan                # scan and list in the terminal
 clicleaner clean --dry-run     # show the plan only, delete nothing
 clicleaner clean               # two-step confirmation + Recycle Bin
 clicleaner undo --restore      # restore from the Recycle Bin
+clicleaner repair --dry-run    # show broken / partial installations
+clicleaner repair              # repair (ONAR confirmation; live output)
 clicleaner ui --tui            # terminal UI (optional)
 ```
 

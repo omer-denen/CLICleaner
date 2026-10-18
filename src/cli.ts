@@ -8,6 +8,7 @@ import { runRules } from './commands/rules.ts';
 import { runLog, runLogSummary } from './commands/log.ts';
 import { runStatus } from './commands/status.ts';
 import { runInventory } from './commands/inventory.ts';
+import { runRepair } from './commands/repair.ts';
 import { ENVS, BUILTIN_PROFILES } from './core/discover.ts';
 import type { Env, ScanResult } from './core/types.ts';
 
@@ -29,6 +30,7 @@ ${C.bold}Gelismis${C.reset}
   clicleaner ui --tui             Terminal arayuzu (Ink)
   clicleaner clean                Iki asamali onay + geri donusum kutusu
   clicleaner inventory [...]      Kurulu CLI envanteri (salt okunur)
+  clicleaner repair [--only <ad>] Bozuk / yarim kurulumlari onar (ONAR onayi)
   clicleaner explain <ad>         Bir kumenin karar gerekcesi
   clicleaner undo [--restore]     Son silmeyi geri al
   clicleaner log [--summary]      Gunluk
@@ -182,6 +184,11 @@ async function main(): Promise<void> {
 
   if (cmd === 'inventory') {
     await runInventory(rest);
+    return;
+  }
+
+  if (cmd === 'repair') {
+    await runRepair(rest);
     return;
   }
 

@@ -215,6 +215,7 @@ const EN: Record<string, string> = {
   'Yedek yok': 'No backup',
   'Kaldırma komutu': 'Uninstall command',
   'Geri kurulum komutu': 'Reinstall command',
+  'Kaldırma sonrası onarım': 'Post-removal repair',
   'Onaylamak için SIL yaz:': 'Type SIL to confirm:',
   'Planı uygula': 'Apply plan',
   'Envanter taranıyor…': 'Scanning inventory…',
@@ -240,6 +241,20 @@ const EN: Record<string, string> = {
   Aktif: 'Active',
   Gölgede: 'Shadowed',
   'Eski sürümü planla': 'Plan removal of the old version',
+
+  // --- bozuk / yarim kurulum onarimi ---
+  'Bozuk / yarım kurulumlar': 'Broken / partial installations',
+  'Bin dosyası stub kalmış; kurulum betiği engellenmiş olabilir. Onarım paket yöneticisinin kendisiyle yapılır.':
+    'The bin file is a stub; the install script may have been blocked. Repair uses the package manager itself.',
+  Bozuk: 'Broken',
+  Onar: 'Repair',
+  'Kurulum onarımı': 'Installation repair',
+  ONARIM: 'REPAIR',
+  'Paket yöneticisi paketi yeniden kuracak ve kurulum betiklerini çalıştıracak.':
+    'The package manager will reinstall the package and run its install scripts.',
+  'Onaylamak için ONAR yaz:': 'Type ONAR to confirm:',
+  'Onarımı uygula': 'Apply repair',
+  'Onarım tamamlandı.': 'Repair completed.',
 
   // --- disk listesi: sekmeler, siralama, tamamlandi ---
   Kategoriler: 'Categories',

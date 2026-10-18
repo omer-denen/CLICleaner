@@ -20,12 +20,22 @@ import {
 } from '../actions/delete.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { scanCliInventory } from '../core/cli-inventory.ts';
-import { executeCliRemoval, planCliRemoval, type CliRemovalPlan } from '../actions/cli-remove.ts';
+import {
+  executeCliRemoval,
+  planCliRemoval,
+  reinstallSpec,
+  type CliRemovalPlan,
+} from '../actions/cli-remove.ts';
+import {
+  executeCliRepairs,
+  planCliRepairs,
+  type CliRepairPlan,
+} from '../actions/cli-repair.ts';
 import { loadScanCache, saveScanCache } from './scan-store.ts';
 import { longPath } from '../util/longpath.ts';
 import { debug, error as logError, info } from '../util/log.ts';
 import type { Cluster, Env, ScanResult } from '../core/types.ts';
-import type { CliInventory, CliTool } from '../core/cli-inventory-types.ts';
+import type { CliInventory, CliTool, UninstallSpec } from '../core/cli-inventory-types.ts';
 import type {
   CliExecuteRequest,
   CliExecuteResponse,
@@ -36,6 +46,11 @@ import type {
   CliPlanItemView,
   CliPlanRequest,
   CliPlanResponse,
+  CliRepairExecuteRequest,
+  CliRepairExecuteResponse,
+  CliRepairItemView,
+  CliRepairPlanRequest,
+  CliRepairPlanResponse,
   ExecuteEvent,
   ExecuteRequest,
   ExecuteStartResponse,
@@ -157,6 +172,7 @@ interface WebContext {
   cliJobs: Map<string, CliInventoryJob>;
   activeCliInventory: CliInventoryJob | null;
   cliPlans: Map<string, { plan: CliRemovalPlan; expiresAt: number }>;
+  cliRepairPlans: Map<string, { plan: CliRepairPlan; expiresAt: number }>;
   /** Disk onbellegi bir kez okundu mu? */
   scanCacheLoaded: boolean;
 }
@@ -189,6 +205,7 @@ export function createWebServer(opts: WebOptions = {}): { server: Server; token:
     cliJobs: new Map(),
     activeCliInventory: null,
     cliPlans: new Map(),
+    cliRepairPlans: new Map(),
     scanCacheLoaded: false,
   };
 
@@ -366,6 +383,16 @@ async function handleRequest(
     pathname.endsWith('/cancel')
   ) {
     handleCancelCliInventory(res, ctx, pathname);
+    return;
+  }
+
+  if (route === 'POST /api/cli/repair/plan') {
+    await handleCliRepairPlan(req, res, ctx);
+    return;
+  }
+
+  if (route === 'POST /api/cli/repair/execute') {
+    await handleCliRepairExecute(req, res, ctx);
     return;
   }
 
@@ -1041,7 +1068,18 @@ async function handleCliPlan(
     return;
   }
 
-  const plan = await planCliRemoval(removable, body.backup !== false);
+  // Golgede kalan bir paket secildiyse kaldirma sonrasi aktif paketi
+  // yeniden baglayacak onarim komutunu plana ekle.
+  const repairs = new Map<string, UninstallSpec>();
+  for (const d of inv.duplicates) {
+    const keep = inv.tools.find((t) => t.id === d.keepId);
+    if (!keep) continue;
+    const spec = reinstallSpec(keep);
+    if (!spec) continue;
+    for (const id of d.removeIds) repairs.set(id, spec);
+  }
+
+  const plan = await planCliRemoval(removable, body.backup !== false, repairs);
   const items: CliPlanItemView[] = plan.items.map((it) => ({
     id: it.tool.id,
     command: it.tool.command,
@@ -1057,6 +1095,7 @@ async function handleCliPlan(
     evidence: it.tool.evidence,
     uninstallCommand: it.uninstallCommand,
     reinstallCommand: it.reinstallCommand,
+    ...(it.repair ? { repairCommand: it.repair.display } : {}),
     manual: it.manual,
     backupPaths: it.backup.items.map((b) => b.path),
     backupBytes: it.backup.totalBytes,
@@ -1080,6 +1119,102 @@ async function handleCliPlan(
     backupBytes: plan.backupBytes,
     requiresPhrase: true,
     expiresAt: plan.expiresAt,
+  };
+  sendJson(res, 200, out);
+}
+
+async function handleCliRepairPlan(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: WebContext,
+): Promise<void> {
+  const body = await readJson<CliRepairPlanRequest>(req);
+  const ids = Array.isArray(body.ids)
+    ? body.ids.filter((x): x is string => typeof x === 'string' && x.length > 0)
+    : [];
+  if (ids.length === 0) {
+    sendJson(res, 400, { error: 'Arac secilmedi' });
+    return;
+  }
+
+  let inv = ctx.lastCliInventory;
+  if (!inv) {
+    inv = await scanCliInventory({ unusedDays: 21 });
+    ctx.lastCliInventory = inv;
+  }
+
+  const wanted = new Set(ids.map((x) => x.toLowerCase()));
+  const selected = inv.tools.filter(
+    (t) => wanted.has(t.id.toLowerCase()) && t.repair,
+  );
+  if (selected.length === 0) {
+    sendJson(res, 400, { error: 'Onarilabilir arac bulunamadi (standalone elle onarilir)' });
+    return;
+  }
+
+  const plan = planCliRepairs(selected);
+  ctx.cliRepairPlans.set(plan.id, { plan, expiresAt: plan.expiresAt });
+
+  const items: CliRepairItemView[] = plan.items.map((it) => ({
+    id: it.tool.id,
+    command: it.tool.command,
+    packageName: it.tool.packageName,
+    version: it.tool.version,
+    repairCommand: it.tool.repair?.display ?? '',
+  }));
+
+  info('cli onarim plani olusturuldu', { planId: plan.id, araclar: items.length });
+  const out: CliRepairPlanResponse = {
+    planId: plan.id,
+    items,
+    requiresPhrase: true,
+    expiresAt: plan.expiresAt,
+  };
+  sendJson(res, 200, out);
+}
+
+async function handleCliRepairExecute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: WebContext,
+): Promise<void> {
+  const body = await readJson<CliRepairExecuteRequest>(req);
+  const planId = typeof body.planId === 'string' ? body.planId : '';
+  const stored = ctx.cliRepairPlans.get(planId);
+  if (!stored) {
+    sendJson(res, 404, { error: 'Onarim plani bulunamadi veya zaten kullanildi' });
+    return;
+  }
+  if (Date.now() > stored.expiresAt) {
+    ctx.cliRepairPlans.delete(planId);
+    sendJson(res, 410, { error: 'Onarim plani suresi doldu; yeniden planlayin' });
+    return;
+  }
+  if (body.phrase !== 'ONAR') {
+    sendJson(res, 400, { error: 'Onay metni hatali ("ONAR" bekleniyordu)' });
+    return;
+  }
+
+  ctx.cliRepairPlans.delete(planId);
+  info('cli onarimi basladi', { planId, araclar: stored.plan.items.length });
+  const results = await executeCliRepairs(stored.plan);
+  // Envanterdeki saglik bilgisi artik eski; sonraki tarama yeniler.
+  ctx.lastCliInventory = null;
+
+  info('cli onarimi bitti', {
+    planId,
+    basarili: results.filter((r) => r.ok).length,
+    hatali: results.filter((r) => !r.ok).length,
+  });
+
+  const out: CliRepairExecuteResponse = {
+    results: results.map((r) => ({
+      command: r.command,
+      ok: r.ok,
+      output: r.output,
+      ...(r.error ? { error: r.error } : {}),
+      verified: r.verified,
+    })),
   };
   sendJson(res, 200, out);
 }

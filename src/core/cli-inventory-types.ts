@@ -46,6 +46,14 @@ export interface CliTool {
   confidence: 'high' | 'medium' | 'low';
   evidence: string[];
   uninstall: UninstallSpec | null;
+  /**
+   * Kurulum sagligi. 'broken' = bin dosyasi stub kalmis / calismiyor;
+   * genellikle npm'in kurulum betiklerini engellemesinden kaynaklanir.
+   */
+  health?: 'ok' | 'broken';
+  healthEvidence?: string[];
+  /** Bozuk kurulumu paket yoneticisiyle onaracak komut. */
+  repair?: UninstallSpec;
 }
 
 /**

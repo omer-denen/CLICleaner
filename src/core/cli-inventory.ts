@@ -124,6 +124,10 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
   }
 
   const uniqueTools = [...byId.values()];
+  // Tum kaynaklarda (npm, uv, dotnet, pip, standalone) yarim kurulum
+  // tespiti: stub bin + calistirma hatasi. Onarim komutu kaynaga gore
+  // uretilir; standalone icin yalnizca raporlanir.
+  await annotateHealth(uniqueTools);
   const duplicates = findDuplicates(uniqueTools);
   const tools = uniqueTools.sort((a, b) => {
     const rank = statusRank(a.status) - statusRank(b.status);
@@ -373,6 +377,165 @@ async function readShimTarget(shim: string, prefix: string): Promise<string | nu
         /* geri yazilamadi; atime kaniti etkilenmis olabilir */
       });
     }
+  }
+}
+
+/**
+ * Yarim / bozuk kurulum tespiti — TUM kaynaklar icin.
+ *
+ * npm 12 gibi politikalarin kurulum betiklerini engellemesi, uv/dotnet/
+ * pip kurulumlarinin yarim kalmasi veya standalone bir ikilinin
+ * bozulmasi ayni belirtiyi verir: bin dosyasi stub kalir ve
+ * calistirilamaz. Kanit: kucuk .exe + calistirma hatasi (+ varsa
+ * kurulum betigi). Onarim kaynaga gore uretilir; standalone yalnizca
+ * raporlanir (paket yoneticisi yok).
+ */
+async function annotateHealth(tools: CliTool[]): Promise<void> {
+  for (const tool of tools) {
+    // Platform araclari (npm, npx, pip, uv...) yanlislikla "bozuk"
+    // isaretlenmemeli; onarim komutu da tehlikeli olur.
+    if (tool.status === 'protected') continue;
+    const candidates = await healthCandidates(tool);
+    for (const binPath of candidates) {
+      const st = await stat(longPath(binPath)).catch(() => null);
+      if (!st?.isFile() || st.size === 0 || st.size >= 4096) continue;
+
+      const probe = await probeExe(binPath);
+      if (probe.ok) continue;
+
+      const scriptEvidence = await installScriptEvidence(tool);
+      tool.health = 'broken';
+      tool.healthEvidence = [
+        `bin dosyasi ${st.size} B (stub)`,
+        ...(scriptEvidence ? [scriptEvidence] : []),
+        `calistirma hatasi: ${probe.detail}`,
+      ];
+      const spec = repairSpecFor(tool, Boolean(scriptEvidence));
+      if (spec) tool.repair = spec;
+      break;
+    }
+  }
+}
+
+/** Araci calistiran .exe adaylari; kaynak fark etmeksizin. */
+async function healthCandidates(tool: CliTool): Promise<string[]> {
+  const out: string[] = [];
+
+  if (tool.source === 'npm-global') {
+    const pkg = await readJson(join(tool.installPath, 'package.json'));
+    const rel = pkg ? packageBinRel(pkg, tool.command) : null;
+    // Yalnizca dogrudan calistirilabilir .exe adayi; .js/.cmd/.ps1
+    // kucuk olabilir ve probe edilmemeli.
+    if (rel && /\.exe$/i.test(rel)) out.push(join(tool.installPath, rel));
+  }
+
+  // uv / dotnet / pip / standalone: shim'in kendisi calistirilabilir
+  // dosyadir (npm'de .cmd/.ps1 oldugu icin buraya girmez).
+  for (const s of tool.shims) {
+    if (/\.exe$/i.test(s) && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
+/** npm paketinde tanimli kurulum betikleri (kanit metni). */
+async function installScriptEvidence(tool: CliTool): Promise<string> {
+  if (tool.source !== 'npm-global') return '';
+  const pkg = await readJson(join(tool.installPath, 'package.json'));
+  const scripts = pkg?.scripts as Record<string, unknown> | undefined;
+  if (!scripts) return '';
+  const names = ['preinstall', 'install', 'postinstall'].filter((n) => scripts[n]);
+  return names.length > 0
+    ? `kurulum betigi tanimli (${names.join(', ')}); betikler engellenmis olabilir`
+    : '';
+}
+
+/** package.json `bin` alanindan bu komutun dosya yolunu cikarir. */
+function packageBinRel(pkg: Record<string, unknown>, cmd: string): string | null {
+  const bin = pkg.bin;
+  if (typeof bin === 'string') return bin;
+  if (bin && typeof bin === 'object') {
+    const v = (bin as Record<string, unknown>)[cmd];
+    return typeof v === 'string' ? v : null;
+  }
+  return null;
+}
+
+/**
+ * Stub bin'i kisaca calistirir. Yalnizca kucuk dosyalar icin cagrilir.
+ * Onemli: surec calisti ama sifir olmayan kodla ciktysa bu "bozuk"
+ * kaniti degildir; yalnizca spawn/OS hatasi bozuk sayilir.
+ */
+async function probeExe(file: string): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const run = promisify(execFile);
+    await run(file, ['--version'], { timeout: 8000, windowsHide: true });
+    return { ok: true, detail: '' };
+  } catch (err) {
+    const e = err as { killed?: boolean; code?: string | number; message?: string };
+    const spawnError = e.killed === true || typeof e.code === 'string';
+    const detail = e.killed ? 'zaman asimi' : (e.message?.split('\n')[0] ?? 'calistirilamadi');
+    return {
+      ok: !spawnError,
+      detail: detail.slice(0, 160),
+    };
+  }
+}
+
+/** Kaynaga gore onarim komutu; standalone icin null (elle onarim). */
+function repairSpecFor(tool: CliTool, hasInstallScript: boolean): UninstallSpec | null {
+  if (!tool.uninstall) return null;
+  const name = tool.packageName;
+  const version = tool.version;
+  const program = tool.uninstall.program;
+  const npmCli = tool.uninstall.args[0]?.endsWith('.js') ? tool.uninstall.args[0] : null;
+
+  switch (tool.source) {
+    case 'npm-global': {
+      const pkg = version ? `${name}@${version}` : name;
+      const flag = hasInstallScript ? `--allow-scripts=${name}` : '--force';
+      return {
+        kind: 'npm',
+        program,
+        args: npmCli
+          ? [npmCli, 'install', '-g', pkg, flag]
+          : ['install', '-g', pkg, flag],
+        display: `npm install -g ${pkg} ${flag}`,
+      };
+    }
+    case 'uv-tool': {
+      const pkg = version ? `${name}==${version}` : name;
+      return {
+        kind: 'uv',
+        program,
+        args: ['tool', 'install', '--force', pkg],
+        display: `uv tool install --force ${pkg}`,
+      };
+    }
+    case 'dotnet-tool':
+      return {
+        kind: 'dotnet',
+        program,
+        args: [
+          'tool',
+          'install',
+          '--global',
+          name,
+          ...(version ? ['--version', version] : []),
+          '--force',
+        ],
+        display: `dotnet tool install --global ${name}${version ? ` --version ${version}` : ''} --force`,
+      };
+    case 'pip-user': {
+      const pkg = version ? `${name}==${version}` : name;
+      return {
+        kind: 'pip',
+        program,
+        args: ['-m', 'pip', 'install', '--force-reinstall', pkg],
+        display: `python -m pip install --force-reinstall ${pkg}`,
+      };
+    }
+    case 'standalone':
+      return null;
   }
 }
 

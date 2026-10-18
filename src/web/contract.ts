@@ -220,6 +220,8 @@ export interface CliPlanItemView {
   evidence: string[];
   uninstallCommand: string;
   reinstallCommand: string;
+  /** Golgede kalan paket kaldirilinca shim'i onarmak icin komut */
+  repairCommand?: string;
   manual: boolean;
   backupPaths: string[];
   backupBytes: number;
@@ -253,4 +255,45 @@ export interface CliExecuteResultView {
 
 export interface CliExecuteResponse {
   results: CliExecuteResultView[];
+}
+
+// ---------------------------------------------------------------------------
+// CLI onarim (bozuk / yarim kurulum)
+// ---------------------------------------------------------------------------
+
+export interface CliRepairPlanRequest {
+  ids: string[];
+}
+
+export interface CliRepairItemView {
+  id: string;
+  command: string;
+  packageName: string;
+  version: string;
+  repairCommand: string;
+}
+
+export interface CliRepairPlanResponse {
+  planId: string;
+  items: CliRepairItemView[];
+  /** Onarim da yazili onay ister */
+  requiresPhrase: true;
+  expiresAt: number;
+}
+
+export interface CliRepairExecuteRequest {
+  planId: string;
+  phrase: string;
+}
+
+export interface CliRepairResultView {
+  command: string;
+  ok: boolean;
+  output: string;
+  error?: string;
+  verified: boolean;
+}
+
+export interface CliRepairExecuteResponse {
+  results: CliRepairResultView[];
 }

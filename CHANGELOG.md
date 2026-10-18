@@ -5,6 +5,19 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ## [Unreleased]
 
+### Eklendi
+
+- **Komut çakışması:** aynı komutu sağlayan birden fazla kurulum (ör. yeni CLI +
+  eski CLI) birlikte listelenir; shim'in gösterdiği aktif kurulum korunur,
+  gölgede kalan eski paket için kaldırma planı üretilir.
+- **Bozuk / yarım kurulum tespiti:** stub bin + kurulum betiği + çalıştırma
+  hatası kanıtıyla tespit; npm, uv, dotnet, pip ve standalone kapsanır.
+- **Onarım planı:** paket yöneticisinin kendi `install` komutu (`--allow-scripts`
+  / `--force`); web'de `ONAR` yazılı onayı, terminalde `clicleaner repair`
+  komutu ve **canlı çıktı akışı**.
+- Kaldırma sonrası **shim onarımı**: gölgede kalan paket silinince komutun
+  kaybolmaması için aktif paket yeniden bağlanır.
+
 ## [0.2.1] - 2026-10-18
 
 ### Belgelendirme

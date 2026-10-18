@@ -6,6 +6,10 @@ import type {
   CliInventoryStartResponse,
   CliPlanRequest,
   CliPlanResponse,
+  CliRepairExecuteRequest,
+  CliRepairExecuteResponse,
+  CliRepairPlanRequest,
+  CliRepairPlanResponse,
   ExecuteRequest,
   ExecuteStartResponse,
   LatestResponse,
@@ -189,6 +193,22 @@ export function cliPlan(body: CliPlanRequest): Promise<CliPlanResponse> {
 
 export function cliExecute(body: CliExecuteRequest): Promise<CliExecuteResponse> {
   return request<CliExecuteResponse>('/api/cli/execute', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function cliRepairPlan(body: CliRepairPlanRequest): Promise<CliRepairPlanResponse> {
+  return request<CliRepairPlanResponse>('/api/cli/repair/plan', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function cliRepairExecute(
+  body: CliRepairExecuteRequest,
+): Promise<CliRepairExecuteResponse> {
+  return request<CliRepairExecuteResponse>('/api/cli/repair/execute', {
     method: 'POST',
     body: JSON.stringify(body),
   });

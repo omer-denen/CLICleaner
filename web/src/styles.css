@@ -1402,6 +1402,34 @@ input {
   font-size: 15px;
 }
 
+/* Bozuk / yarim kurulumlar: stub bin + onarim komutu. */
+.repairs {
+  padding: 14px 16px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: var(--radius);
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.repairs h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.repairs .because {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+}
+
+.repairs code {
+  display: inline-block;
+  margin-top: 2px;
+}
+
+.tag-broken {
+  color: var(--red);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
 /* Ayni komutu saglayan birden fazla kurulum: aktif + golgede. */
 .conflicts {
   padding: 14px 16px;

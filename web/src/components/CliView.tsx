@@ -4,6 +4,7 @@ import type {
   CliExecuteResponse,
   CliInventoryStreamEvent,
   CliPlanResponse,
+  CliRepairPlanResponse,
 } from '../../../src/web/contract.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import {
@@ -11,6 +12,8 @@ import {
   cliExecute,
   cliInventoryStream,
   cliPlan,
+  cliRepairExecute,
+  cliRepairPlan,
   startCliInventory,
 } from '../api.ts';
 import { useI18n } from '../i18n.tsx';
@@ -44,6 +47,8 @@ export function CliView({ onError, onNotice }: Props) {
   const [plan, setPlan] = useState<CliPlanResponse | null>(null);
   const [phrase, setPhrase] = useState('');
   const [results, setResults] = useState<CliExecuteResponse | null>(null);
+  const [repairPlan, setRepairPlan] = useState<CliRepairPlanResponse | null>(null);
+  const [repairPhrase, setRepairPhrase] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [lastInspectedAt, setLastInspectedAt] = useState<number | null>(null);
   /** Tarama surerken bulunan araclar; bitince yerini `inventory` alir. */
@@ -191,6 +196,17 @@ export function CliView({ onError, onNotice }: Props) {
   const unused = inventory?.tools.filter((x) => x.status === 'unused') ?? [];
   const unusedBytes = unused.reduce((a, x) => a + x.totalBytes, 0);
 
+  // Bozuk kurulumlar: ayni paketin birden fazla komutu varsa tek kart.
+  const brokenTools = useMemo(() => {
+    const map = new Map<string, CliTool>();
+    for (const tool of inventory?.tools ?? []) {
+      if (tool.health !== 'broken') continue;
+      const key = `${tool.source}:${tool.packageName}@${tool.version}`;
+      if (!map.has(key)) map.set(key, tool);
+    }
+    return [...map.values()];
+  }, [inventory]);
+
   const selectable = (x: CliTool) => x.status !== 'protected' && x.uninstall !== null;
 
   const toggle = (id: string) => {
@@ -233,6 +249,40 @@ export function CliView({ onError, onNotice }: Props) {
       const r = await cliExecute({ planId: plan.planId, phrase: phrase.trim() });
       setResults(r);
       setPlan(null);
+      await load();
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openRepair = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      const p = await cliRepairPlan({ ids });
+      setRepairPlan(p);
+      setRepairPhrase('');
+    } catch (e) {
+      onError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyRepair = async () => {
+    if (!repairPlan || repairPhrase.trim() !== 'ONAR') return;
+    setBusy(true);
+    try {
+      const r = await cliRepairExecute({ planId: repairPlan.planId, phrase: 'ONAR' });
+      setRepairPlan(null);
+      const failed = r.results.filter((x) => !x.ok);
+      if (failed.length > 0) {
+        onError(failed.map((x) => `${x.command}: ${x.error ?? 'hata'}`).join(' | '));
+      } else {
+        onNotice?.(t('Onarım tamamlandı.'));
+      }
       await load();
     } catch (e) {
       onError(errText(e));
@@ -338,6 +388,43 @@ export function CliView({ onError, onNotice }: Props) {
             <span className="dim">{t('Yedek')}: {inventory.tools.filter((x) => x.stateDirs.length > 0).length}</span>
           </div>
         </div>
+      )}
+
+      {brokenTools.length > 0 && (
+        <section className="repairs">
+          <h3>{t('Bozuk / yarım kurulumlar')}</h3>
+          <p className="dim small">
+            {t(
+              'Bin dosyası stub kalmış; kurulum betiği engellenmiş olabilir. Onarım paket yöneticisinin kendisiyle yapılır.',
+            )}
+          </p>
+          {brokenTools.map((tool) => (
+            <div className="conflict" key={tool.id}>
+              <div className="conflict-main">
+                <div className="conflict-head">
+                  <strong>{tool.command}</strong>
+                  <span className="dim">
+                    {tool.packageName}@{tool.version}
+                  </span>
+                  <span className="tag tag-broken">{t('Bozuk')}</span>
+                </div>
+                <ul className="because">
+                  {(tool.healthEvidence ?? []).map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+                {tool.repair && <code>{tool.repair.display}</code>}
+              </div>
+              <button
+                className="btn"
+                disabled={busy || !tool.repair}
+                onClick={() => void openRepair([tool.id])}
+              >
+                {t('Onar')}
+              </button>
+            </div>
+          ))}
+        </section>
       )}
 
       {inventory && inventory.duplicates.length > 0 && (
@@ -583,6 +670,12 @@ export function CliView({ onError, onNotice }: Props) {
                     <li>
                       <span className="dim">{t('Geri kurulum komutu')}:</span> <code>{item.reinstallCommand}</code>
                     </li>
+                    {item.repairCommand && (
+                      <li>
+                        <span className="dim">{t('Kaldırma sonrası onarım')}:</span>{' '}
+                        <code>{item.repairCommand}</code>
+                      </li>
+                    )}
                     {item.backupPaths.length > 0 && (
                       <li>
                         <span className="dim">{t('Yedek')}:</span> {item.backupPaths.map(shortPath).join(', ')}
@@ -619,6 +712,67 @@ export function CliView({ onError, onNotice }: Props) {
                 onClick={() => void applyPlan()}
               >
                 {busy ? t('Başlatılıyor…') : t('Planı uygula')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {repairPlan && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('Kurulum onarımı')}
+        >
+          <div className="modal repair-modal">
+            <header className="modal-head">
+              <h2>{t('Kurulum onarımı')}</h2>
+              <span className="tag tag-recycle">{t('ONARIM')}</span>
+            </header>
+            <p className="dim">
+              {t(
+                'Paket yöneticisi paketi yeniden kuracak ve kurulum betiklerini çalıştıracak.',
+              )}
+            </p>
+            <div className="modal-list">
+              {repairPlan.items.map((item) => (
+                <div className="plan-cluster" key={item.id}>
+                  <div className="plan-head">
+                    <strong>{item.command}</strong>
+                    <span className="dim">
+                      {item.packageName}@{item.version}
+                    </span>
+                  </div>
+                  <ul>
+                    <li>
+                      <code>{item.repairCommand}</code>
+                    </li>
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <label className="phrase">
+              <span>{t('Onaylamak için ONAR yaz:')}</span>
+              <input
+                type="text"
+                value={repairPhrase}
+                onChange={(e) => setRepairPhrase(e.target.value)}
+                placeholder="ONAR"
+                disabled={busy}
+                autoFocus
+              />
+            </label>
+            <footer className="modal-actions">
+              <button className="btn" onClick={() => setRepairPlan(null)} disabled={busy}>
+                {t('Vazgeç')}
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={busy || repairPhrase.trim() !== 'ONAR'}
+                onClick={() => void applyRepair()}
+              >
+                {busy ? t('Başlatılıyor…') : t('Onarımı uygula')}
               </button>
             </footer>
           </div>

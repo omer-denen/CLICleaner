@@ -197,6 +197,8 @@ clicleaner scan                # terminalde tara ve listele
 clicleaner clean --dry-run     # yalnızca planı göster, hiçbir şey silme
 clicleaner clean               # iki aşamalı onay + geri dönüşüm kutusu
 clicleaner undo --restore      # geri dönüşüm kutusundan geri al
+clicleaner repair --dry-run    # bozuk / yarım kurulumları göster
+clicleaner repair              # onar (ONAR onayı; çıktı canlı akar)
 clicleaner ui --tui            # terminal arayüzü (isteğe bağlı)
 ```
 
