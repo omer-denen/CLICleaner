@@ -5,6 +5,13 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ## [Unreleased]
 
+### Değişti
+
+- **İç mimari — servis katmanı:** plan/job/TTL durumu `web/server.ts`'ten
+  çıkarıldı; `ScanService`, `DeleteService`, `CliInventoryService`,
+  `CliRemovalService`, `CliRepairService` eklendi. Server artık yalnız
+  HTTP/SSE adaptörü. **Kullanıcı davranışı değişmedi.**
+
 ### Eklendi
 
 - **Ajan kurulum izi (T17):** npm `_logs` günlüklerinden `install -g` satırı,

@@ -5,80 +5,55 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { runScan } from '../commands/scan.ts';
-import {
-  buildPlan,
-  closeRecycle,
-  deleteTarget,
-  Journal,
-  type DeletePlan,
-  type DeleteResult,
-} from '../actions/delete.ts';
+import { closeRecycle } from '../actions/delete.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
-import { scanCliInventory } from '../core/cli-inventory.ts';
-import {
-  executeCliRemoval,
-  planCliRemoval,
-  reinstallSpec,
-  type CliRemovalPlan,
-} from '../actions/cli-remove.ts';
-import {
-  executeCliRepairs,
-  planCliRepairs,
-  type CliRepairPlan,
-} from '../actions/cli-repair.ts';
-import { loadScanCache, saveScanCache } from './scan-store.ts';
-import { longPath } from '../util/longpath.ts';
-import { debug, error as logError, info } from '../util/log.ts';
-import type { Cluster, Env, ScanResult } from '../core/types.ts';
-import type { CliInventory, CliTool, UninstallSpec } from '../core/cli-inventory-types.ts';
+import { ScanService } from '../services/scan-service.ts';
+import { DeleteService } from '../services/delete-service.ts';
+import { CliInventoryService } from '../services/cli-inventory-service.ts';
+import { CliRemovalService } from '../services/cli-removal-service.ts';
+import { CliRepairService } from '../services/cli-repair-service.ts';
+import { ServiceError, describeError } from '../services/errors.ts';
+import { readJson, sendJson, sseSend, sseSetup } from './http.ts';
+import type { Env } from '../core/types.ts';
 import type {
-  CliExecuteRequest,
-  CliExecuteResponse,
   CliInventoryCancelResponse,
   CliInventoryRequest,
   CliInventoryStartResponse,
   CliInventoryStreamEvent,
-  CliPlanItemView,
+  CliExecuteRequest,
   CliPlanRequest,
-  CliPlanResponse,
   CliRepairExecuteRequest,
-  CliRepairExecuteResponse,
-  CliRepairItemView,
   CliRepairPlanRequest,
-  CliRepairPlanResponse,
-  ExecuteEvent,
   ExecuteRequest,
-  ExecuteStartResponse,
   LatestResponse,
   MetaResponse,
   PlanRequest,
-  PlanResponse,
-  PlanView,
   ScanRequest,
   ScanStartResponse,
   ScanStreamEvent,
 } from './contract.ts';
 
 /**
- * CLICleaner yerel web arayuzu.
+ * CLICleaner yerel web arayuzu — YALNIZ HTTP/SSE adaptoru.
+ *
+ * Is mantigi `src/services/` altindadir:
+ *   ScanService, DeleteService, CliInventoryService,
+ *   CliRemovalService, CliRepairService.
  *
  * Guvenlik modeli:
  *  - Sunucu YALNIZCA 127.0.0.1 uzerinde dinler; aga acilmaz.
  *  - Her baslatmada rastgele bir token uretilir; API cagrilari bu
- *    token olmadan reddedilir. Boylece ayni makinedeki baska bir
- *    program/tarayici sekmesi araci kullanamaz.
+ *    token olmadan reddedilir.
  *  - Istemci YOL gondermez. Yollar sunucudaki tarama sonucundan
  *    gelir; istemci yalnizca kume anahtari secer.
  *  - Silme iki asamalidir: once plan (kimlik), sonra onay. Plan
  *    10 dakika sonra duser. Orta/yuksek risk "SIL" yazili onayi
  *    olmadan yurutulmez.
- *  - Tarayici "Origin" ve "Host" basliklari dogrulanir (DNS
- *    rebinding ve CSRF'e karsi).
+ *  - Tarayici "Origin" ve "Host" basliklari dogrulanir.
  */
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -103,124 +78,64 @@ export interface WebOptions {
   persistScan?: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Durum
-// ---------------------------------------------------------------------------
-
-interface ScanJob {
-  id: string;
-  status: 'running' | 'done' | 'error' | 'cancelled';
-  progress: { done: number; total: number; bytes: number };
-  /** Taranacak alanlarin tam listesi (sol sutun). */
-  targets: string[];
-  /** Simdiye kadar siniflandirilan kumeler: gec baglanan istemciye replay. */
-  found: Cluster[];
-  result?: ScanResult;
-  error?: string;
-  clients: Set<ServerResponse>;
-  startedAt: number;
-  controller: AbortController;
-}
-
-interface ExecuteJob {
-  id: string;
-  status: 'running' | 'done' | 'error';
-  last: ExecuteEvent | null;
-  clients: Set<ServerResponse>;
-  startedAt: number;
-}
-
-/**
- * CLI envanteri isi. Araclar bulundukca `tools`a eklenir ve SSE
- * istemcilerine tek tek gonderilir; sonunda toplu `inventory` gelir.
- */
-interface CliInventoryJob {
-  id: string;
-  status: 'running' | 'done' | 'error' | 'cancelled';
-  unusedDays: number;
-  tools: CliTool[];
-  result?: CliInventory;
-  error?: string;
-  clients: Set<ServerResponse>;
-  startedAt: number;
-  controller: AbortController;
-}
-
-interface StoredPlan {
-  planId: string;
-  plan: DeletePlan;
-  createdAt: number;
-  expiresAt: number;
-  requiresPhrase: boolean;
-  requiresHighAck: boolean;
-}
-
 interface WebContext {
   token: string;
   opts: WebOptions;
-  scans: Map<string, ScanJob>;
-  activeScan: ScanJob | null;
-  lastScan: { scan: ScanResult; at: number } | null;
-  plans: Map<string, StoredPlan>;
-  jobs: Map<string, ExecuteJob>;
-  lastCliInventory: CliInventory | null;
-  /**
-   * Ayni anda tek CLI envanteri: ikinci istek yeni bir dosya
-   * yuruyusu baslatmaz, calisan isi paylasir. `activeCliInventory`
-   * yalnizca suren isi gosterir (bitenler `cliJobs`ta kalir).
-   */
-  cliJobs: Map<string, CliInventoryJob>;
-  activeCliInventory: CliInventoryJob | null;
-  cliPlans: Map<string, { plan: CliRemovalPlan; expiresAt: number }>;
-  cliRepairPlans: Map<string, { plan: CliRepairPlan; expiresAt: number }>;
-  /** Disk onbellegi bir kez okundu mu? */
-  scanCacheLoaded: boolean;
-}
-
-/** Tarayicidan gelen govde limiti: plan listesi kucuktur, 1 MB yeter. */
-const MAX_BODY = 1024 * 1024;
-const PLAN_TTL_MS = 10 * 60_000;
-
-/** Istemci hatasi: 4xx olarak doner (500 degil). */
-class HttpError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = 'HttpError';
-    this.status = status;
-  }
+  scan: ScanService;
+  remove: DeleteService;
+  inventory: CliInventoryService;
+  removal: CliRemovalService;
+  repair: CliRepairService;
+  /** jobId -> SSE istemcileri (HTTP adaptorune ait gecici durum). */
+  streams: Map<string, Set<ServerResponse>>;
 }
 
 export function createWebServer(opts: WebOptions = {}): { server: Server; token: string } {
+  const token = randomBytes(24).toString('hex');
+  const streams = new Map<string, Set<ServerResponse>>();
+
+  // Servis olaylarini SSE istemcilerine yazan tek nokta. Terminal
+  // olaydan sonra baglantilar kapatilir; servisler HTTP bilmez.
+  const emit = (jobId: string, event: unknown): void => {
+    const clients = streams.get(jobId);
+    if (!clients) return;
+    for (const c of clients) sseSend(c, event);
+    const type = (event as { type?: string }).type;
+    if (type === 'done' || type === 'cancelled' || type === 'error') {
+      for (const c of clients) c.end();
+      streams.delete(jobId);
+    }
+  };
+
+  const scan = new ScanService(emit, opts.persistScan !== false);
+  const remove = new DeleteService(emit);
+  const inventory = new CliInventoryService(emit);
+  const removal = new CliRemovalService(inventory);
+  const repair = new CliRepairService(inventory);
+
   const ctx: WebContext = {
-    token: randomBytes(24).toString('hex'),
+    token,
     opts,
-    scans: new Map(),
-    activeScan: null,
-    lastScan: null,
-    plans: new Map(),
-    jobs: new Map(),
-    lastCliInventory: null,
-    cliJobs: new Map(),
-    activeCliInventory: null,
-    cliPlans: new Map(),
-    cliRepairPlans: new Map(),
-    scanCacheLoaded: false,
+    scan,
+    remove,
+    inventory,
+    removal,
+    repair,
+    streams,
   };
 
   const server = createServer((req, res) => {
     handleRequest(req, res, ctx).catch((err) => {
       try {
-        const status = err instanceof HttpError ? err.status : 500;
-        sendJson(res, status, { error: describe(err) });
+        const status = err instanceof ServiceError ? err.status : 500;
+        sendJson(res, status, { error: describeError(err) });
       } catch {
         /* yanit zaten yazilmis olabilir */
       }
     });
   });
 
-  return { server, token: ctx.token };
+  return { server, token };
 }
 
 /** Web arayuzunu baslatir ve kullanici Ctrl+C'ye basana kadar tutar. */
@@ -324,11 +239,9 @@ async function handleRequest(
   }
 
   if (route === 'GET /api/latest') {
-    await ensureLastScan(ctx);
-    const body: LatestResponse = {
-      scan: ctx.lastScan?.scan ?? null,
-      at: ctx.lastScan?.at ?? null,
-    };
+    await ctx.scan.ensureCacheLoaded();
+    const last = ctx.scan.last();
+    const body: LatestResponse = { scan: last?.scan ?? null, at: last?.at ?? null };
     sendJson(res, 200, body);
     return;
   }
@@ -344,7 +257,9 @@ async function handleRequest(
   }
 
   if (req.method === 'POST' && pathname.startsWith('/api/scan/') && pathname.endsWith('/cancel')) {
-    handleCancelScan(res, ctx, pathname);
+    const id = pathname.split('/')[3] ?? '';
+    ctx.scan.cancel(id);
+    sendJson(res, 202, { ok: true });
     return;
   }
 
@@ -354,7 +269,13 @@ async function handleRequest(
   }
 
   if (route === 'POST /api/execute') {
-    await handleExecute(req, res, ctx);
+    const body = await readJson<ExecuteRequest>(req);
+    const out = ctx.remove.execute(
+      body.planId ?? '',
+      body.phrase,
+      body.acknowledgeHigh === true,
+    );
+    sendJson(res, 202, out);
     return;
   }
 
@@ -382,27 +303,42 @@ async function handleRequest(
     pathname.startsWith('/api/cli/inventory/') &&
     pathname.endsWith('/cancel')
   ) {
-    handleCancelCliInventory(res, ctx, pathname);
+    const id = pathname.split('/')[4] ?? '';
+    ctx.inventory.cancel(id);
+    const out: CliInventoryCancelResponse = { ok: true };
+    sendJson(res, 202, out);
     return;
   }
 
   if (route === 'POST /api/cli/repair/plan') {
-    await handleCliRepairPlan(req, res, ctx);
+    const body = await readJson<CliRepairPlanRequest>(req);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((x): x is string => typeof x === 'string' && x.length > 0)
+      : [];
+    sendJson(res, 200, await ctx.repair.plan(ids));
     return;
   }
 
   if (route === 'POST /api/cli/repair/execute') {
-    await handleCliRepairExecute(req, res, ctx);
+    const body = await readJson<CliRepairExecuteRequest>(req);
+    const planId = typeof body.planId === 'string' ? body.planId : '';
+    sendJson(res, 200, await ctx.repair.execute(planId, body.phrase));
     return;
   }
 
   if (route === 'POST /api/cli/plan') {
-    await handleCliPlan(req, res, ctx);
+    const body = await readJson<CliPlanRequest>(req);
+    const commands = Array.isArray(body.commands)
+      ? body.commands.filter((c): c is string => typeof c === 'string' && c.length > 0)
+      : [];
+    sendJson(res, 200, await ctx.removal.plan(commands, body.backup !== false));
     return;
   }
 
   if (route === 'POST /api/cli/execute') {
-    await handleCliExecute(req, res, ctx);
+    const body = await readJson<CliExecuteRequest>(req);
+    const planId = typeof body.planId === 'string' ? body.planId : '';
+    sendJson(res, 200, await ctx.removal.execute(planId, body.phrase));
     return;
   }
 
@@ -415,40 +351,14 @@ async function handleRequest(
 }
 
 // ---------------------------------------------------------------------------
-// Tarama
+// Tarama adaptoru
 // ---------------------------------------------------------------------------
-
-/**
- * Son tarama sonucunu disk onbelleginden BIR KEZ yukler.
- * 24 saatten eskiyse loadScanCache null doner; kullanici "Incele" gorur.
- */
-async function ensureLastScan(ctx: WebContext): Promise<void> {
-  if (ctx.scanCacheLoaded) return;
-  ctx.scanCacheLoaded = true;
-  if (ctx.lastScan) return;
-  const cached = await loadScanCache();
-  if (cached) {
-    ctx.lastScan = cached;
-    info('tarama onbellegi yuklendi', {
-      at: new Date(cached.at).toISOString(),
-      kume: cached.scan.clusters.length,
-    });
-  } else {
-    debug('taze tarama onbellegi yok (24 saat)');
-  }
-}
 
 async function handleStartScan(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: WebContext,
 ): Promise<void> {
-  // Ayni anda tek tarama: mevcut tarama varsa kimligini bildir.
-  if (ctx.activeScan) {
-    sendJson(res, 409, { error: 'Tarama zaten suruyor', scanId: ctx.activeScan.id });
-    return;
-  }
-
   const body = await readJson<ScanRequest>(req);
   const envs = sanitizeEnvs(body.envs) ?? ctx.opts.envs ?? [];
   const profile = sanitizeProfile(body.profile) ?? ctx.opts.profile;
@@ -460,112 +370,18 @@ async function handleStartScan(
       ? Math.max(0, Math.floor(body.minAgeDays))
       : (ctx.opts.minAgeDays ?? 0);
 
-  const job: ScanJob = {
-    id: newId(),
-    status: 'running',
-    progress: { done: 0, total: 0, bytes: 0 },
-    targets: [],
-    found: [],
-    clients: new Set(),
-    startedAt: Date.now(),
-    controller: new AbortController(),
-  };
-  ctx.scans.set(job.id, job);
-  ctx.activeScan = job;
-
-  void runScanJob(ctx, job, { envs, profile, exclude, minAgeDays });
-
-  const out: ScanStartResponse = { scanId: job.id };
-  sendJson(res, 202, out);
-}
-
-async function runScanJob(
-  ctx: WebContext,
-  job: ScanJob,
-  args: { envs: Env[]; profile?: string; exclude: string[]; minAgeDays: number },
-): Promise<void> {
   try {
-    const result = await runScan({
-      envs: args.envs,
-      profile: args.profile,
-      minAgeDays: args.minAgeDays,
-      json: true,
-      includeBytes: true,
-      exclude: args.exclude,
-      quiet: true,
-      signal: job.controller.signal,
-      onProgress: (done, total, bytes) => {
-        job.progress = { done, total, bytes };
-        broadcast(job.clients, { type: 'progress', done, total, bytes });
-      },
-      onTargets: (paths) => {
-        job.targets = paths;
-        const ev: ScanStreamEvent = { type: 'targets', paths };
-        broadcast(job.clients, ev);
-      },
-      onTargetStart: (path, done, total) => {
-        const ev: ScanStreamEvent = { type: 'target-start', path, done, total };
-        broadcast(job.clients, ev);
-      },
-      onTargetDone: (path, done, total, cluster) => {
-        if (cluster) job.found.push(cluster);
-        const ev: ScanStreamEvent = { type: 'target-done', path, done, total, cluster };
-        broadcast(job.clients, ev);
-      },
-    });
-
-    if (job.controller.signal.aborted) {
-      job.status = 'cancelled';
-      info('tarama iptal edildi', {
-        scanId: job.id,
-        ilerleme: `${job.progress.done}/${job.progress.total}`,
-        kume: result.clusters.length,
-      });
-      broadcast(job.clients, { type: 'cancelled' });
+    const job = ctx.scan.start({ envs, profile, exclude, minAgeDays });
+    const out: ScanStartResponse = { scanId: job.id };
+    sendJson(res, 202, out);
+  } catch (err) {
+    // Eski davranis: 409 govdesinde calisan taramanin kimligi de doner.
+    if (err instanceof ServiceError && err.status === 409) {
+      sendJson(res, 409, { error: err.message, scanId: ctx.scan.activeJobId() });
       return;
     }
-
-    job.status = 'done';
-    job.result = result;
-    ctx.lastScan = { scan: result, at: Date.now() };
-    ctx.scanCacheLoaded = true;
-    // Sonraki sunucu baslangicinda / sayfa yenilemesinde kullanilir.
-    // Testler kismi taramalari onbellege yazmasin (persistScan: false).
-    if (ctx.opts.persistScan !== false) await saveScanCache(result);
-    broadcast(job.clients, { type: 'done', result });
-  } catch (err) {
-    if (job.controller.signal.aborted) {
-      job.status = 'cancelled';
-      broadcast(job.clients, { type: 'cancelled' });
-    } else {
-      job.status = 'error';
-      job.error = describe(err);
-      broadcast(job.clients, { type: 'error', message: job.error });
-    }
-  } finally {
-    ctx.activeScan = null;
-    for (const c of job.clients) c.end();
-    job.clients.clear();
+    throw err;
   }
-}
-
-function handleCancelScan(res: ServerResponse, ctx: WebContext, pathname: string): void {
-  const id = pathname.split('/')[3] ?? '';
-  const job = ctx.scans.get(id);
-  if (!job) {
-    sendJson(res, 404, { error: 'Tarama bulunamadi' });
-    return;
-  }
-  if (job.status !== 'running') {
-    sendJson(res, 409, { error: 'Tarama zaten bitti' });
-    return;
-  }
-  job.controller.abort();
-  info('tarama iptal istendi', {
-    scanId: job.id,
-    ilerleme: `${job.progress.done}/${job.progress.total}`,
-  });
-  sendJson(res, 202, { ok: true });
 }
 
 function openScanStream(
@@ -575,7 +391,7 @@ function openScanStream(
   pathname: string,
 ): void {
   const id = pathname.split('/')[3] ?? '';
-  const job = ctx.scans.get(id);
+  const job = ctx.scan.get(id);
   if (!job) {
     sendJson(res, 404, { error: 'Tarama bulunamadi' });
     return;
@@ -617,12 +433,11 @@ function openScanStream(
     return;
   }
 
-  job.clients.add(res);
-  req.on('close', () => job.clients.delete(res));
+  subscribe(ctx, id, req, res);
 }
 
 // ---------------------------------------------------------------------------
-// Plan ve silme
+// Disk plan adaptoru
 // ---------------------------------------------------------------------------
 
 async function handleCreatePlan(
@@ -631,229 +446,42 @@ async function handleCreatePlan(
   ctx: WebContext,
 ): Promise<void> {
   const body = await readJson<PlanRequest>(req);
-  await ensureLastScan(ctx);
-  const scan = body.scanId ? ctx.scans.get(body.scanId)?.result : ctx.lastScan?.scan;
-  if (!scan) {
-    sendJson(res, 400, { error: 'Once tarama yapilmali' });
-    return;
-  }
+  await ctx.scan.ensureCacheLoaded();
 
+  const scan = body.scanId ? ctx.scan.get(body.scanId)?.result : ctx.scan.last()?.scan;
   const keys = Array.isArray(body.keys)
     ? body.keys.filter((k): k is string => typeof k === 'string' && k.length > 0)
     : [];
-  if (keys.length === 0) {
-    sendJson(res, 400, { error: 'Kume secilmedi' });
-    return;
-  }
-
   const mode = body.mode === 'purge' ? 'purge' : 'recycle';
-  const selected = scan.clusters.filter((c) => keys.includes(c.key));
-  if (selected.length === 0) {
-    sendJson(res, 400, { error: 'Secilen kumeler bulunamadi' });
-    return;
-  }
-
-  let plan: DeletePlan;
-  try {
-    plan = buildPlan(selected, mode);
-  } catch (err) {
-    // Guvenlik kapisi burada hata firlatir; plana hicbir zaman girmez.
-    sendJson(res, 400, { error: describe(err) });
-    return;
-  }
-
-  if (plan.targets.length === 0) {
-    sendJson(res, 400, { error: 'Secilen kumeler icin silinecek yol yok' });
-    return;
-  }
-
-  const requiresPhrase = plan.clusters.some((c) => c.risk === 'medium' || c.risk === 'high');
-  const requiresHighAck = plan.clusters.some((c) => c.risk === 'high');
-  const planId = newId();
-  const expiresAt = Date.now() + PLAN_TTL_MS;
-
-  ctx.plans.set(planId, {
-    planId,
-    plan,
-    createdAt: Date.now(),
-    expiresAt,
-    requiresPhrase,
-    requiresHighAck,
-  });
-
-  const planView: PlanView = {
-    mode: plan.mode,
-    clusters: plan.clusters,
-    targets: plan.targets,
-    totalBytes: plan.totalBytes,
-  };
-  const out: PlanResponse = { planId, plan: planView, requiresPhrase, requiresHighAck, expiresAt };
-  sendJson(res, 200, out);
+  sendJson(res, 200, ctx.remove.createPlan(scan ?? null, keys, mode));
 }
 
-async function handleExecute(
+function openJobStream(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: WebContext,
-): Promise<void> {
-  const body = await readJson<ExecuteRequest>(req);
-  const stored = ctx.plans.get(body.planId ?? '');
-  if (!stored) {
-    sendJson(res, 404, { error: 'Plan bulunamadi veya zaten kullanildi' });
-    return;
-  }
-  if (Date.now() > stored.expiresAt) {
-    ctx.plans.delete(stored.planId);
-    sendJson(res, 410, { error: 'Plan suresi doldu; yeniden planlayin' });
-    return;
-  }
-  if (stored.requiresPhrase && body.phrase !== 'SIL') {
-    sendJson(res, 400, { error: 'Onay metni hatali ("SIL" bekleniyordu)' });
-    return;
-  }
-  if (stored.requiresHighAck && body.acknowledgeHigh !== true) {
-    sendJson(res, 400, { error: 'Yuksek risk onayi eksik' });
+  pathname: string,
+): void {
+  const id = pathname.split('/')[3] ?? '';
+  const job = ctx.remove.getJob(id);
+  if (!job) {
+    sendJson(res, 404, { error: 'Islem bulunamadi' });
     return;
   }
 
-  // Plan tek kullanimlik: ayni planla ikinci kez silme baslatilamaz.
-  ctx.plans.delete(stored.planId);
+  sseSetup(res);
+  if (job.last) sseSend(res, job.last);
 
-  const job: ExecuteJob = {
-    id: newId(),
-    status: 'running',
-    last: null,
-    clients: new Set(),
-    startedAt: Date.now(),
-  };
-  ctx.jobs.set(job.id, job);
-  void runExecuteJob(job, stored);
-
-  const out: ExecuteStartResponse = { jobId: job.id };
-  sendJson(res, 202, out);
-}
-
-async function runExecuteJob(job: ExecuteJob, stored: StoredPlan): Promise<void> {
-  const plan = stored.plan;
-  const journal = new Journal();
-  let freed = 0;
-  let removed = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  const emit = (ev: ExecuteEvent) => {
-    job.last = ev;
-    broadcast(job.clients, ev);
-  };
-
-  emit({ type: 'start', total: plan.targets.length, bytes: plan.totalBytes, mode: plan.mode });
-
-  try {
-    for (let i = 0; i < plan.targets.length; i++) {
-      const pt = plan.targets[i]!;
-      emit({
-        type: 'target-start',
-        index: i,
-        total: plan.targets.length,
-        label: pt.target.label,
-        path: pt.target.path,
-        bytes: pt.bytes,
-      });
-
-      const t0 = Date.now();
-      const heartbeat = setInterval(
-        () => emit({ type: 'heartbeat', index: i, elapsedMs: Date.now() - t0 }),
-        5_000,
-      );
-
-      let r: DeleteResult | null = null;
-      try {
-        r = await deleteTarget(pt.target, plan.mode);
-      } catch (err) {
-        failed++;
-        journal.add({
-          at: Date.now(),
-          mode: plan.mode,
-          action: 'failed',
-          path: pt.target.path,
-          bytes: 0,
-          reason: describe(err),
-        });
-        emit({ type: 'target-done', index: i, bytesFreed: 0, removed: 0, skipped: 0, failed: 1 });
-      } finally {
-        clearInterval(heartbeat);
-      }
-
-      if (r) {
-        freed += r.bytesFreed;
-        removed += r.removed;
-        skipped += r.skipped.length;
-        failed += r.failed.length;
-        for (const s of r.skipped) {
-          journal.add({
-            at: Date.now(),
-            mode: plan.mode,
-            action: 'skipped',
-            path: s.path,
-            bytes: 0,
-            reason: s.reason,
-          });
-        }
-        for (const f of r.failed) {
-          journal.add({
-            at: Date.now(),
-            mode: plan.mode,
-            action: 'failed',
-            path: f.path,
-            bytes: 0,
-            reason: f.reason,
-          });
-        }
-        if (r.removed > 0) {
-          journal.add({
-            at: Date.now(),
-            mode: plan.mode,
-            action: 'deleted',
-            path: pt.target.path,
-            bytes: r.bytesFreed,
-          });
-        }
-        emit({
-          type: 'target-done',
-          index: i,
-          bytesFreed: r.bytesFreed,
-          removed: r.removed,
-          skipped: r.skipped.length,
-          failed: r.failed.length,
-        });
-      }
-    }
-
-    let journalPath = '';
-    if (journal.all().length > 0) {
-      try {
-        const dir = join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'journals');
-        await mkdir(longPath(dir), { recursive: true });
-        journalPath = await journal.save(dir);
-      } catch {
-        /* gunluk yazilamadi; silme zaten tamamlandi */
-      }
-    }
-
-    job.status = 'done';
-    emit({ type: 'done', freed, removed, skipped, failed, journalPath, mode: plan.mode });
-  } catch (err) {
-    job.status = 'error';
-    emit({ type: 'error', message: describe(err) });
-  } finally {
-    closeRecycle();
-    for (const c of job.clients) c.end();
-    job.clients.clear();
+  if (job.status !== 'running') {
+    res.end();
+    return;
   }
+
+  subscribe(ctx, id, req, res);
 }
 
 // ---------------------------------------------------------------------------
-// CLI envanteri
+// CLI envanteri adaptoru
 // ---------------------------------------------------------------------------
 
 async function handleCliInventory(
@@ -867,98 +495,9 @@ async function handleCliInventory(
       ? Math.max(1, Math.floor(body.unusedDays))
       : 21;
 
-  // Ayni anda birden fazla envanter taramasi baslatma: pahali
-  // dosya yuruyusleri birbirini yavaslatir. Devam eden is varsa
-  // istemci ayni isin akisina baglanir (kacirdigi araclar replay edilir).
-  if (ctx.activeCliInventory) {
-    const out: CliInventoryStartResponse = {
-      jobId: ctx.activeCliInventory.id,
-      shared: true,
-    };
-    sendJson(res, 200, out);
-    return;
-  }
-
-  // Biten islerin akisi kapanmistir; yalnizca son is yeniden acilabilsin
-  // diye eskileri temizle.
-  for (const [id, old] of ctx.cliJobs) {
-    if (old.status !== 'running') ctx.cliJobs.delete(id);
-  }
-
-  const job: CliInventoryJob = {
-    id: newId(),
-    status: 'running',
-    unusedDays,
-    tools: [],
-    clients: new Set(),
-    startedAt: Date.now(),
-    controller: new AbortController(),
-  };
-  ctx.cliJobs.set(job.id, job);
-  ctx.activeCliInventory = job;
-
-  info('cli envanteri istendi', { jobId: job.id, unusedDays });
-  void runCliInventoryJob(ctx, job);
-
-  const out: CliInventoryStartResponse = { jobId: job.id };
-  sendJson(res, 202, out);
-}
-
-async function runCliInventoryJob(ctx: WebContext, job: CliInventoryJob): Promise<void> {
-  try {
-    const inv = await scanCliInventory({
-      unusedDays: job.unusedDays,
-      signal: job.controller.signal,
-      onTool: (tool) => {
-        if (job.status !== 'running') return;
-        job.tools.push(tool);
-        const ev: CliInventoryStreamEvent = { type: 'tool', tool };
-        broadcast(job.clients, ev);
-      },
-    });
-
-    if (job.controller.signal.aborted) {
-      job.status = 'cancelled';
-      info('cli envanteri iptal edildi', {
-        jobId: job.id,
-        bulunan: job.tools.length,
-      });
-      broadcast(job.clients, { type: 'cancelled' } satisfies CliInventoryStreamEvent);
-      return;
-    }
-
-    job.status = 'done';
-    job.result = inv;
-    ctx.lastCliInventory = inv;
-    info('cli envanteri tamamlandi', {
-      jobId: job.id,
-      araclar: inv.tools.length,
-      atil: inv.tools.filter((t) => t.status === 'unused').length,
-      bilinmiyor: inv.tools.filter((t) => t.status === 'unknown').length,
-      korunan: inv.tools.filter((t) => t.status === 'protected').length,
-      cokluKurulum: inv.duplicates.length,
-    });
-    const ev: CliInventoryStreamEvent = { type: 'done', inventory: inv };
-    broadcast(job.clients, ev);
-  } catch (err) {
-    if (job.controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-      job.status = 'cancelled';
-      info('cli envanteri iptal edildi', { jobId: job.id, bulunan: job.tools.length });
-      broadcast(job.clients, { type: 'cancelled' } satisfies CliInventoryStreamEvent);
-    } else {
-      job.status = 'error';
-      job.error = describe(err);
-      logError('cli envanteri basarisiz', { jobId: job.id, err: job.error });
-      broadcast(job.clients, {
-        type: 'error',
-        message: job.error,
-      } satisfies CliInventoryStreamEvent);
-    }
-  } finally {
-    if (ctx.activeCliInventory === job) ctx.activeCliInventory = null;
-    for (const c of job.clients) c.end();
-    job.clients.clear();
-  }
+  const { jobId, shared } = ctx.inventory.start(unusedDays);
+  const out: CliInventoryStartResponse = shared ? { jobId, shared: true } : { jobId };
+  sendJson(res, shared ? 200 : 202, out);
 }
 
 function openCliInventoryStream(
@@ -968,7 +507,7 @@ function openCliInventoryStream(
   pathname: string,
 ): void {
   const id = pathname.split('/')[4] ?? '';
-  const job = ctx.cliJobs.get(id);
+  const job = ctx.inventory.get(id);
   if (!job) {
     sendJson(res, 404, { error: 'Envanter isi bulunamadi' });
     return;
@@ -1005,284 +544,29 @@ function openCliInventoryStream(
     return;
   }
 
-  job.clients.add(res);
-  req.on('close', () => job.clients.delete(res));
+  subscribe(ctx, id, req, res);
 }
 
-function handleCancelCliInventory(
-  res: ServerResponse,
+// ---------------------------------------------------------------------------
+// SSE aboneligi
+// ---------------------------------------------------------------------------
+
+function subscribe(
   ctx: WebContext,
-  pathname: string,
+  jobId: string,
+  req: IncomingMessage,
+  res: ServerResponse,
 ): void {
-  const id = pathname.split('/')[4] ?? '';
-  const job = ctx.cliJobs.get(id);
-  if (!job) {
-    sendJson(res, 404, { error: 'Envanter isi bulunamadi' });
-    return;
+  let clients = ctx.streams.get(jobId);
+  if (!clients) {
+    clients = new Set();
+    ctx.streams.set(jobId, clients);
   }
-  if (job.status !== 'running') {
-    sendJson(res, 409, { error: 'Envanter zaten bitti' });
-    return;
-  }
-
-  job.controller.abort();
-  info('cli envanteri iptal istendi', { jobId: job.id, bulunan: job.tools.length });
-  const out: CliInventoryCancelResponse = { ok: true };
-  sendJson(res, 202, out);
-}
-
-async function handleCliPlan(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: WebContext,
-): Promise<void> {
-  const body = await readJson<CliPlanRequest>(req);
-  const commands = Array.isArray(body.commands)
-    ? body.commands.filter((c): c is string => typeof c === 'string' && c.length > 0)
-    : [];
-  if (commands.length === 0) {
-    sendJson(res, 400, { error: 'Arac secilmedi' });
-    return;
-  }
-
-  let inv = ctx.lastCliInventory;
-  if (!inv) {
-    inv = await scanCliInventory({ unusedDays: 21 });
-    ctx.lastCliInventory = inv;
-  }
-
-  const wanted = new Set(commands.map((c) => c.toLowerCase()));
-  // Kimlik verildiyse YALNIZ onu sec. Ayni komutu iki paket
-  // saglayabildigi icin komut eslesmesi yanlis kurulumu planlayabilir.
-  const byId = inv.tools.filter((t) => wanted.has(t.id.toLowerCase()));
-  const selected =
-    byId.length > 0 ? byId : inv.tools.filter((t) => wanted.has(t.command.toLowerCase()));
-  if (selected.length === 0) {
-    sendJson(res, 400, { error: 'Secilen araclar envanterde yok' });
-    return;
-  }
-
-  const removable = selected.filter((t) => t.status !== 'protected');
-  if (removable.length === 0) {
-    sendJson(res, 400, { error: 'Korunan araclar kaldirilamaz' });
-    return;
-  }
-
-  // Golgede kalan bir paket secildiyse kaldirma sonrasi aktif paketi
-  // yeniden baglayacak onarim komutunu plana ekle.
-  const repairs = new Map<string, UninstallSpec>();
-  for (const d of inv.duplicates) {
-    const keep = inv.tools.find((t) => t.id === d.keepId);
-    if (!keep) continue;
-    const spec = reinstallSpec(keep);
-    if (!spec) continue;
-    for (const id of d.removeIds) repairs.set(id, spec);
-  }
-
-  const plan = await planCliRemoval(removable, body.backup !== false, repairs);
-  const items: CliPlanItemView[] = plan.items.map((it) => ({
-    id: it.tool.id,
-    command: it.tool.command,
-    source: it.tool.source,
-    packageName: it.tool.packageName,
-    version: it.tool.version,
-    installPath: it.tool.installPath,
-    shims: it.tool.shims,
-    stateDirs: it.tool.stateDirs,
-    status: it.tool.status,
-    confidence: it.tool.confidence,
-    idleDays: it.tool.idleDays,
-    evidence: it.tool.evidence,
-    uninstallCommand: it.uninstallCommand,
-    reinstallCommand: it.reinstallCommand,
-    ...(it.repair ? { repairCommand: it.repair.display } : {}),
-    manual: it.manual,
-    backupPaths: it.backup.items.map((b) => b.path),
-    backupBytes: it.backup.totalBytes,
-    backupSkipped: it.backup.skipped.map((s) => ({
-      path: s.path,
-      reason: s.reason ?? 'atlandi',
-    })),
-  }));
-
-  ctx.cliPlans.set(plan.id, { plan, expiresAt: plan.expiresAt });
-  info('cli kaldirma plani olusturuldu', {
-    planId: plan.id,
-    araclar: plan.items.length,
-    yedekMB: Math.round(plan.backupBytes / 1048576),
-    manuel: plan.items.filter((i) => i.manual).length,
+  clients.add(res);
+  req.on('close', () => {
+    clients!.delete(res);
+    if (clients!.size === 0) ctx.streams.delete(jobId);
   });
-  const out: CliPlanResponse = {
-    planId: plan.id,
-    items,
-    totalBytes: plan.totalBytes,
-    backupBytes: plan.backupBytes,
-    requiresPhrase: true,
-    expiresAt: plan.expiresAt,
-  };
-  sendJson(res, 200, out);
-}
-
-async function handleCliRepairPlan(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: WebContext,
-): Promise<void> {
-  const body = await readJson<CliRepairPlanRequest>(req);
-  const ids = Array.isArray(body.ids)
-    ? body.ids.filter((x): x is string => typeof x === 'string' && x.length > 0)
-    : [];
-  if (ids.length === 0) {
-    sendJson(res, 400, { error: 'Arac secilmedi' });
-    return;
-  }
-
-  let inv = ctx.lastCliInventory;
-  if (!inv) {
-    inv = await scanCliInventory({ unusedDays: 21 });
-    ctx.lastCliInventory = inv;
-  }
-
-  const wanted = new Set(ids.map((x) => x.toLowerCase()));
-  const selected = inv.tools.filter(
-    (t) => wanted.has(t.id.toLowerCase()) && t.repair,
-  );
-  if (selected.length === 0) {
-    sendJson(res, 400, { error: 'Onarilabilir arac bulunamadi (standalone elle onarilir)' });
-    return;
-  }
-
-  const plan = planCliRepairs(selected);
-  ctx.cliRepairPlans.set(plan.id, { plan, expiresAt: plan.expiresAt });
-
-  const items: CliRepairItemView[] = plan.items.map((it) => ({
-    id: it.tool.id,
-    command: it.tool.command,
-    packageName: it.tool.packageName,
-    version: it.tool.version,
-    repairCommand: it.tool.repair?.display ?? '',
-  }));
-
-  info('cli onarim plani olusturuldu', { planId: plan.id, araclar: items.length });
-  const out: CliRepairPlanResponse = {
-    planId: plan.id,
-    items,
-    requiresPhrase: true,
-    expiresAt: plan.expiresAt,
-  };
-  sendJson(res, 200, out);
-}
-
-async function handleCliRepairExecute(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: WebContext,
-): Promise<void> {
-  const body = await readJson<CliRepairExecuteRequest>(req);
-  const planId = typeof body.planId === 'string' ? body.planId : '';
-  const stored = ctx.cliRepairPlans.get(planId);
-  if (!stored) {
-    sendJson(res, 404, { error: 'Onarim plani bulunamadi veya zaten kullanildi' });
-    return;
-  }
-  if (Date.now() > stored.expiresAt) {
-    ctx.cliRepairPlans.delete(planId);
-    sendJson(res, 410, { error: 'Onarim plani suresi doldu; yeniden planlayin' });
-    return;
-  }
-  if (body.phrase !== 'ONAR') {
-    sendJson(res, 400, { error: 'Onay metni hatali ("ONAR" bekleniyordu)' });
-    return;
-  }
-
-  ctx.cliRepairPlans.delete(planId);
-  info('cli onarimi basladi', { planId, araclar: stored.plan.items.length });
-  const results = await executeCliRepairs(stored.plan);
-  // Envanterdeki saglik bilgisi artik eski; sonraki tarama yeniler.
-  ctx.lastCliInventory = null;
-
-  info('cli onarimi bitti', {
-    planId,
-    basarili: results.filter((r) => r.ok).length,
-    hatali: results.filter((r) => !r.ok).length,
-  });
-
-  const out: CliRepairExecuteResponse = {
-    results: results.map((r) => ({
-      command: r.command,
-      ok: r.ok,
-      output: r.output,
-      ...(r.error ? { error: r.error } : {}),
-      verified: r.verified,
-    })),
-  };
-  sendJson(res, 200, out);
-}
-
-async function handleCliExecute(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: WebContext,
-): Promise<void> {
-  const body = await readJson<CliExecuteRequest>(req);
-  const planId = typeof body.planId === 'string' ? body.planId : '';
-  const stored = ctx.cliPlans.get(planId);
-  if (!stored) {
-    sendJson(res, 404, { error: 'Plan bulunamadi veya zaten kullanildi' });
-    return;
-  }
-  if (Date.now() > stored.expiresAt) {
-    ctx.cliPlans.delete(planId);
-    sendJson(res, 410, { error: 'Plan suresi doldu; yeniden planlayin' });
-    return;
-  }
-  if (body.phrase !== 'SIL') {
-    sendJson(res, 400, { error: 'Onay metni hatali ("SIL" bekleniyordu)' });
-    return;
-  }
-
-  ctx.cliPlans.delete(planId);
-  const results = await executeCliRemoval(stored.plan);
-  // Envanter artik eski; bir sonraki planlama yeniden tarar.
-  ctx.lastCliInventory = null;
-
-  const out: CliExecuteResponse = {
-    results: results.map((r) => ({
-      command: r.command,
-      ok: r.ok,
-      manual: r.manual,
-      output: r.output,
-      ...(r.error ? { error: r.error } : {}),
-      ...(r.backupDir ? { backupDir: r.backupDir } : {}),
-      verified: r.verified,
-    })),
-  };
-  sendJson(res, 200, out);
-}
-
-function openJobStream(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: WebContext,
-  pathname: string,
-): void {
-  const id = pathname.split('/')[3] ?? '';
-  const job = ctx.jobs.get(id);
-  if (!job) {
-    sendJson(res, 404, { error: 'Islem bulunamadi' });
-    return;
-  }
-
-  sseSetup(res);
-  if (job.last) sseSend(res, job.last);
-
-  if (job.status !== 'running') {
-    res.end();
-    return;
-  }
-
-  job.clients.add(res);
-  req.on('close', () => job.clients.delete(res));
 }
 
 // ---------------------------------------------------------------------------
@@ -1315,13 +599,8 @@ function openRecycleBin(res: ServerResponse): void {
     }).unref();
     sendJson(res, 200, { ok: true });
   } catch (err) {
-    sendJson(res, 500, { error: describe(err) });
+    sendJson(res, 500, { error: describeError(err) });
   }
-}
-
-/** Kimligin kimseye sizmadigi rastgele kimlik. */
-function newId(): string {
-  return randomBytes(8).toString('hex');
 }
 
 function isLoopbackHost(host: string | undefined): boolean {
@@ -1368,62 +647,6 @@ function sanitizeProfile(profile: unknown): string | undefined {
 
 function isSafeName(name: string): boolean {
   return /^[a-z0-9._@-]+$/i.test(name) && name.length <= 64;
-}
-
-async function readJson<T>(req: IncomingMessage): Promise<T> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
-    size += buf.length;
-    if (size > MAX_BODY) throw new HttpError(413, 'Istek govdesi cok buyuk');
-    chunks.push(buf);
-  }
-  if (chunks.length === 0) return {} as T;
-  const txt = Buffer.concat(chunks).toString('utf8');
-  try {
-    return JSON.parse(txt) as T;
-  } catch {
-    throw new HttpError(400, 'Gecersiz JSON govdesi');
-  }
-}
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  if (res.writableEnded) return;
-  const txt = JSON.stringify(body);
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-  });
-  res.end(txt);
-}
-
-function sseSetup(res: ServerResponse): void {
-  res.writeHead(200, {
-    'content-type': 'text/event-stream; charset=utf-8',
-    'cache-control': 'no-store',
-    connection: 'keep-alive',
-    'x-accel-buffering': 'no',
-  });
-  res.flushHeaders?.();
-  res.write(': bagli\n\n');
-}
-
-function sseSend(res: ServerResponse, data: unknown): void {
-  if (res.writableEnded) return;
-  try {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  } catch {
-    /* istemci koptu */
-  }
-}
-
-function broadcast(clients: Set<ServerResponse>, data: unknown): void {
-  for (const c of clients) sseSend(c, data);
-}
-
-function describe(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 function openBrowser(url: string): void {
@@ -1527,10 +750,7 @@ export async function ensureWebBuild(): Promise<void> {
       await readFile(WEB_INDEX);
     } catch (err) {
       buildPromise = null;
-      throw new Error(
-        `Web arayuzu derlenemedi: ${describe(err)}\n` +
-          '  Cozum: npm install && npm run build:web',
-      );
+      throw err;
     }
   })();
   return buildPromise;
