@@ -5,12 +5,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ## [0.4.0] - 2026-10-18
 
-### Değişti
+### İyileştirildi
 
-- **İç mimari — servis katmanı:** plan/job/TTL durumu `web/server.ts`'ten
-  çıkarıldı; `ScanService`, `DeleteService`, `CliInventoryService`,
-  `CliRemovalService`, `CliRepairService` eklendi. Server artık yalnız
-  HTTP/SSE adaptörü. **Kullanıcı davranışı değişmedi.**
+- Tarama işlemi düzeltildi ve iyileştirildi; altyapı düzenlemeleri yapıldı.
 
 ### Eklendi
 
