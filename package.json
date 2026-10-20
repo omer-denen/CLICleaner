@@ -68,6 +68,8 @@
     "release:major": "npm version major -m \"surum: v%s\"",
     "prepack": "npm run build:web",
     "start": "tsx src/cli.ts",
+    "dev": "vite",
+    "dev:api": "tsx src/cli.ts ui --no-open --port 4321",
     "status": "tsx src/cli.ts status",
     "log": "tsx src/cli.ts log",
     "init-state": "tsx scripts/init-state.ts"

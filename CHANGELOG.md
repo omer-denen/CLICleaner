@@ -3,6 +3,54 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
+## [1.0.0] - 2026-10-21
+
+İlk genel kullanım sürümü. Web arayüzü bu sürümden itibaren baştan
+tasarlanacaktır; 1.x çizgisi arayüz çalışması için ayrılmıştır.
+
+### Eklendi
+
+- **Kendi kasa:** silinen öğeler artık Windows Geri Dönüşüm Kutusu'na
+  değil, aracın kendi kasasına taşınır. Kasadan tek tıkla geri yüklenir,
+  toplu geri alınabilir ve kullanıcı yazılı onayıyla boşaltılabilir.
+- **Tarama durumu:** son taramanın zamanı, güncelliği ve önbellek süresi
+  arayüzde görünür; süresi dolmuş sonuçlar da yüklenebilir, tarama hiçbir
+  zaman engellenmez.
+- **Canlı tarama akışı:** bulunanlar anında listeye düşer, uzun listeler
+  akıcı kaydırılır, canlı tarama sırasında konum korunur.
+- **Kanıt tabanlı sınıflandırma genişletildi:** model depoları, vektör
+  indeksleri, ajan çalışma alanları, proje bağımlılıkları, pnpm/yarn/bun
+  depoları, NuGet deposu ve güncelleyici artıkları yapılarına göre tanınır.
+- **CLI envanteri genişletildi:** kurulu araçların atıl olup olmadığı,
+  PATH kaynakları, Node sürüm yöneticisi kopyaları ve kaldırma öncesi
+  referans kontrolü raporlanır; atıl araçlar güven düzeyiyle listelenir.
+- **Hassas temizlik seçenekleri:** sohbet geçmişi, model depoları ve kural
+  dosyaları varsayılan olarak plana girmez; yalnızca açık seçenekle ve
+  yazılı onayla temizlenir.
+- **Paylaşılabilir inceleme raporu:** envanter, kanıtları ve önerilen
+  komutlarla birlikte Markdown olarak dışa aktarılır.
+- **Güncelleme politikası ekranı:** aracın ne gönderdiğini, neden göndermediğini
+  ve manuel güncelleme adımlarını gösterir; ağ isteği yapmaz.
+- **Geliştirici arayüzü için canlı geliştirme modu:** arayüz değişiklikleri
+  tarayıcıda anında görülür.
+
+### İyileştirildi
+
+- **Güvenlik:** iki aşamalı onay korunur, aracın kendi verisi hiçbir taramada
+  aday gösterilmez, sürüm kontrolü altındaki dosyalar silinmez.
+- Silme güvenliği artırıldı: sembolik bağ ve junction'lar atlanır, korumalı
+  yolların üstü asla hedeflenmez.
+- Sürüm ve bozuk kurulum kontrolü, bilinmeyen programları çalıştırmadan yapılır.
+- Uzun listelerde kaydırma, sıralama ve canlı tarama akışı iyileştirildi.
+- Web arayüzü artık sistem varsayılan tarayıcısında açılır.
+
+### Değişiklikler
+
+- Varsayılan seçim, yeniden üretilebilirliği kanıtlanmış ve güven düzeyi
+  düşük olmayan öğelerle sınırlıdır.
+- Web arayüzü yerel bilgisayarda çalışır; her açılışta yeni bir güvenlik
+  jetonu üretilir.
+
 ## [0.7.0] - 2026-10-20
 
 ### Eklendi
