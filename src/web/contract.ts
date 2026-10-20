@@ -107,10 +107,49 @@ export interface SettingsResponse {
   scanCacheHours: number;
   minCacheHours: number;
   maxCacheHours: number;
+  /** Bilgi amacli: kasa kayitlari icin onerilen saklama suresi. */
+  vaultRetentionDays: number;
 }
 
 export interface SettingsUpdateRequest {
-  scanCacheHours: number;
+  scanCacheHours?: number;
+  vaultRetentionDays?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Kasa (vault)
+// ---------------------------------------------------------------------------
+
+export interface VaultEntryView {
+  id: string;
+  batchId: string;
+  originalPath: string;
+  storedPath: string;
+  bytes: number;
+  files: number;
+  at: number;
+  ageMs: number;
+  /** Onerilen saklama suresine gore kalan gun (bilgi amacli). */
+  remainingDays: number;
+  /** Orijinal yol su an dolu mu? (geri yuklemede cakisma) */
+  originalExists: boolean;
+}
+
+export interface VaultListResponse {
+  entries: VaultEntryView[];
+  totalBytes: number;
+  retentionDays: number;
+}
+
+export interface VaultRestoreRequest {
+  id: string;
+}
+
+export interface VaultRestoreResponse {
+  ok: boolean;
+  to: string;
+  conflict: boolean;
+  error?: string;
 }
 
 // ---------------------------------------------------------------------------

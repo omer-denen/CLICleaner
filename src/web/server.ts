@@ -11,7 +11,8 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { closeRecycle } from '../actions/delete.ts';
-import { vaultRoot } from '../actions/vault.ts';
+import { findVaultEntry, listVaultEntries, restoreVaultEntry, vaultRoot } from '../actions/vault.ts';
+import { exists } from '../actions/restore.ts';
 import { mkdirSync } from 'node:fs';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { longPath } from '../util/longpath.ts';
@@ -45,6 +46,10 @@ import type {
   ScanStreamEvent,
   SettingsResponse,
   SettingsUpdateRequest,
+  VaultEntryView,
+  VaultListResponse,
+  VaultRestoreRequest,
+  VaultRestoreResponse,
 } from './contract.ts';
 
 /**
@@ -410,6 +415,56 @@ async function handleRequest(
     const body = await readJson<CliExecuteRequest>(req);
     const planId = typeof body.planId === 'string' ? body.planId : '';
     sendJson(res, 200, await ctx.removal.execute(planId, body.phrase));
+    return;
+  }
+
+  if (route === 'GET /api/vault') {
+    const settings = await ctx.scan.settings();
+    const now = Date.now();
+    const entries = (await listVaultEntries()).slice(0, 500);
+    const views: VaultEntryView[] = [];
+    for (const e of entries) {
+      const ageMs = Math.max(0, now - e.at);
+      views.push({
+        id: e.id,
+        batchId: e.batchId,
+        originalPath: e.originalPath,
+        storedPath: e.storedPath,
+        bytes: e.bytes,
+        files: e.files,
+        at: e.at,
+        ageMs,
+        remainingDays: Math.max(
+          0,
+          settings.vaultRetentionDays - Math.floor(ageMs / 86_400_000),
+        ),
+        originalExists: await exists(e.originalPath),
+      });
+    }
+    const body: VaultListResponse = {
+      entries: views,
+      totalBytes: views.reduce((a, e) => a + e.bytes, 0),
+      retentionDays: settings.vaultRetentionDays,
+    };
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'POST /api/vault/restore') {
+    const body = await readJson<VaultRestoreRequest>(req);
+    const entry = await findVaultEntry(body.id ?? '');
+    if (!entry) {
+      sendJson(res, 404, { error: 'Kasa kaydi bulunamadi' });
+      return;
+    }
+    const r = await restoreVaultEntry(entry);
+    const out: VaultRestoreResponse = {
+      ok: r.restored,
+      to: r.to,
+      conflict: r.conflict,
+      ...(r.reason ? { error: r.reason } : {}),
+    };
+    sendJson(res, r.restored ? 200 : 409, out);
     return;
   }
 

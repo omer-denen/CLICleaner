@@ -363,6 +363,25 @@ const EN: Record<string, string> = {
   'Kasada. Geri almak için kasayı aç veya {cmd} kullan.':
     'In the vault. To restore, open the vault or use {cmd}.',
   'Kasayı aç': 'Open vault',
+  Kasa: 'Vault',
+  'Kasa boş': 'Vault is empty',
+  'Silinen öğeler burada tutulur; istediğini geri yükleyebilirsin.':
+    'Deleted items are kept here; you can restore any of them.',
+  'Silinen öğeler burada görünür.': 'Deleted items appear here.',
+  '{n} kayıt': '{n} entries',
+  'Önerilen saklama: {n} gün (otomatik silinmez).':
+    'Suggested retention: {n} days (no automatic deletion).',
+  'Kalan {n} gün': '{n} days left',
+  'Orijinal yol dolu': 'Original path is occupied',
+  'Geri yükle': 'Restore',
+  'Geri yükleniyor…': 'Restoring…',
+  'Geri yüklendi: {path}': 'Restored: {path}',
+  'Orijinal yol doluydu; {path} olarak geri kondu.':
+    'Original path was occupied; restored as {path}.',
+  'Geri yükleme başarısız.': 'Restore failed.',
+  'Kasa saklama süresi (gün)': 'Vault retention (days)',
+  'Yalnızca bilgi amaçlıdır; kasa otomatik silinmez.':
+    'Informational only; the vault is never auto-deleted.',
 
   // --- plan görünümü (Faz 1) ---
   'Planı gözden geçir': 'Review the plan',

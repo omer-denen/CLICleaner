@@ -42,6 +42,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 - **Kendi kasa:** Windows Geri Dönüşüm Kutusu yerine silinen öğeler aracın
   kasasına taşınır. Manifest, atomik taşıma ve çakışmada `.restored-*`
   olarak geri yükleme vardır (`clicleaner undo --restore`).
+- **Kasa ekranı:** silinen öğeler listelenir; tek tıkla geri yüklenir,
+  çakışma ve kalan gün gösterilir. Saklama süresi ayarlardan değiştirilebilir
+  (bilgi amaçlı; otomatik silme yok).
 - Varsayılan seçim yalnızca yeniden oluşturulabilirliği kanıtlanmış ve
   güven düzeyi düşük olmayan klasörleri işaretler.
 - Web arayüzünün hangi tarayıcıda açıldığı ve nasıl değiştirileceği

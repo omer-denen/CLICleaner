@@ -174,18 +174,23 @@ export class ScanService {
 
   async settings(): Promise<SettingsResponse> {
     await this.ensureSettingsLoaded();
+    const s = await loadSettings();
     return {
       scanCacheHours: Math.round(this.ttlMs / 3_600_000),
       minCacheHours: MIN_CACHE_HOURS,
       maxCacheHours: MAX_CACHE_HOURS,
+      vaultRetentionDays: s.vaultRetentionDays,
     };
   }
 
-  async updateSettings(patch: { scanCacheHours?: number }): Promise<SettingsResponse> {
+  async updateSettings(patch: {
+    scanCacheHours?: number;
+    vaultRetentionDays?: number;
+  }): Promise<SettingsResponse> {
     const saved = await saveSettings(patch);
     this.ttlMs = saved.scanCacheHours * 3_600_000;
     this.settingsLoaded = true;
-    info('ayarlar guncellendi', { scanCacheHours: saved.scanCacheHours });
+    info('ayarlar guncellendi', { ...saved });
     return this.settings();
   }
 

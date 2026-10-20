@@ -127,12 +127,33 @@ export async function listVaultBatches(): Promise<VaultBatch[]> {
   return out.sort((a, b) => b.at - a.at);
 }
 
-/** Kasada duran, diskte artik olmayan kayitlar (yeni -> eski). */
-export async function listVaultEntries(): Promise<Array<VaultEntry & { batchId: string }>> {
+export interface VaultEntryRef extends VaultEntry {
+  batchId: string;
+  /** Sunucu tarafinda kararli kimlik: `<batchId>:<index>` */
+  id: string;
+}
+
+/** Kasada duran kayitlar (yeni -> eski). */
+export async function listVaultEntries(): Promise<VaultEntryRef[]> {
   const batches = await listVaultBatches();
-  const out: Array<VaultEntry & { batchId: string }> = [];
-  for (const b of batches) for (const e of b.entries) out.push({ ...e, batchId: b.id });
+  const out: VaultEntryRef[] = [];
+  for (const b of batches) {
+    b.entries.forEach((e, i) => out.push({ ...e, batchId: b.id, id: `${b.id}:${i}` }));
+  }
   return out.sort((a, b) => b.at - a.at);
+}
+
+/** Kimlikten kaydi bulur (istemci YOL gondermez). */
+export async function findVaultEntry(id: string): Promise<VaultEntryRef | null> {
+  return (await listVaultEntries()).find((e) => e.id === id) ?? null;
+}
+
+/** Basariyla geri yuklenen kaydi manifestten cikarir (liste kirlenmesin). */
+export async function removeVaultEntry(entry: VaultEntryRef): Promise<void> {
+  const batch = (await listVaultBatches()).find((b) => b.id === entry.batchId);
+  if (!batch) return;
+  batch.entries = batch.entries.filter((e) => e.storedPath !== entry.storedPath);
+  await saveVaultManifest(batch);
 }
 
 async function moveBack(src: string, dst: string): Promise<void> {
@@ -158,16 +179,22 @@ async function moveBack(src: string, dst: string): Promise<void> {
 export async function restoreVaultEntry(
   entry: VaultEntry,
 ): Promise<{ restored: boolean; to: string; conflict: boolean; reason?: string }> {
+  const ref = entry as Partial<VaultEntryRef>;
+  const cleanup = async () => {
+    if (ref.batchId && ref.id) await removeVaultEntry(entry as VaultEntryRef);
+  };
   try {
     await stat(longPath(entry.originalPath));
     const to = `${entry.originalPath}.restored-${Date.now()}`;
     await moveBack(entry.storedPath, to);
+    await cleanup();
     return { restored: true, to, conflict: true };
   } catch {
     /* orijinal yol bos: normal geri yukleme */
   }
   try {
     await moveBack(entry.storedPath, entry.originalPath);
+    await cleanup();
     return { restored: true, to: entry.originalPath, conflict: false };
   } catch (err) {
     return {

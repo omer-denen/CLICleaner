@@ -33,6 +33,7 @@ import { ClusterRow } from './components/ClusterRow.tsx';
 import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { ScanStatusBar } from './components/ScanStatusBar.tsx';
+import { VaultView } from './components/VaultView.tsx';
 import { useI18n } from './i18n.tsx';
 import { VERDICT_HINT } from './labels.ts';
 
@@ -100,7 +101,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [view, setView] = useState<'disk' | 'cli'>('disk');
+  const [view, setView] = useState<'disk' | 'cli' | 'vault'>('disk');
 
 
   const [phase, setPhase] = useState<Phase>('idle');
@@ -174,6 +175,7 @@ export default function App() {
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hoursDraft, setHoursDraft] = useState('24');
+  const [daysDraft, setDaysDraft] = useState('30');
 
   const streamRef = useRef<EventSource | null>(null);
 
@@ -217,6 +219,7 @@ export default function App() {
       const s = await getSettings();
       setSettings(s);
       setHoursDraft(String(s.scanCacheHours));
+      setDaysDraft(String(s.vaultRetentionDays));
     } catch (e) {
       setError(errText(e));
     }
@@ -225,9 +228,13 @@ export default function App() {
 
   const saveHours = useCallback(async () => {
     const n = Number(hoursDraft);
-    if (!Number.isFinite(n)) return;
+    const days = Number(daysDraft);
+    if (!Number.isFinite(n) || !Number.isFinite(days)) return;
     try {
-      const s = await updateSettings(n);
+      const s = await updateSettings({
+        scanCacheHours: n,
+        vaultRetentionDays: days,
+      });
       setSettings(s);
       setSettingsOpen(false);
       await refreshScanStatus();
@@ -235,7 +242,7 @@ export default function App() {
     } catch (e) {
       setError(errText(e));
     }
-  }, [hoursDraft, refreshScanStatus, notify, t]);
+  }, [hoursDraft, daysDraft, refreshScanStatus, notify, t]);
 
   const showPreviousScan = useCallback(async () => {
     if (scan) {
@@ -701,6 +708,15 @@ export default function App() {
           >
             {t("CLI'lar")}
           </button>
+          <button
+            role="tab"
+            aria-selected={view === 'vault'}
+            className={view === 'vault' ? 'active' : ''}
+            onClick={() => setView('vault')}
+            disabled={phase === 'deleting'}
+          >
+            {t('Kasa')}
+          </button>
         </nav>
 
         <div className="top-actions">
@@ -1030,6 +1046,10 @@ export default function App() {
         <CliView onError={setError} onNotice={notify} />
       </div>
 
+      <div style={{ display: view === 'vault' ? undefined : 'none' }}>
+        <VaultView active={view === 'vault'} onError={setError} onNotice={notify} />
+      </div>
+
       {settingsOpen && (
         <div
           className="modal-overlay"
@@ -1063,6 +1083,19 @@ export default function App() {
                 {t(
                   'Son tarama bu süre içinde güncel sayılır. Varsayılan 24 saat; tarama hiçbir zaman engellenmez.',
                 )}
+              </span>
+            </label>
+            <label className="settings-field">
+              <span>{t('Kasa saklama süresi (gün)')}</span>
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                value={daysDraft}
+                onChange={(e) => setDaysDraft(e.target.value)}
+              />
+              <span className="dim small">
+                {t('Yalnızca bilgi amaçlıdır; kasa otomatik silinmez.')}
               </span>
             </label>
             <footer className="modal-actions">

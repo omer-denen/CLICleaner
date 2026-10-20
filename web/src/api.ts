@@ -24,6 +24,8 @@ import type {
   ScanStartResponse,
   ScanStatusResponse,
   SettingsResponse,
+  VaultListResponse,
+  VaultRestoreResponse,
 } from '../../src/web/contract.ts';
 
 /**
@@ -131,10 +133,13 @@ export function getSettings(): Promise<SettingsResponse> {
   return request<SettingsResponse>('/api/settings');
 }
 
-export function updateSettings(scanCacheHours: number): Promise<SettingsResponse> {
+export function updateSettings(patch: {
+  scanCacheHours?: number;
+  vaultRetentionDays?: number;
+}): Promise<SettingsResponse> {
   return request<SettingsResponse>('/api/settings', {
     method: 'PUT',
-    body: JSON.stringify({ scanCacheHours }),
+    body: JSON.stringify(patch),
   });
 }
 
@@ -173,6 +178,17 @@ export function executePlan(body: ExecuteRequest): Promise<ExecuteStartResponse>
 export function executeStream(jobId: string): EventSource {
   if (!token) throw new ApiError(401, { error: 'Token yok' });
   return new EventSource(`/api/jobs/${encodeURIComponent(jobId)}/events?token=${encodeURIComponent(token)}`);
+}
+
+export function getVault(): Promise<VaultListResponse> {
+  return request<VaultListResponse>('/api/vault');
+}
+
+export function restoreVault(id: string): Promise<VaultRestoreResponse> {
+  return request<VaultRestoreResponse>('/api/vault/restore', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  });
 }
 
 export function openRecycleBin(): Promise<{ ok: boolean }> {

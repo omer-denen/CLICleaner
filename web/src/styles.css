@@ -1916,3 +1916,84 @@ input {
   border: 1px solid var(--border-strong);
   background: var(--panel-2);
 }
+
+/* ------------------------------------------------------------------ kasa */
+
+.vault {
+  padding: 8px 0 24px;
+}
+
+.vault-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.vault-head h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.vault-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vault-summary strong {
+  font-size: 18px;
+}
+
+.vault-retention {
+  margin: 0 0 10px;
+}
+
+.vault-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.vault-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.vault-row:last-child {
+  border-bottom: 0;
+}
+
+.vault-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.vault-row-main code {
+  max-width: 58ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tag-warn {
+  border-color: rgba(251, 191, 36, 0.5);
+  color: var(--yellow);
+}
