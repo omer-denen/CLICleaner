@@ -243,6 +243,38 @@ export function renderInventoryMarkdown(inv: CliInventory, generatedAt: number =
     }
   }
 
+  // ── Node surum kopyalari (T36) ───────────────────────────────────
+  const nr = inv.nodeRuntimes;
+  if (nr && nr.copies.length >= 2) {
+    L.push('## Node sürüm kopyaları');
+    L.push('');
+    L.push('Sürüm yöneticisi her Node sürümünü ayrı tutar; eski sürümün global paketleri diskte kalabilir. **SALT OKUNUR**: hiçbir kopya silinmez, otomatik seçilmez.');
+    L.push('');
+    if (nr.roots.length > 0) {
+      L.push(`- Kökler: ${nr.roots.map((r) => `${code(r.path)} (${r.kind})`).join(', ')}`);
+    }
+    L.push(`- Aktif sürüm: ${nr.activeVersion ? code(`v${nr.activeVersion}`) : 'belirlenemedi'}`);
+    L.push('');
+    for (const c of nr.copies) {
+      const tags = [c.active ? 'aktif' : 'kullanılmıyor'];
+      if (c.review) tags.push('inceleme gerekli');
+      L.push(`- ${code(`v${c.version}`)} (${tags.join(', ')}) — ${code(c.nodeExe)}`);
+      if (c.globalModules) {
+        L.push(`  - Global paketler: ${c.globalPackageCount} adet — ${code(c.globalModules)}`);
+        if (c.review) {
+          L.push(
+            `  - İnceleme: ${code(`"${c.nodeExe}" "${c.globalModules}\\npm\\bin\\npm-cli.js" ls -g --depth=0`)}`,
+          );
+        }
+      }
+    }
+    if (nr.note) {
+      L.push('');
+      L.push(`Not: ${nr.note}`);
+    }
+    L.push('');
+  }
+
   // ── PATH kaynaklari (T35) ────────────────────────────────────────
   const pc = inv.pathChannels;
   if (pc) {

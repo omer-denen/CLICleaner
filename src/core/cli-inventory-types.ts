@@ -15,6 +15,34 @@ export interface PathDuplicate {
   detail: string;
 }
 
+/** T36: Node surum yoneticisi turu (yapidann taninir, addan degil). */
+export type NodeRuntimeKind = 'nvm' | 'fnm' | 'volta' | 'unknown';
+
+/** T36: tek bir Node surum kopyasi. Silme hedefi DEGILDIR. */
+export interface NodeRuntimeCopy {
+  version: string;
+  nodeExe: string;
+  dir: string;
+  kind: NodeRuntimeKind;
+  /** Calisan node.exe veya PATH bu kopyayi gosteriyor mu? */
+  active: boolean;
+  /** Surumun global paket klasoru (varsa). */
+  globalModules: string | null;
+  /** npm/corepack disindaki global paket sayisi. */
+  globalPackageCount: number;
+  lastTouched: number;
+  /** Aktif degil + global paket var: inceleme gerekli (otomatik secilmez). */
+  review: boolean;
+}
+
+/** T36: surum yoneticisi kokleri ve kopyalari (SALT OKUNUR). */
+export interface NodeRuntimeReport {
+  roots: Array<{ path: string; kind: NodeRuntimeKind }>;
+  copies: NodeRuntimeCopy[];
+  activeVersion: string | null;
+  note?: string;
+}
+
 /** T35: User (HKCU) ve Machine (HKLM) PATH kaynaklari. SALT OKUNUR. */
 export interface PathSourceReport {
   userDirs: string[];
@@ -149,6 +177,8 @@ export interface CliInventory {
   pathShadows: PathShadow[];
   /** T35: User / Machine PATH kaynaklari ve cakismalar (SALT OKUNUR). */
   pathChannels?: PathSourceReport;
+  /** T36: Node surum yoneticisi kopyalari (SALT OKUNUR, silme hedefi yok). */
+  nodeRuntimes?: NodeRuntimeReport;
 }
 
 export interface CliInventoryOptions {

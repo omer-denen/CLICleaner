@@ -7,6 +7,7 @@ import { longPath } from '../util/longpath.ts';
 import { walk } from './walker.ts';
 import { readExeInfo } from './exe-info.ts';
 import { readPathSources } from './path-sources.ts';
+import { scanNodeRuntimes } from './node-runtimes.ts';
 import { daysSince } from '../util/format.ts';
 
 /**
@@ -148,6 +149,9 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
   // T35: PATH'in User (HKCU) ve Machine (HKLM) kaynaklari. SALT OKUNUR;
   // kayit defterine yazilmaz, PATH degistirilmez.
   const pathChannels = await readPathSources();
+  // T36: Node surum yoneticisi kopyalari. SALT OKUNUR; "review" isareti
+  // silme hedefi DEGILDIR, yalnizca inceleme kanitidir.
+  const nodeRuntimes = await scanNodeRuntimes();
 
   const tools = uniqueTools.sort((a, b) => {
     const rank = statusRank(a.status) - statusRank(b.status);
@@ -164,6 +168,7 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
     shimIssues,
     pathShadows,
     pathChannels,
+    nodeRuntimes,
   };
 }
 

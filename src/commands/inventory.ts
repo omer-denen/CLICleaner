@@ -170,6 +170,35 @@ export async function runInventory(args: string[]): Promise<void> {
     console.log('');
   }
 
+  const nr = inv.nodeRuntimes;
+  if (nr && nr.copies.length >= 2) {
+    console.log(`${C.magenta}${C.bold}NODE SURUM KOPYALARI${C.reset}`);
+    console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
+    console.log(
+      `  ${C.gray}kok: ${nr.roots.map((r) => `${r.path} (${r.kind})`).join(' · ') || '-'}${C.reset}`,
+    );
+    console.log(
+      `  ${C.gray}aktif: ${nr.activeVersion ? `v${nr.activeVersion}` : 'belirlenemedi'}${C.reset}`,
+    );
+    for (const c of nr.copies) {
+      const tag = c.active
+        ? `${C.green}AKTIF ${C.reset}`
+        : c.review
+          ? `${C.yellow}INCELE${C.reset}`
+          : `${C.dim}atil  ${C.reset}`;
+      console.log(`  ${tag} v${c.version.padEnd(12)} ${C.dim}${c.nodeExe}${C.reset}`);
+      if (c.globalModules) {
+        console.log(
+          `          ${C.gray}global paket: ${c.globalPackageCount}${C.reset}`,
+        );
+      }
+    }
+    console.log(
+      `${C.dim}  SALT OKUNUR: eski surumler otomatik secilmez; kaldirma o surumun npm'i ile yapilir.${C.reset}`,
+    );
+    console.log('');
+  }
+
   const pc = inv.pathChannels;
   if (pc && (pc.duplicates.length > 0 || pc.missing.length > 0)) {
     console.log(`${C.magenta}${C.bold}PATH KAYNAKLARI (User / Machine)${C.reset}`);

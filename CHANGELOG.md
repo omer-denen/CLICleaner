@@ -13,6 +13,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   raporlanır, silme hedefi olmaz.
 - **PATH kaynakları:** CLI envanteri, kullanıcı ve makine PATH'ini
   karşılaştırır; yinelenen ve artık var olmayan dizinleri listeler.
+- **Node sürüm kopyaları:** CLI envanteri, Node sürüm yöneticilerinin
+  (nvm / fnm / volta) barındırdığı sürümleri yapıdan tanır; hangi sürümün
+  aktif olduğunu gösterir ve eski sürümlerin global paketlerini inceleme
+  notuyla listeler. Otomatik seçim veya silme yoktur.
 - **Daha güvenli inceleme:** sürüm bilgisi ve bozuk kurulum kontrolü,
   bilinmeyen programlar çalıştırılmadan yapılır.
 
