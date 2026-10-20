@@ -40,7 +40,14 @@ export async function runStatus(args: string[]): Promise<void> {
   const openBugs = s.bugs.filter((b) => b.status !== 'fixed');
 
   console.log(`\n${C.bold}${s.project.name}${C.reset} ${C.gray}— ${s.project.purpose}${C.reset}`);
-  console.log(`${C.dim}Guncelleme: ${s.updatedAt}${C.reset}\n`);
+  console.log(`${C.dim}Guncelleme: ${s.updatedAt}${C.reset}`);
+  if (s.waves?.length) {
+    const label = s.waves
+      .map((w) => `${w.id} ${w.status === 'done' ? 'tamam' : w.status === 'active' ? 'suruyor' : 'planli'}`)
+      .join(' · ');
+    console.log(`${C.dim}Dalgalar: ${label}${C.reset}`);
+  }
+  console.log('');
 
   console.log(`  ${C.green}${done.length} tamamlandi${C.reset} · ${C.yellow}${wip.length} yarida${C.reset} · ${C.gray}${todo.length} planli${C.reset}`);
   if (openBugs.length > 0) {

@@ -322,11 +322,30 @@ export async function probeDir(path: string): Promise<Probe> {
   // Bir klasorde "skills" olmasi tek basina yeterli degildir (oyun
   // verilerinde de gecebilir). SKILL.md veya beceri kilidi varsa
   // kanit gercekten bir ajan calisma alanidir.
+  //
+  // Kokun KENDISI de bir beceri klasoru olabilir: dogrudan SKILL.md
+  // iceren dizin, adi ne olursa olsun beceri kanitidir.
+  if (entries.some((e) => e.isFile() && e.name.toLowerCase() === 'skill.md')) {
+    p.skillStore = true;
+    if (!p.markers.includes('skill-store')) p.markers.push('skill-store');
+  }
   const skillsDir = entries.find(
     (e) => e.isDirectory() && e.name.toLowerCase() === 'skills',
   );
   if (skillsDir) {
     await probeSkillStore(`${path}\\${skillsDir.name}`, p);
+  }
+
+  // --- Ajan plan dosyalari: plan/ + *.md ---
+  //
+  // "plan" adi tek basina kanit degildir (her projede olabilir). Yalnizca
+  // ayni kokte beceri deposu/kilit varsa ajan plani sayilir; boylece
+  // kullanici planlari yanlislikla "ajan verisi" olarak etiketlenmez.
+  if (p.skillStore || p.markers.includes('skill-lock')) {
+    const planDir = entries.find((e) => e.isDirectory() && e.name.toLowerCase() === 'plan');
+    if (planDir && (await dirHasMarkdown(`${path}\\${planDir.name}`))) {
+      p.markers.push('agent-plan');
+    }
   }
 
   // --- Editor uzanti deposu: extensions/ + extensions.json ---
@@ -566,7 +585,7 @@ async function probeSkillStore(dir: string, p: Probe): Promise<void> {
 
   if (entries.some((e) => e.isFile() && e.name.toLowerCase() === 'skill.md')) {
     p.skillStore = true;
-    p.markers.push('skill-store');
+    if (!p.markers.includes('skill-store')) p.markers.push('skill-store');
     return;
   }
 
@@ -575,7 +594,7 @@ async function probeSkillStore(dir: string, p: Probe): Promise<void> {
     const files = await readdirSafe(`${dir}\\${c.name}`);
     if (files?.some((e) => e.isFile() && e.name.toLowerCase() === 'skill.md')) {
       p.skillStore = true;
-      p.markers.push('skill-store');
+      if (!p.markers.includes('skill-store')) p.markers.push('skill-store');
       return;
     }
   }
@@ -619,6 +638,12 @@ async function readdirSafe(dir: string): Promise<Dirent[] | null> {
   } catch {
     return null;
   }
+}
+
+/** Bir klasorde en az bir Markdown dosyasi var mi? (tek seviye) */
+async function dirHasMarkdown(dir: string): Promise<boolean> {
+  const entries = await readdirSafe(dir);
+  return !!entries?.some((e) => e.isFile() && /\.md$/i.test(e.name));
 }
 
 /** Proje ici bagimlilik klasorleri (T31). Ad tek basina kanit degildir. */

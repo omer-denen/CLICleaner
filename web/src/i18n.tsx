@@ -351,6 +351,34 @@ const EN: Record<string, string> = {
     'The last scan is considered current within this period. Default 24 hours; scanning is never blocked.',
   Kaydet: 'Save',
   'Ayarlar kaydedildi.': 'Settings saved.',
+  'Güncelleme Politikası': 'Update policy',
+  'Varsayılan olarak kapalıdır: uygulama hiçbir ağ isteği yapmaz. Neden ve ne gönderileceğini oku.':
+    'Off by default: the app makes no network request. Read why and what would be sent.',
+  'Politikayı aç': 'Open policy',
+  'Bugün nasıl?': 'Today',
+  'Hiçbir güncelleme kontrolü yapılmaz ve hiçbir veri dışarı gönderilmez. Yeni sürümü npm sayfasından veya {cmd} ile kontrol edebilirsin.':
+    'No update check is performed and no data leaves the machine. Check the new version on the npm page or with {cmd}.',
+  'Neden bir kontrol?': 'Why a check?',
+  'npx her çalıştırmada güncel sürümü alır; global kurulum (npm i -g) ise eski sürümde kalır. Sürüm bildirimi olmadan düzeltmeler ve güvenlik güncellemeleri görünmez.':
+    'npx always fetches the current version; a global install (npm i -g) stays on the old one. Without a version notice, fixes and security updates remain invisible.',
+  'Açarsan ne gönderilir?': 'What is sent if enabled?',
+  'Yalnızca bir sürüm sorusu: registry.npmjs.org/clicleaner/latest. Kimlik, disk yolu, tarama sonucu ve kullanım verisi GÖNDERİLMEZ. Sonuç 24 saat önbellekte tutulur.':
+    'Only a version query: registry.npmjs.org/clicleaner/latest. No identity, disk path, scan result or usage data is sent. The result is cached for 24 hours.',
+  Sonuç: 'Result',
+  'Kapalıyken ağ isteği yoktur. Açıkken günde veya haftada bir tek HTTPS isteği gider. Kendi kendine güncelleme YAPILMAZ; güncellemeyi sen {cmd} ile yaparsın.':
+    'When off, there is no network request. When on, one HTTPS request per day or week. There is NO self-update; you update with {cmd}.',
+  'Manuel güncelleme': 'Manual update',
+  'Otomatik kontrolü beklemeden güncelleyebilirsin:':
+    'You can update without waiting for an automatic check:',
+  'Global kurulum:': 'Global install:',
+  'Kurulum yapmadan:': 'Without installing:',
+  'Sürümü şu adreslerden doğrulayabilirsin:': 'Verify the version here:',
+  'GitHub sürümleri': 'GitHub releases',
+  'npm paketi': 'npm package',
+  'Sürümü terminalde görmek için: {cmd}': 'To see the version in a terminal: {cmd}',
+  'Bu ekran bilgilendirir. Otomatik kontrol henüz uygulanmadı (T41); sen açmadan etkinleşmez.':
+    'This screen is informational. Automatic checking is not implemented yet (T41); it will not activate without your consent.',
+  Anladım: 'Got it',
 
   // --- kasa (Recycle Bin yerine) ---
   'Kasaya taşı': 'Move to vault',

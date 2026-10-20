@@ -169,6 +169,8 @@ export default function App() {
   const [scanStatus, setScanStatus] = useState<ScanStatusResponse | null>(null);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Güncelleme politikası bilgi ekranı (ağ isteği YAPMAZ). */
+  const [policyOpen, setPolicyOpen] = useState(false);
   const [hoursDraft, setHoursDraft] = useState('24');
   const [daysDraft, setDaysDraft] = useState('30');
 
@@ -1073,6 +1075,19 @@ export default function App() {
                 {t('Yalnızca bilgi amaçlıdır; kasa otomatik silinmez.')}
               </span>
             </label>
+            <div className="settings-policy">
+              <div>
+                <strong>{t('Güncelleme Politikası')}</strong>
+                <p className="dim small">
+                  {t(
+                    'Varsayılan olarak kapalıdır: uygulama hiçbir ağ isteği yapmaz. Neden ve ne gönderileceğini oku.',
+                  )}
+                </p>
+              </div>
+              <button className="btn small" onClick={() => setPolicyOpen(true)}>
+                {t('Politikayı aç')}
+              </button>
+            </div>
             <footer className="modal-actions">
               <button className="btn" onClick={() => setSettingsOpen(false)}>
                 {t('İptal')}
@@ -1083,6 +1098,118 @@ export default function App() {
                 onClick={() => void saveHours()}
               >
                 {t('Kaydet')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {policyOpen && (
+        <div
+          className="modal-overlay policy-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('Güncelleme Politikası')}
+          onClick={() => setPolicyOpen(false)}
+        >
+          <div className="modal modal-small" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-head">
+              <h2>{t('Güncelleme Politikası')}</h2>
+              <button
+                className="icon-btn"
+                onClick={() => setPolicyOpen(false)}
+                aria-label={t('Kapat')}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="policy-body">
+              <section>
+                <h3>{t('Bugün nasıl?')}</h3>
+                <p>
+                  {t(
+                    'Hiçbir güncelleme kontrolü yapılmaz ve hiçbir veri dışarı gönderilmez. Yeni sürümü npm sayfasından veya {cmd} ile kontrol edebilirsin.',
+                    { cmd: 'npm view clicleaner version' },
+                  )}
+                </p>
+              </section>
+
+              <section>
+                <h3>{t('Neden bir kontrol?')}</h3>
+                <p>
+                  {t(
+                    'npx her çalıştırmada güncel sürümü alır; global kurulum (npm i -g) ise eski sürümde kalır. Sürüm bildirimi olmadan düzeltmeler ve güvenlik güncellemeleri görünmez.',
+                  )}
+                </p>
+              </section>
+
+              <section>
+                <h3>{t('Açarsan ne gönderilir?')}</h3>
+                <p>
+                  {t(
+                    'Yalnızca bir sürüm sorusu: registry.npmjs.org/clicleaner/latest. Kimlik, disk yolu, tarama sonucu ve kullanım verisi GÖNDERİLMEZ. Sonuç 24 saat önbellekte tutulur.',
+                  )}
+                </p>
+              </section>
+
+              <section>
+                <h3>{t('Sonuç')}</h3>
+                <p>
+                  {t(
+                    'Kapalıyken ağ isteği yoktur. Açıkken günde veya haftada bir tek HTTPS isteği gider. Kendi kendine güncelleme YAPILMAZ; güncellemeyi sen {cmd} ile yaparsın.',
+                    { cmd: 'npm i -g clicleaner' },
+                  )}
+                </p>
+              </section>
+
+              <section>
+                <h3>{t('Manuel güncelleme')}</h3>
+                <p>{t('Otomatik kontrolü beklemeden güncelleyebilirsin:')}</p>
+                <ul className="policy-links">
+                  <li>
+                    {t('Global kurulum:')} <code>npm i -g clicleaner</code>
+                  </li>
+                  <li>
+                    {t('Kurulum yapmadan:')} <code>npx clicleaner@latest</code>
+                  </li>
+                </ul>
+                <p>{t('Sürümü şu adreslerden doğrulayabilirsin:')}</p>
+                <ul className="policy-links">
+                  <li>
+                    <a
+                      href="https://github.com/omer-denen/CLICleaner/releases"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {t('GitHub sürümleri')} — github.com/omer-denen/CLICleaner/releases
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://www.npmjs.com/package/clicleaner"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {t('npm paketi')} — npmjs.com/package/clicleaner
+                    </a>
+                  </li>
+                </ul>
+                <p className="dim small">
+                  {t('Sürümü terminalde görmek için: {cmd}', { cmd: 'npm view clicleaner version' })}
+                </p>
+              </section>
+
+              <p className="dim small">
+                {t(
+                  'Bu ekran bilgilendirir. Otomatik kontrol henüz uygulanmadı (T41); sen açmadan etkinleşmez.',
+                )}
+              </p>
+            </div>
+
+            <footer className="modal-actions">
+              <button className="btn btn-primary" onClick={() => setPolicyOpen(false)}>
+                {t('Anladım')}
               </button>
             </footer>
           </div>

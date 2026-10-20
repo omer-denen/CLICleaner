@@ -35,6 +35,18 @@ export interface BugEntry {
   severity: 'critical' | 'high' | 'medium' | 'low';
 }
 
+/**
+ * Bagimsiz calisma dalgasi. Gorev listesi (T*) tek tek isleri tutar;
+ * dalga, ayni hedefe yonelik islerin ust grubudur (or. Web UX fazlari,
+ * ajan calisma alani motoru).
+ */
+export interface WaveState {
+  id: string;
+  title: string;
+  status: 'active' | 'done' | 'planned';
+  note?: string;
+}
+
 export interface ProjectState {
   version: number;
   updatedAt: string;
@@ -44,6 +56,8 @@ export interface ProjectState {
     stack: string;
     entry: string;
   };
+  /** Paralel yuruyen is gruplari (opsiyonel; eski state dosyalari icermez). */
+  waves?: WaveState[];
   /** Calisan komutlar */
   commands: Array<{ cmd: string; desc: string }>;
   tasks: TaskState[];
@@ -91,6 +105,16 @@ export function renderHandoff(s: ProjectState): string {
   L.push('');
   L.push(`Guncelleme: ${s.updatedAt}`);
   L.push('');
+
+  if (s.waves?.length) {
+    L.push('## DALGALAR');
+    L.push('');
+    for (const w of s.waves) {
+      const state = w.status === 'done' ? 'tamam' : w.status === 'active' ? 'suruyor' : 'planli';
+      L.push(`- **${w.id}** ${w.title} (${state})${w.note ? ` — ${w.note}` : ''}`);
+    }
+    L.push('');
+  }
 
   if (wip.length) {
     L.push('## YARIDA KALAN ISE');

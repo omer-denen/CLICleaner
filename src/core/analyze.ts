@@ -122,9 +122,16 @@ export async function classifyPath(
   const extra: SubPart[] = [];
   if (probe.editorExtensions) extra.push(...(await detectEditorOrphans(root)));
   if (probe.appVersions) extra.push(...(await detectAppVersionOrphans(root)));
+  if (archetype === 'agent-workspace') extra.push(...(await detectAgentParts(root, ev)));
   const sub = [...extra, ...(await detectSubParts(root, ev, now))];
-  if (sub.length > 0) {
-    reclaimable += sub.reduce((a, b) => a + b.bytes, 0);
+  // Yalnizca GERCEKTEN geri kazanilabilir alt parcalar toplanir. Ajan
+  // calisma alanindaki beceri/plan (keep) ve bagimlilik (report-only)
+  // parcalari "silinebilir" sayiya KATILMAZ.
+  const reclaimableSub = sub.filter(
+    (s) => s.verdictKind === 'recommend' || s.verdictKind === 'ask',
+  );
+  if (reclaimableSub.length > 0) {
+    reclaimable += reclaimableSub.reduce((a, b) => a + b.bytes, 0);
   }
 
   const verdict = decide({
@@ -501,6 +508,85 @@ export interface SubPart {
   label: string;
   verdictKind: Verdict['kind'];
   reason: string;
+}
+
+/**
+ * Ajan calisma alaninin ALT PARCALARI.
+ *
+ * Kanit: `skills/<ad>/SKILL.md` veya kokte `.skill-lock.json`. Boyle bir
+ * klasorde ajanin eklenti bagimliliklari (node_modules / .venv) da bulunur.
+ * Ucunu AYRI gosteririz:
+ *  - beceriler ve planlar: kullanici degeri (keep)
+ *  - bagimliliklar: yeniden uretilebilir (report-only)
+ *
+ * Hicbiri silme hedefi olmaz; `agent-workspace` zaten hedef uretmez.
+ * Buradaki amac, "52 MB var ama dokunulmaz" ayrimini gorunur kilmaktir.
+ */
+async function detectAgentParts(root: string, ev: Evidence): Promise<SubPart[]> {
+  const markers = new Set(ev.markers ?? []);
+  if (!markers.has('skill-store') && !markers.has('skill-lock')) return [];
+
+  const out: SubPart[] = [];
+
+  const skills = await measureChild(root, 'skills');
+  if (skills) {
+    out.push({
+      path: `${root}\\skills`,
+      bytes: skills.bytes,
+      label: 'Ajan becerileri (kullanici verisi)',
+      // 'keep' bilincli: bu bayt "silinebilir" toplamina girmez.
+      verdictKind: 'keep',
+      reason: 'SKILL.md iceriyor; ogrenilmis beceriler kullanici/ajan emegidir',
+    });
+  }
+
+  if (markers.has('agent-plan')) {
+    const plan = await measureChild(root, 'plan');
+    if (plan) {
+      out.push({
+        path: `${root}\\plan`,
+        bytes: plan.bytes,
+        label: 'Ajan planlari (kullanici verisi)',
+        verdictKind: 'keep',
+        reason: 'Plan dosyalari oturum kararlarini tasir; silme hedefi uretilmez',
+      });
+    }
+  }
+
+  const lock = [...markers].find((m) => m.startsWith('lockfile:'))?.slice('lockfile:'.length);
+  for (const name of ['node_modules', '.venv', 'venv']) {
+    const deps = await measureChild(root, name);
+    if (!deps) continue;
+    out.push({
+      path: `${root}\\${name}`,
+      bytes: deps.bytes,
+      label: `Ajan eklenti bagimliliklari (${name})`,
+      // 'report-only': gorunur ama silinebilir sayilmaz, hedef uretmez.
+      verdictKind: 'report-only',
+      reason: lock
+        ? `${lock} ile birebir yeniden kurulabilir; beceri ve plan dosyalari korunur`
+        : 'Manifestten yeniden kurulabilir; beceri ve plan dosyalari korunur',
+    });
+  }
+
+  return out;
+}
+
+/** Tek bir alt klasoru (varsa) olcer. Yoksa null. */
+async function measureChild(
+  root: string,
+  name: string,
+): Promise<{ bytes: number; files: number } | null> {
+  const dir = `${root}\\${name}`;
+  try {
+    const st = await stat(longPath(dir));
+    if (!st.isDirectory()) return null;
+  } catch {
+    return null;
+  }
+  const w = await walk({ root: dir, largeThreshold: Infinity, maxLarge: 0 });
+  if (w.bytes === 0 && w.files === 0) return null;
+  return { bytes: w.bytes, files: w.files };
 }
 
 async function detectSubParts(root: string, ev: Evidence, now: number): Promise<SubPart[]> {
@@ -918,6 +1004,15 @@ export function detectArchetype(
 
   // 3. CUDA/cuDNN runtime yigini (model icermeyen)
   if (kinds.has('cuda-runtime')) return 'accelerator-runtime';
+
+  // 3b. AJAN CALISMA ALANI (kesin kanit): skills/*/SKILL.md veya beceri kilidi.
+  //
+  // Ajanlar eklenti bagimliliklarini (package.json + node_modules) ya da
+  // Python ortamlarini KENDI klasorlerine kurabilir. Bu, klasoru "kullanici
+  // projesi" yapmaz: plan ve beceri dosyalari kullanici degeridir. Bagimlilik
+  // klasorleri alt parca olarak "yeniden uretilebilir" raporlanir; silme
+  // hedefi URETILMEZ. (Proje koku ayrimi icin bkz. 4e.)
+  if (markers.has('skill-store') || markers.has('skill-lock')) return 'agent-workspace';
 
   // 4. Ortam HAVUZU, paket ONBELLEGI'nden once gelir.
   //    Ikisi de "paket" icerir ama riski farklidir: onbellek yeniden
@@ -1409,24 +1504,41 @@ function decideBase(ctx: {
 
   // ---- AGENT CALISMA ALANI: oturum gecmisi var ----
   if (archetype === 'agent-workspace') {
-    const hasSessions = (ev.markers ?? []).some((m) => /session|memory|skill/i.test(m));
-    const history = (ev.markers ?? []).includes('chat-history');
+    const markers = new Set(ev.markers ?? []);
+    const history = markers.has('chat-history');
+    const hasSkills = markers.has('skill-store') || markers.has('skill-lock');
+    const hasPlan = markers.has('agent-plan');
+    const hasDeps =
+      markers.has('node_modules') || markers.has('venv') || markers.has('.venv') ||
+      markers.has('site-packages');
+    const hasSessions =
+      hasSkills || hasPlan || [...markers].some((m) => /session|memory|chat/i.test(m));
+
     return {
       risk: allow?.history && history ? 'high' : 'medium',
       kind: 'ask',
       title: `${name} — AI ajan calisma alani`,
-      what: 'Ajanin oturum gecmisi, becerileri, hafizasi ve onbellegi.',
-      consequence: hasSessions
-        ? 'SILMEZ: eski oturumlar ve ogrenilmis beceriler kaybolur.'
-        : 'Onbellek ve gunlukler silinir; ajan yeniden indirme yapar.',
+      what: hasSkills
+        ? 'Ajanin beceri deposu, planlari ve eklenti bagimliliklari.'
+        : 'Ajanin oturum gecmisi, becerileri, hafizasi ve onbellegi.',
+      consequence: hasSkills
+        ? 'SILMEZ: beceri ve plan dosyalari kullanici degeridir. Eklenti bagimliliklari yeniden kurulabilir; yine de silme hedefi uretilmez.'
+        : hasSessions
+          ? 'SILMEZ: eski oturumlar ve ogrenilmis beceriler kaybolur.'
+          : 'Onbellek ve gunlukler silinir; ajan yeniden indirme yapar.',
       because: [
         ...because,
+        ...(hasSkills ? ['SKILL.md / beceri kilidi kaniti'] : []),
+        ...(hasPlan ? ['Plan dosyalari oturum kararlarini tasir (kullanici degeri)'] : []),
+        ...(hasSkills && hasDeps
+          ? ['Eklenti bagimliliklari (node_modules / ortam) yeniden kurulabilir; hedef uretilmez']
+          : []),
         ...(allow?.history && history
           ? ['--clear-history: yalnizca sohbet/oturum klasorleri hedeflenir']
           : []),
       ],
       preconditions: [
-        'Ajanin kapali oldugundan emin ol',
+        hasSkills ? 'Beceri ve plan dosyalari her durumda korunur' : 'Ajanin kapali oldugundan emin ol',
         ...(allow?.history && history ? ['Sohbet gecmisi geri gelmez; once yedekle'] : []),
       ],
     };

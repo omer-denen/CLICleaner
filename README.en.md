@@ -82,6 +82,7 @@ regenerated and what is **your data**.
 | What is on the AI side? | What CLICleaner does |
 |---|---|
 | Agent sessions, skills, memory | **Keeps them.** User value; never produces a delete target. |
+| Plugin dependencies inside an agent workspace | **Reported.** Regenerable; skills and plan files are kept. |
 | Model files | **Keeps them.** Only unusable GPU leftovers become candidates; CPU models stay. |
 | GPU libraries | A candidate only when proven unused; otherwise untouched. |
 | Python / conda environments | **Reports** old or idle ones; project-bound environments are kept. |
@@ -262,6 +263,24 @@ clicleaner ui --tui            # terminal UI (optional)
 ```
 
 For more: `clicleaner help`
+
+---
+
+## Updates
+
+There is **no automatic update check** (planned behaviour: off by default).
+Manual update:
+
+```bash
+npm i -g clicleaner        # update the global install
+npx clicleaner@latest      # run the latest version without installing
+```
+
+- npm: <https://www.npmjs.com/package/clicleaner>
+- GitHub releases: <https://github.com/omer-denen/CLICleaner/releases>
+
+In the UI, **Settings → Update policy** explains what would and would not be
+sent, and lists the manual update links.
 
 ---
 

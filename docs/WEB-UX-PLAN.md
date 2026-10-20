@@ -91,6 +91,76 @@
 - [ ] Klavye/odak/ekran okuyucu denetimi, açık/koyu tema, bildirim merkezi.
 - [ ] Tutarlı boyut biçimlendirme (mevcut `formatBytes`).
 
+### Faz 9 — Masaüstü kısayolu (token'li başlatma) — T40
+
+Amaç: web arayüzündeki bir düğme, masaüstüne **CLICleaner** kısayolu
+eklesin; kısayol her çalıştırmada sunucuyu başlatsın, **yeni token** üretsin
+ve tarayıcıyı doğrudan arayüze yönlendirsin.
+
+- [ ] Server: `GET/POST/DELETE /api/shortcut/desktop`.
+      Masaüstü yolu OS'ten alınır (`[Environment]::GetFolderPath('Desktop')`);
+      OneDrive yönlendirmesi böylece kendiliğinden doğru olur.
+- [ ] `.lnk` hedefi: global `clicleaner` shim'i varsa `cmd.exe /k "<shim>" ui`;
+      yoksa `process.execPath` + `bin/clicleaner.mjs ui`. Yollar tırnaklanır.
+- [ ] **Token .lnk içine YAZILMAZ.** Her başlatmada `runWeb` rastgele token
+      üretir ve `?token=` ile tarayıcıyı açar (mevcut davranış).
+- [ ] UI: **Ayarlar → Masaüstüne kısayol ekle**; durum + tam yol + **Kaldır**.
+      Kaldırma yalnızca bizim oluşturduğumuz kısayolu siler (Description
+      işareti doğrulanır).
+- [ ] Tek örnek: ikinci çalıştırma yeni port/tarayıcı açmak yerine uyarır
+      (token diske yazılmaz; istenirse yalnız "zaten çalışıyor" denir).
+- [ ] Test: `CLICLEANER_DESKTOP` ile sentetik masaüstü; oluştur/oku/sil;
+      boşluklu ve Türkçe karakterli yol; `.lnk` içinde token yok.
+- Not: konsol penceresi kapanırsa sunucu da kapanır (bilinçli: kullanıcı
+  durdurabilsin). Simge/ikon ayrı iştir; ilk sürüm Node ikonunu kullanır.
+
+### Faz 10 — Sürüm / güncelleme bildirimi — T41 (önce karar)
+
+**Soru:** Kullanıcı yeni sürüm çıktığını nasıl öğrenecek? Bugün **hiçbir
+mekanizma yok**: uygulama yerel çalışır, telemetri göndermez ve kendini
+güncellemez. `npx` kullanıcısı bir sonraki çalıştırmada zaten yeni sürümü
+alır; **global kurulum** yapan kullanıcı ise `npm i -g clicleaner` yapmadıkça
+eski sürümde kalır.
+
+Seçenekler:
+
+1. **Hiç kontrol yok (bugünkü durum).** "Veri dışarı gitmez" sözü aynen
+   korunur; kullanıcı sürümü tesadüfen öğrenir. En az sürpriz, en zayıf
+   keşfedilebilirlik.
+2. **Elle kontrol:** Ayarlar → "Sürümü kontrol et" + `clicleaner update`
+   (yalnız kontrol, kurulum yok). Tek tıkla tek HTTPS isteği; varsayılan
+   **kapalı**. "Veri dışarı gitmez" sözü bozulmaz.
+3. **Otomatik kontrol (varsayılan açık), 24 saat önbellekli.**
+   `https://registry.npmjs.org/clicleaner/latest` adresine yalnız sürüm
+   sorgusu; kimlik/telemetri yok, sonuç `%LOCALAPPDATA%\clicleaner\update.json`
+   içinde saklanır. Üst barda bloklamayan "Yeni sürüm var" rozeti +
+   `npm i -g clicleaner` kopyalama düğmesi. README'deki "hiçbir veri dışarı
+   gönderilmez" cümlesi **"telemetri yok; isteğe bağlı sürüm kontrolü"**
+   olarak düzeltilmeli.
+4. **npm `update-notifier`**: CLI çıkışında uyarı basar; web arayüzü
+   kullanıcısını (ürünün ana girişi) görmez. Ek bağımlılık + varsayılan
+   ağ erişimi. Önerilmez.
+5. **Arka plan servisi / tepsi simgesi**: sürekli çalışan süreç, Windows
+   başlangıcı ve ayrı güncelleme kanalı gerektirir; kapsam dışı.
+
+**Öneri:** 2 + 3 birlikte — varsayılan **kapalı** otomatik kontrol, ayarlarda
+"Güncelleme kontrolü: kapalı / günlük / haftalık", ayrıca "Şimdi kontrol et".
+Kullanıcı açtığında tek istek, 24 saat önbellek, çevrimdışıysa sessiz geç.
+Kendi kendine güncelleme **yok** (npm kurulumunu web arayüzünden çalıştırmak
+güvenlik riski); yalnız komut gösterilir.
+
+- [x] **"Güncelleme Politikası" bilgi ekranı** (Ayarlar): bugünkü davranış,
+      neden kontrol, ne gönderilir, sonuç ve **manuel güncelleme adresleri**
+      (GitHub Releases + npm). Ağ isteği YAPMAZ; yalnız bilgilendirir.
+- [x] README TR/EN: "Güncelleme" bölümü + manuel komutlar + iki adres.
+- [ ] `GET /api/update` (önbellekli) + `POST /api/update/check` (zorla).
+- [ ] Ayar: `updateCheck: 'off' | 'daily' | 'weekly'`, varsayılan `off`.
+- [ ] Üst bar rozeti + ayar satırı + komut kopyalama.
+- [ ] CLI: `clicleaner update` (yalnız kontrol) ve `--no-update-check`.
+- [ ] Test: `CLICLEANER_UPDATE_URL` ile sentetik kayıt; TTL, çevrimdışı,
+      kapalıyken istek yok.
+- [ ] README veri politikası cümlesini netleştir (otomatik kontrol eklenince).
+
 ## Çelişkiler ve varsayımlar
 
 1. **Zamanlanmış silme:** "Direkt silme hiçbir zaman olmaz" ilkesiyle çelişir.
@@ -109,6 +179,13 @@
 6. **Winget/scoop:** kanıt yoksa gösterilmez; envanter kaynakları gerçektir.
 7. **SSE item düzeyi:** mevcut küme akışı korunur; item olayları ek katman
    olarak eklenir, silme sözleşmesi değişmez.
+8. **Masaüstü kısayolu:** kısayol yalnızca başlatıcıdır; token, port ve
+   oturum bilgisi `.lnk` içine yazılmaz. Her çalıştırmada yeni token üretilir.
+   Kısayol kaldırılırken hedefin bizim oluşturduğumuz kısayol olduğu doğrulanır.
+9. **Güncelleme kontrolü:** "hiçbir veri dışarı gitmez" ilkesiyle çelişir.
+   Karar: otomatik kontrol **varsayılan kapalı**; yalnız kullanıcı açarsa
+   `registry.npmjs.org` üzerinden tek sürüm sorgusu yapılır. README'deki
+   ifade buna göre netleştirilecek; kendi kendine güncelleme olmayacak.
 
 ## Varsayımlar
 

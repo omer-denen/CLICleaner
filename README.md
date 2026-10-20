@@ -83,6 +83,7 @@ hangisinin **senin verin** olduğunu bilmek zordur.
 | AI tarafında ne var? | CLICleaner ne yapar? |
 |---|---|
 | Ajan oturumları, beceriler, hafıza | **Korur.** Kullanıcı değeridir; silme hedefi üretmez. |
+| Ajan çalışma alanındaki eklenti bağımlılıkları | **Raporlanır.** Yeniden kurulabilir; beceri ve plan dosyaları korunur. |
 | Model dosyaları | **Korur.** Yalnız kullanılamayan GPU artıkları aday olur; CPU modelleri kalır. |
 | GPU kütüphaneleri | Kullanılmadığı kanıtlanırsa aday olur; yoksa dokunmaz. |
 | Python / conda ortamları | Eski veya atıl olanları **raporlar**; projeye bağlı olanlar korunur. |
@@ -261,6 +262,24 @@ clicleaner ui --tui            # terminal arayüzü (isteğe bağlı)
 ```
 
 Daha fazlası için: `clicleaner help`
+
+---
+
+## Güncelleme
+
+Otomatik güncelleme kontrolü **yoktur** (planlanan davranış: varsayılan kapalı).
+Manuel güncelleme:
+
+```bash
+npm i -g clicleaner        # global kurulumu güncelle
+npx clicleaner@latest      # kurulum yapmadan en güncel sürümü çalıştır
+```
+
+- npm: <https://www.npmjs.com/package/clicleaner>
+- GitHub sürümleri: <https://github.com/omer-denen/CLICleaner/releases>
+
+Arayüzde **Ayarlar → Güncelleme Politikası** ekranı neyin gönderilip
+gönderilmediğini ve manuel güncelleme adreslerini gösterir.
 
 ---
 

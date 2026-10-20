@@ -47,6 +47,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   (bilgi amaçlı; otomatik silme yok).
 - Varsayılan seçim yalnızca yeniden oluşturulabilirliği kanıtlanmış ve
   güven düzeyi düşük olmayan klasörleri işaretler.
+- Ajan çalışma alanları ayrı bir sınıf olarak tanınır: beceri ve plan
+  dosyaları korunur, eklenti bağımlılıkları yalnızca raporlanır.
+- Ayarlar'a **Güncelleme Politikası** bilgi ekranı eklendi; manuel güncelleme
+  komutları ve adresleri gösterilir, ağ isteği yapılmaz.
 - Web arayüzü artık sistem varsayılan tarayıcısında açılır; istenirse Edge
   zorlanabilir.
 - Uzun listelerde kaydırma ve canlı tarama akışı iyileştirildi.
