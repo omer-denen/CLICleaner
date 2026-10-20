@@ -88,6 +88,22 @@ export async function classifyPath(
 
   const archetype = detectArchetype(ev, root, w.extensionCounts, probe);
   let reclaimable = estimateReclaimable(archetype, w.bytes, w.extensionCounts);
+
+  // T32: pnpm/bun ana klasorleri uygulamayi da icerir. Depo kokü
+  // taranan klasorden farkliysa YALNIZCA depo olculur ve hedeflenir.
+  if (archetype === 'pkg-manager-cache' && probe.cacheRoot) {
+    const cw = await walk({
+      root: probe.cacheRoot,
+      largeThreshold: Infinity,
+      maxLarge: 0,
+      signal: opts.signal,
+    });
+    if (!opts.signal?.aborted) {
+      ev.cacheRoot = probe.cacheRoot;
+      reclaimable = cw.bytes;
+    }
+  }
+
   const key = clusterKey(ev, root);
 
   // Bilesik mimari: model deposunun icinde kullanilamayan GPU runtime'i
@@ -162,6 +178,12 @@ export async function classifyPath(
   // Kume seviyesindeki "silinebilir" bayt tek basina yeterli degildir;
   // hangi YOLUN ne kadarinin silineceği burada belirlenir.
   const rawTargets = buildDeleteTargets(root, archetype, sub, w.bytes, now, ev);
+  // T32: depo alt klasoru hedefleniyorsa boyutu olculmus degerden al.
+  if (ev.cacheRoot) {
+    for (const t of rawTargets) {
+      if (t.path.toLowerCase() === ev.cacheRoot.toLowerCase()) t.bytes = reclaimable;
+    }
+  }
   // Git farkindaligi (T27): tracked yollar silme hedefinden cikarilir.
   const targets: DeleteTarget[] = [];
   let gitSkipped = 0;
@@ -326,7 +348,20 @@ function buildDeleteTargets(
       }));
     }
 
-    case 'pkg-manager-cache':
+    case 'pkg-manager-cache': {
+      // T32: depo kokü taranan klasorden farkliysa (pnpm/bun ana
+      // klasoru) yalnizca depo alt klasoru hedeflenir.
+      const cacheRoot = ev?.cacheRoot ?? root;
+      return [
+        {
+          path: cacheRoot,
+          kind: 'whole',
+          label: `${baseName(cacheRoot)} — paket deposu`,
+          bytes: cacheRoot === root ? totalBytes : 0,
+        },
+      ];
+    }
+
     case 'crash-artifacts':
     case 'updater-staging':
       return [
@@ -1248,12 +1283,18 @@ function decideBase(ctx: {
         ...because,
         `${formatAge(ev.lastTouched ?? 0, now)} son kullanildi`,
         'Icerik yeniden uretilebilir',
+        ...(ev.cacheRoot
+          ? [`Depo kokü: ${ev.cacheRoot} (silme hedefi yalnizca bu klasor)`]
+          : []),
         ...(npmManaged ? ['npm onbellegi: butunluk icin "npm cache verify" de kullanilabilir'] : []),
         ...(fresh ? ['Cok guncel: bir sonraki kurulum biraz gecikebilir'] : []),
       ],
-      preconditions: npmManaged
-        ? ['npm/Node calismiyorken calistir', 'Guvenli alternatif: "npm cache verify" (butunluk + cop toplama)']
-        : [],
+      preconditions: [
+        ...(npmManaged
+          ? ['npm/Node calismiyorken calistir', 'Guvenli alternatif: "npm cache verify" (butunluk + cop toplama)']
+          : []),
+        ...(ev.cacheRoot ? ['Uygulama klasoru korunur; yalnizca paket deposu silinir'] : []),
+      ],
     };
   }
 

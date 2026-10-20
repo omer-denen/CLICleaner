@@ -1,4 +1,5 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
@@ -40,6 +41,12 @@ export interface Probe {
   vectorStore?: boolean;
   /** Proje ici bagimlilik klasoru (T31): node_modules / .venv + manifest */
   projectArtifact?: ProjectArtifactEvidence;
+  /**
+   * T32: paket deposunun gercek koku (taranan klasorden farkliysa).
+   * pnpm/bun ana klasorleri uygulama icerir; yalnizca depo alt klasoru
+   * silme hedefi olabilir.
+   */
+  cacheRoot?: string;
 }
 
 /**
@@ -253,6 +260,10 @@ export async function probeDir(path: string): Promise<Probe> {
   // Global paket kurulumuyla karismamasi icin bu kanit, shim isaretinden
   // ONCE toplanir ve karar katmaninda daha yuksek oncelik alir.
   await probeProjectArtifact(path, p);
+
+  // Paket yoneticisi depolarini YAPIDAN tani (T32): pnpm / yarn / bun.
+  // Genel "cache" adi tek basina kanit DEGILDIR.
+  await probePackageManagerStore(path, p);
 
   // Komut shim'i + node_modules: global paket kurulumu (npm prefix).
   if (hasShim) p.markers.push('shim-dir');
@@ -692,6 +703,165 @@ async function readJsonSafe(file: string): Promise<Record<string, unknown> | nul
   } catch {
     return null;
   }
+}
+
+/**
+ * Bilinen paket yoneticisi depolarini YAPIDAN tanir (T32).
+ *
+ * Onemli guvenlik kurali: pnpm ve bun ana klasorleri uygulamanin
+ * kendisini de icerir (`pnpm.exe`, `bun.exe`). Bu yuzden depo kokü
+ * taranan klasorden farkliysa `cacheRoot` olarak isaretlenir ve silme
+ * hedefi YALNIZCA o alt klasor olur.
+ */
+async function probePackageManagerStore(path: string, p: Probe): Promise<void> {
+  const hit =
+    (await findPnpmStore(path)) ??
+    (await findYarnCache(path)) ??
+    (await findBunCache(path));
+  if (!hit) return;
+  p.markers.push('store', hit.marker);
+  if (normLocal(hit.root) !== normLocal(path)) p.cacheRoot = hit.root;
+}
+
+const HEX2_RE = /^[0-9a-f]{2}$/i;
+const HEX_HASH_RE = /^[0-9a-f]{20,}$/i;
+const VERSION_DIR_RE = /^v\d+$/i;
+/** Bun depo girdisi: `pkg@1.2.3` veya `@scope+pkg@1.2.3`. */
+const PKG_AT_VERSION_RE = /^(@[^@\\/]+[+/])?[^@\\/]+@\d+\.\d+\.\d+/i;
+
+interface StoreHit {
+  root: string;
+  marker: string;
+}
+
+function normLocal(p: string): string {
+  return p.replace(/[\\/]+$/, '').toLowerCase();
+}
+
+async function childDirs(
+  dir: string,
+  match: (name: string) => boolean,
+  max = 8,
+): Promise<string[]> {
+  const ents = await readdirSafe(dir);
+  if (!ents) return [];
+  return ents
+    .filter((e) => e.isDirectory() && match(e.name))
+    .slice(0, max)
+    .map((e) => join(dir, e.name));
+}
+
+/**
+ * pnpm: icerik adresli depo. Kanit `files\xx\<hash>` duzeni (iki harf
+ * onek + uzun hex dosya adi) ve genelde yanindaki `index` klasoru.
+ * Ad ("pnpm") tek basina kanit sayilmaz.
+ */
+async function findPnpmStore(root: string): Promise<StoreHit | null> {
+  const base = root.split('\\').filter(Boolean).pop()?.toLowerCase() ?? '';
+  const candidates: string[] = [root];
+  if (base !== 'store') candidates.push(join(root, 'store'));
+
+  const storeBase = base === 'store' ? root : join(root, 'store');
+  candidates.push(...(await childDirs(storeBase, (n) => VERSION_DIR_RE.test(n))));
+  // Taranan klasor dogrudan surum deposu ise (store\v10) yukarida root zaten denenir.
+
+  for (const c of candidates) {
+    if (await isPnpmFilesStore(c)) return { root: c, marker: 'pnpm-store' };
+  }
+  return null;
+}
+
+async function isPnpmFilesStore(dir: string): Promise<boolean> {
+  const files = join(dir, 'files');
+  if (!existsSync(longPath(files))) return false;
+  const prefixes = (await readdirSafe(files))?.filter(
+    (e) => e.isDirectory() && HEX2_RE.test(e.name),
+  ).slice(0, 3) ?? [];
+  if (prefixes.length === 0) return false;
+  for (const pre of prefixes) {
+    const kids = await readdirSafe(join(files, pre.name));
+    if (kids?.some((k) => k.isFile() && HEX_HASH_RE.test(k.name))) return true;
+  }
+  return false;
+}
+
+/**
+ * yarn: v1 icin `v6/v8` altinda `.yarn-metadata.json` tasiyan paket
+ * klasorleri; Berry icin `*-npm-*.zip` arsivleri. Ikisi de yapidir.
+ */
+async function findYarnCache(root: string): Promise<StoreHit | null> {
+  const candidates: string[] = [root, join(root, 'Cache'), join(root, 'cache')];
+  for (const base of [root, join(root, 'Cache'), join(root, 'cache')]) {
+    candidates.push(...(await childDirs(base, (n) => VERSION_DIR_RE.test(n))));
+  }
+  candidates.push(join(root, 'Berry', 'cache'), join(root, 'berry', 'cache'));
+
+  for (const c of candidates) {
+    if (await isYarnCacheDir(c)) return { root: c, marker: 'yarn-cache' };
+  }
+  return null;
+}
+
+async function isYarnCacheDir(dir: string): Promise<boolean> {
+  const ents = await readdirSafe(dir);
+  if (!ents) return false;
+
+  // Berry: paket arsivleri (adinda -npm- gecen .zip)
+  const zips = ents.filter((e) => e.isFile() && /-npm-.*\.zip$/i.test(e.name));
+  if (zips.length >= 2) return true;
+
+  // v1: paket klasorlerinde .yarn-metadata.json
+  let hits = 0;
+  for (const e of ents.filter((x) => x.isDirectory()).slice(0, 6)) {
+    if (await hasYarnMetadata(join(dir, e.name))) {
+      hits++;
+      if (hits >= 2) return true;
+    }
+  }
+  return false;
+}
+
+async function hasYarnMetadata(entry: string): Promise<boolean> {
+  if (existsSync(longPath(join(entry, '.yarn-metadata.json')))) return true;
+  const modules = await readdirSafe(join(entry, 'node_modules'));
+  if (!modules) return false;
+  return modules
+    .filter((e) => e.isDirectory())
+    .slice(0, 3)
+    .some((e) => existsSync(longPath(join(entry, 'node_modules', e.name, '.yarn-metadata.json'))));
+}
+
+/**
+ * bun: `install\cache` altinda `pkg@surum` klasorleri (her birinde
+ * package.json). Rastgele bir "cache" klasoru bu yapiyi saglamaz.
+ */
+async function findBunCache(root: string): Promise<StoreHit | null> {
+  const candidates = [join(root, 'install', 'cache'), join(root, 'cache'), root];
+  for (const c of candidates) {
+    if (await isBunCacheDir(c)) return { root: c, marker: 'bun-cache' };
+  }
+  return null;
+}
+
+async function isBunCacheDir(dir: string): Promise<boolean> {
+  const ents = await readdirSafe(dir);
+  if (!ents) return false;
+  const dirs = ents
+    .filter((e) => e.isDirectory() && PKG_AT_VERSION_RE.test(e.name))
+    .slice(0, 8);
+  if (dirs.length < 2) return false;
+
+  let withPackageJson = 0;
+  let withBunTag = 0;
+  for (const d of dirs) {
+    const kids = await readdirSafe(join(dir, d.name));
+    if (kids?.some((k) => k.isFile() && k.name.toLowerCase() === 'package.json')) withPackageJson++;
+    if (kids?.some((k) => k.name.toLowerCase() === '.bun-tag')) withBunTag++;
+  }
+  if (withPackageJson < 2) return false;
+
+  const inInstallCache = /[\\/]install[\\/]cache[\\/]?$/i.test(dir);
+  return inInstallCache || withBunTag >= 2;
 }
 
 async function probePackageJson(dir: string): Promise<OwnerSignal | null> {

@@ -31,6 +31,12 @@ export interface Evidence {
   ownerAccount?: string;
   /** Kume icinde tespit edilen bilesik alt parca sayisi (rapor icin) */
   markerSubpartCount?: number;
+  /**
+   * T32: paket deposunun GERCEK kokü, taranan klasorden farkliysa.
+   * Ornek: `%LOCALAPPDATA%\pnpm` bir uygulama klasorudur; depo ise
+   * `pnpm\store\v10` altindadir. Silme hedefi bu yol olmalidir.
+   */
+  cacheRoot?: string;
 }
 
 export type OwnerSignal =

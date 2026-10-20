@@ -11,6 +11,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   klasörleri, üst dizindeki proje dosyalarıyla birlikte değerlendirilir;
   yeniden kurulabilirlik ve güven düzeyi gösterilir. Bu klasörler yalnızca
   raporlanır, silme hedefi olmaz.
+- **Paket depoları:** pnpm, yarn ve bun depoları ada değil yapıya göre
+  tanınır. pnpm/bun ana klasörleri uygulama da içerdiği için yalnızca depo
+  alt klasörü hedeflenir; uygulama klasörü korunur.
 - **PATH kaynakları:** CLI envanteri, kullanıcı ve makine PATH'ini
   karşılaştırır; yinelenen ve artık var olmayan dizinleri listeler.
 - **Node sürüm kopyaları:** CLI envanteri, Node sürüm yöneticilerinin
