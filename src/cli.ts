@@ -72,7 +72,7 @@ ${C.bold}Hassas siniflar (yalnizca acikca istenirse)${C.reset}
 
 ${C.bold}Web arayuzu icin${C.reset}
   --port <n>         Sabit port (varsayilan: bos port otomatik secilir)
-  --browser <ad>     Acilacak tarayici: edge (varsayilan) | default
+  --browser <ad>     Acilacak tarayici: default (varsayilan) | edge
   --no-open          Tarayiciyi otomatik acma, yalnizca adresi yaz
   --tui              Terminal arayuzunu kullan (varsayilan: tarayici)
 
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
     let tui = false;
     let port = 0;
     let open = true;
-    let browser: 'edge' | 'default' = 'edge';
+    let browser: 'edge' | 'default' = 'default';
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];

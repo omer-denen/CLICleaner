@@ -75,6 +75,20 @@ export type ScanStreamEvent =
       total: number;
       cluster: Cluster | null;
     }
+  /**
+   * Oge duzeyi olay. `id` kararlidir (kume anahtari + yol ozeti): ayni
+   * oge tekrar gelirse istemci satiri gunceller, cogaltmaz. `target-done`
+   * geriye donuk uyumluluk icin korunur.
+   */
+  | {
+      type: 'item';
+      id: string;
+      key: string;
+      path: string;
+      cluster: Cluster;
+      done: number;
+      total: number;
+    }
   | { type: 'progress'; done: number; total: number; bytes: number }
   | { type: 'done'; result: ScanResult }
   | { type: 'cancelled' }

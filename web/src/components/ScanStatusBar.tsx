@@ -28,7 +28,9 @@ export function ScanStatusBar({
   if (!status) return null;
 
   const state = status.scanning ? 'scanning' : status.state;
-  const age = status.ageMs !== null ? ageLabel(status.ageMs, lang) : null;
+  // `ageMs` bir SURE; `ageLabel` zaman damgasi bekler. Yas yanlis
+  // gorunmesin diye simdiki zamandan cikarilir.
+  const age = status.ageMs !== null ? ageLabel(Date.now() - status.ageMs, lang) : null;
   const hoursLeft =
     status.nextRecommendedAt !== null
       ? Math.max(0, Math.ceil((status.nextRecommendedAt - Date.now()) / 3_600_000))

@@ -29,13 +29,20 @@ import {
   updateSettings,
 } from './api.ts';
 import { CliView } from './components/CliView.tsx';
-import { ClusterRow } from './components/ClusterRow.tsx';
 import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { ScanStatusBar } from './components/ScanStatusBar.tsx';
 import { VaultView } from './components/VaultView.tsx';
+import { VirtualClusterList } from './components/VirtualClusterList.tsx';
 import { useI18n } from './i18n.tsx';
 import { VERDICT_HINT } from './labels.ts';
+import {
+  EMPTY_LIVE_SCAN,
+  EMPTY_SCAN_PROGRESS,
+  reduceScanBatch,
+  type ScanBatchState,
+} from './util/live-scan.ts';
+import { createSseBatcher, type SseBatcher } from './util/sse-batch.ts';
 
 type Phase = 'idle' | 'scanning' | 'review' | 'planning' | 'confirm' | 'deleting' | 'done';
 type KindFilter = 'all' | 'recommend' | 'ask' | 'report-only' | 'keep' | 'git';
@@ -63,14 +70,6 @@ interface DoneState {
   journalPath: string;
   mode: DeleteMode;
   rows: Array<{ label: string; bytes: number; note: string; ok: boolean }>;
-}
-
-/** Tarama surerken: tum alanlar, o an tarananlar, bitenler ve bulunanlar. */
-interface LiveScan {
-  paths: string[];
-  found: Array<{ path: string; cluster: Cluster }>;
-  active: string[];
-  finished: string[];
 }
 
 /** Tarama bitince gosterilen onay diyalogu; "Tamam" ile listeye gecilir. */
@@ -150,12 +149,10 @@ export default function App() {
 
   const [lastScanAt, setLastScanAt] = useState<number | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
-  const [scanProgress, setScanProgress] = useState({ done: 0, total: 0, bytes: 0 });
-  const [scanLive, setScanLive] = useState<LiveScan>({
-    paths: [],
-    found: [],
-    active: [],
-    finished: [],
+  /** Canli tarama: olaylar tamponlanarak TEK guncellemede uygulanir. */
+  const [scanBatch, setScanBatch] = useState<ScanBatchState>({
+    live: EMPTY_LIVE_SCAN,
+    progress: EMPTY_SCAN_PROGRESS,
   });
   const [scanDone, setScanDone] = useState<ScanDoneInfo | null>(null);
 
@@ -164,8 +161,6 @@ export default function App() {
   const [filter, setFilter] = useState('');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('size');
-  /** Ayni anda gosterilen satir sayisi: liste sonsuza uzamasin. */
-  const [listLimit, setListLimit] = useState(30);
   const [mode, setMode] = useState<DeleteMode>('recycle');
 
   const [plan, setPlan] = useState<PlanResponse | null>(null);
@@ -178,10 +173,14 @@ export default function App() {
   const [daysDraft, setDaysDraft] = useState('30');
 
   const streamRef = useRef<EventSource | null>(null);
+  /** SSE tamponu: bilesen kapanirken zamanlayici de iptal edilir. */
+  const batchRef = useRef<SseBatcher<ScanStreamEvent> | null>(null);
 
   const closeStream = useCallback(() => {
     streamRef.current?.close();
     streamRef.current = null;
+    batchRef.current?.dispose();
+    batchRef.current = null;
   }, []);
 
   const notify = useCallback((message: string) => {
@@ -290,8 +289,7 @@ export default function App() {
     setDeleting(null);
     setSelected(new Set());
     setExpanded(new Set());
-    setScanProgress({ done: 0, total: 0, bytes: 0 });
-    setScanLive({ paths: [], found: [], active: [], finished: [] });
+    setScanBatch({ live: EMPTY_LIVE_SCAN, progress: EMPTY_SCAN_PROGRESS });
     setScanDone(null);
     setPhase('scanning');
 
@@ -315,7 +313,20 @@ export default function App() {
       setScanId(id);
       const es = scanStream(id);
       streamRef.current = es;
+
+      // Olaylari 120 ms'lik pencerelerde topla: yuzlerce olay tek render.
+      const batcher = createSseBatcher<ScanStreamEvent>((events) => {
+        setScanBatch((prev) => reduceScanBatch(prev, events));
+      });
+      batchRef.current = batcher;
+
       let finished = false;
+      /** EventSource kendisi yeniden baglanir; ust sinir bizde. */
+      let retries = 0;
+
+      es.onopen = () => {
+        retries = 0;
+      };
 
       es.onmessage = (ev) => {
         let data: ScanStreamEvent;
@@ -324,39 +335,12 @@ export default function App() {
         } catch {
           return;
         }
-        if (data.type === 'targets') {
-          // Sol sutun: taranacak dizinlerin tam listesi.
-          setScanLive((prev) => ({ ...prev, paths: data.paths }));
-        } else if (data.type === 'target-start') {
-          // Ayni anda 6 dizin taranir; hangileri oldugu gorunur.
-          setScanLive((prev) =>
-            prev.active.includes(data.path)
-              ? prev
-              : { ...prev, active: [...prev.active, data.path] },
-          );
-        } else if (data.type === 'target-done') {
-          setScanLive((prev) => {
-            const active = prev.active.filter((p) => p !== data.path);
-            const finishedPaths = prev.finished.includes(data.path)
-              ? prev.finished
-              : [...prev.finished, data.path];
-            const alreadyFound = prev.found.some((f) => f.path === data.path);
-            if (!data.cluster || alreadyFound) {
-              return { ...prev, active, finished: finishedPaths };
-            }
-            return {
-              ...prev,
-              found: [...prev.found, { path: data.path, cluster: data.cluster }],
-              active,
-              finished: finishedPaths,
-            };
-          });
-        } else if (data.type === 'progress') {
-          setScanProgress({ done: data.done, total: data.total, bytes: data.bytes });
-        } else if (data.type === 'done') {
+        if (data.type === 'done') {
+          // Bekleyen oge olaylarini once uygula: sonuc ekrani eksik kalmasin.
+          batcher.flush();
           finished = true;
           closeStream();
-          setScanLive({ paths: [], found: [], active: [], finished: [] });
+          setScanBatch({ live: EMPTY_LIVE_SCAN, progress: EMPTY_SCAN_PROGRESS });
           setScan(data.result);
           setSelected(defaultSelection(data.result));
           setLastScanAt(Date.now());
@@ -374,20 +358,30 @@ export default function App() {
         } else if (data.type === 'cancelled') {
           finished = true;
           closeStream();
-          setScanLive({ paths: [], found: [], active: [], finished: [] });
+          setScanBatch({ live: EMPTY_LIVE_SCAN, progress: EMPTY_SCAN_PROGRESS });
           notify(t('Tarama iptal edildi.'));
           setPhase('idle');
         } else if (data.type === 'error') {
           finished = true;
           closeStream();
-          setScanLive({ paths: [], found: [], active: [], finished: [] });
+          setScanBatch({ live: EMPTY_LIVE_SCAN, progress: EMPTY_SCAN_PROGRESS });
           setError(data.message);
           setPhase('review');
+        } else {
+          // targets / target-start / target-done / item / progress
+          batcher.push(data);
         }
       };
 
       es.onerror = () => {
         if (finished) return;
+        // `CONNECTING`: tarayici ayni adrese Last-Event-ID ile kendisi
+        // yeniden baglaniyor. Bu bir hata degil; kacirilan olaylar
+        // sunucudaki tampondan tekrar oynatilir.
+        if (es.readyState === EventSource.CONNECTING && retries < 10) {
+          retries++;
+          return;
+        }
         closeStream();
         setError('Tarama bağlantısı koptu. Yeniden taramayı dene.');
         setPhase('review');
@@ -444,11 +438,6 @@ export default function App() {
     };
   }, [tokenReady, closeStream, refreshScanStatus]);
 
-  // Sekme, arama veya siralama degisince ilk 30 kayda don.
-  useEffect(() => {
-    setListLimit(30);
-  }, [kindFilter, filter, sortMode]);
-
   const groups = useMemo(() => (scan ? groupByVerdict(scan.clusters) : null), [scan]);
 
   const activeItems = useMemo(() => {
@@ -467,9 +456,6 @@ export default function App() {
     else base = (groups?.[kindFilter] ?? []);
     return [...base].filter(match).sort((a, b) => compareClusters(a, b, sortMode));
   }, [scan, groups, filter, kindFilter, sortMode]);
-
-  // Uzayan liste yerine kademeli gosterim: once ilk 30 kayit.
-  const shownItems = activeItems.slice(0, listLimit);
 
   const selectedClusters = useMemo(
     () => (scan?.clusters ?? []).filter((c) => selected.has(c.key)),
@@ -828,11 +814,11 @@ export default function App() {
       {phase === 'scanning' && (
         <ProgressPanel
           kind="scan"
-          {...scanProgress}
-          paths={scanLive.paths}
-          found={scanLive.found}
-          active={scanLive.active}
-          finished={scanLive.finished}
+          {...scanBatch.progress}
+          paths={scanBatch.live.paths}
+          found={scanBatch.live.items}
+          active={scanBatch.live.active}
+          finished={scanBatch.live.finished}
           onCancel={() => void cancelCurrentScan()}
         />
       )}
@@ -960,29 +946,18 @@ export default function App() {
                       : t(VERDICT_HINT[kindFilter] ?? '')}
                   </span>
                 </div>
-                {shownItems.map((c) => {
-                  const selectable = c.verdict.kind !== 'report-only' && (c.deleteTargets?.length ?? 0) > 0;
-                  return (
-                    <ClusterRow
-                      key={c.key}
-                      cluster={c}
-                      selected={selected.has(c.key)}
-                      expanded={expanded.has(c.key)}
-                      selectable={selectable}
-                      onToggle={() => toggleSelect(c.key)}
-                      onExpand={() => toggleExpand(c.key)}
-                    />
-                  );
-                })}
-                {activeItems.length > shownItems.length && (
-                  <div className="list-more">
-                    <button className="btn" onClick={() => setListLimit((n) => n + 30)}>
-                      {t('Daha fazla göster ({n})', {
-                        n: activeItems.length - shownItems.length,
-                      })}
-                    </button>
-                  </div>
-                )}
+                {/*
+                  Sanal liste: yalnizca gorunen satirlar DOM'a girer.
+                  Kaydirma konusu korunur; filtre/siralama degisince basa doner.
+                */}
+                <VirtualClusterList
+                  items={activeItems}
+                  selected={selected}
+                  expanded={expanded}
+                  resetKey={`${kindFilter}|${sortMode}|${filter}|${scan.finishedAt}`}
+                  onToggle={toggleSelect}
+                  onExpand={toggleExpand}
+                />
               </section>
             )}
           </main>

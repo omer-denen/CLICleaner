@@ -13,6 +13,7 @@ import {
   saveSettings,
 } from '../web/settings-store.ts';
 import { debug, info } from '../util/log.ts';
+import { primaryPath, scanItemId } from '../core/scan-items.ts';
 import { ServiceError, describeError } from './errors.ts';
 import { newId } from './ids.ts';
 import type { Cluster, Env, ScanResult } from '../core/types.ts';
@@ -246,8 +247,21 @@ export class ScanService {
           this.pushEvent(job, { type: 'target-start', path, done, total });
         },
         onTargetDone: (path, done, total, cluster) => {
+          // Once kume olayi (eski istemci/uyumluluk), sonra oge duzeyi
+          // olay. Istemci oge kimligiyle tekillestirir.
           if (cluster) job.found.push(cluster);
           this.pushEvent(job, { type: 'target-done', path, done, total, cluster });
+          if (cluster) {
+            this.pushEvent(job, {
+              type: 'item',
+              id: scanItemId(cluster),
+              key: cluster.key,
+              path: primaryPath(cluster),
+              cluster,
+              done,
+              total,
+            });
+          }
         },
       });
 

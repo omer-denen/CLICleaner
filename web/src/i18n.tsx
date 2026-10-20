@@ -131,6 +131,8 @@ const EN: Record<string, string> = {
     'Nothing found yet; results appear here as directories are scanned.',
   'Aynı uygulamanın parçaları tarama sonunda birleştirilir.':
     'Parts of the same app are merged when the scan finishes.',
+  '{n} yeni öğe': '{n} new items',
+  Kümeler: 'Clusters',
   'İptal ediliyor…': 'Cancelling…',
   'Temizleniyor…': 'Cleaning…',
   '{index}/{total} hedef · %{pct} · {bytes} boşaltıldı': '{index}/{total} targets · {pct}% · {bytes} freed',

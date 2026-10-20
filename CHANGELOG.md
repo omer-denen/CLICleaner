@@ -47,8 +47,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   (bilgi amaçlı; otomatik silme yok).
 - Varsayılan seçim yalnızca yeniden oluşturulabilirliği kanıtlanmış ve
   güven düzeyi düşük olmayan klasörleri işaretler.
-- Web arayüzünün hangi tarayıcıda açıldığı ve nasıl değiştirileceği
-  belgelendi.
+- Web arayüzü artık sistem varsayılan tarayıcısında açılır; istenirse Edge
+  zorlanabilir.
+- Uzun listelerde kaydırma ve canlı tarama akışı iyileştirildi.
+- Son tarama zamanı ve durumu düzeltildi.
 - Tarama ve listeleme işlemi düzeltildi ve iyileştirildi.
 
 ## [0.6.0] - 2026-10-19

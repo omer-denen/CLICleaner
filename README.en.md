@@ -7,23 +7,25 @@
 
 [Türkçe (varsayılan)](README.md) · **English**
 
-**Evidence-based analyzer for developer and AI tool leftovers.** AI coding
-tools and developer tooling leave caches, models, virtual environments,
-sessions and updater leftovers behind — none of them show up in the Windows
-"Add or remove programs" list. CLICleaner recognises these folders **by the
-evidence inside them, not by their names**: it tells you what each folder is,
-what exactly deletion would cost, and why it decided that way. It deletes
-nothing without your approval.
+**A CLI cleaner that shows its evidence.** AI coding tools and developer
+tooling leave CLI caches, model stores, virtual environments, sessions and
+updater leftovers behind — none of them show up in the Windows "Add or remove
+programs" list. CLICleaner recognises these folders
+**by the evidence inside them, not by their names**: it tells you what each
+folder is, what exactly deletion would cost, and why it decided that way.
 
-> **Nothing is deleted without your approval.** The first scan only lists.
+> **This is not a Windows disk cleaner.** It is not a general disk cleanup,
+> registry/PATH repair, "PC tune-up" or free-up-space tool. Its scope is only
+> the developer and AI leftovers that Windows never lists. **Nothing is
+> deleted without your approval;** the first scan only lists.
 
 ---
 
-## This is not a generic "Windows disk cleaner"
+## Scope and limits
 
 | It does not | Why |
 |---|---|
-| Touch the registry, PATH or uninstall entries | It focuses on developer and AI leftovers |
+| Touch the registry, PATH or uninstall entries | It is not general Windows maintenance; it focuses on developer and AI leftovers |
 | Delete your documents, photos or projects "to free space" | Those folders are never decisions |
 | Delete a folder just because of its name | Without evidence it says "unidentified" and **reports only** |
 | Delete models, agent sessions or skills | That is your data; they never become delete targets |
@@ -43,19 +45,19 @@ It answers one question with evidence: **"What is this folder, and what happens 
    npx clicleaner
    ```
 
-4. The browser opens automatically. The UI opens in **Microsoft Edge**; if
-   Edge is not installed the system default browser is used. If nothing opens,
-   paste the `http://localhost:<port>` address printed in the terminal. Use
-   `clicleaner ui --browser default` or the `CLICLEANER_BROWSER` environment
-   variable to change this.
+4. The browser opens automatically in your **system default browser**. If
+   nothing opens, paste the `http://localhost:<port>` address printed in the
+   terminal. Force Edge with `clicleaner ui --browser edge` or the
+   `CLICLEANER_BROWSER` environment variable.
 5. Press **Inspect**. While the scan runs, the left column shows the directories
    being scanned and the right column shows what is found.
 6. When it finishes press **OK**, then review the list.
 7. Tick what you want to delete → **Plan and confirm** → read the plan → type
    `SIL` → **Apply plan**.
 
-The default mode is the **Recycle Bin**, so a wrong decision is reversible
-(`clicleaner undo --restore`).
+The default mode moves items into the tool's own **vault**, so a wrong
+decision is reversible (`clicleaner undo --restore` or the **Vault** tab in
+the web UI).
 
 ### Never used a terminal before?
 
@@ -153,7 +155,7 @@ In this mode:
   the tool says "unidentified" and only reports.
 - **Two steps:** a plan first, then a written `SIL` approval. `--yes` cannot
   bypass it.
-- **Recycle Bin:** default mode; undo a mistake.
+- **Vault:** default mode; deleted items move to the tool's vault and can be restored.
 - **Targeted deletion:** not the whole folder — only the safe part.
 - **Git awareness:** tracked files can never be targeted; project scans are
   report-only.
@@ -179,7 +181,7 @@ A project scan (`--root`) never produces delete targets; it only reports. Files
 tracked by Git are protected in every mode anyway.
 
 **I deleted something by mistake.**
-Restore from the Recycle Bin: `clicleaner undo --restore`.
+Restore from the vault: `clicleaner undo --restore` or the **Vault** tab in the web UI.
 
 **Can I disable a standalone tool without deleting it?**
 Yes. Quarantine it: use the **Quarantine** button in the browser UI or
@@ -251,8 +253,8 @@ clicleaner                     # browser UI (recommended)
 clicleaner scan                # scan and list in the terminal
 clicleaner scan --root .       # report project-internal leftovers only
 clicleaner clean --dry-run     # show the plan only, delete nothing
-clicleaner clean               # two-step confirmation + Recycle Bin
-clicleaner undo --restore      # restore from the Recycle Bin
+clicleaner clean               # two-step confirmation + vault (reversible)
+clicleaner undo --restore      # restore from the vault
 clicleaner repair --dry-run    # show broken / partial installations
 clicleaner repair              # repair (ONAR confirmation; live output)
 clicleaner quarantine <ad>     # move a standalone tool to the vault (KARANTINA confirmation)

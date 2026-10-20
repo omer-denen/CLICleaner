@@ -1,7 +1,9 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatBytes } from '../../../src/util/format.ts';
-import type { Cluster } from '../../../src/core/types.ts';
 import { useI18n } from '../i18n.tsx';
 import { ARCHETYPE_LABEL, VERDICT_LABEL, shortPath } from '../labels.ts';
+import { sortLiveItems, type LiveItem } from '../util/live-scan.ts';
 
 interface ScanProgressProps {
   kind: 'scan';
@@ -10,8 +12,8 @@ interface ScanProgressProps {
   bytes: number;
   /** Taranacak tum dizinler (sol sutun). */
   paths?: string[];
-  /** Simdiye kadar bulunanlar; hedef yolu da tasinir (sag sutun). */
-  found?: Array<{ path: string; cluster: Cluster }>;
+  /** Simdiye kadar bulunan ogeler; kimlikleri kararli (sag sutun). */
+  found?: LiveItem[];
   /** O an taranan dizinler. */
   active?: string[];
   /** Biten dizinler (bulunan veya atlanan). */
@@ -45,9 +47,6 @@ export function ProgressPanel(props: Props) {
     const activeSet = new Set(active);
     const finishedSet = new Set(finished);
     const foundPaths = new Set(found.map((f) => f.path));
-    const sortedFound = [...found].sort(
-      (a, b) => b.cluster.reclaimableBytes - a.cluster.reclaimableBytes,
-    );
     const listed = paths.length > 0 ? paths : active;
     const completed = listed.filter((p) => finishedSet.has(p)).length;
 
@@ -113,30 +112,7 @@ export function ProgressPanel(props: Props) {
               <p className="dim small scan-merge-note">
                 {t('Aynı uygulamanın parçaları tarama sonunda birleştirilir.')}
               </p>
-              <div className="live-scan-list scan-found" role="list">
-                {sortedFound.length === 0 && (
-                  <p className="dim small">
-                    {t('Henüz bulunan yok; dizinler tarandıkça burada listelenir.')}
-                  </p>
-                )}
-                {sortedFound.map(({ path, cluster: c }) => (
-                  <div
-                    className="live-scan-row"
-                    key={path}
-                    role="listitem"
-                    title={path}
-                  >
-                    <span className="live-scan-title">{c.title}</span>
-                    <span className="dim small">
-                      {t(ARCHETYPE_LABEL[c.archetype] ?? 'Tanımlanamayan')}
-                    </span>
-                    <span className={`tag tag-verdict-${c.verdict.kind}`}>
-                      {t(VERDICT_LABEL[c.verdict.kind] ?? c.verdict.kind)}
-                    </span>
-                    <span className="live-scan-size">{formatBytes(c.reclaimableBytes)}</span>
-                  </div>
-                ))}
-              </div>
+              <ScanFoundList items={found} />
             </section>
           </div>
 
@@ -193,6 +169,99 @@ export function ProgressPanel(props: Props) {
         <p className="dim small">
           {t('Büyük klasörlerde bu işlem dakikalar sürebilir; pencereyi kapatma.')}
         </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Canli "Bulunanlar" listesi.
+ *
+ * Sanal liste + kaydirma korumasi: kullanici asagi kaydirdiysa yeni
+ * ogeler geldiginde konum ATLAMAZ; sag ustte "N yeni oge" rozeti cikar.
+ */
+function ScanFoundList({ items }: { items: LiveItem[] }) {
+  const { t } = useI18n();
+  const parentRef = useRef<HTMLDivElement | null>(null);
+  const sorted = useMemo(() => sortLiveItems(items), [items]);
+  const [pending, setPending] = useState(0);
+  const prevCount = useRef(0);
+  const atTop = useRef(true);
+
+  const virtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 34,
+    overscan: 10,
+    getItemKey: (index) => sorted[index]?.id ?? index,
+  });
+
+  useEffect(() => {
+    const arrived = sorted.length - prevCount.current;
+    prevCount.current = sorted.length;
+    if (arrived > 0 && !atTop.current) setPending((n) => n + arrived);
+  }, [sorted.length]);
+
+  const onScroll = () => {
+    const el = parentRef.current;
+    if (!el) return;
+    const top = el.scrollTop <= 4;
+    atTop.current = top;
+    if (top) setPending(0);
+  };
+
+  const jumpToTop = () => {
+    parentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    atTop.current = true;
+    setPending(0);
+  };
+
+  return (
+    <div className="scan-found-wrap">
+      {pending > 0 && (
+        <button type="button" className="new-items-badge" onClick={jumpToTop}>
+          {t('{n} yeni öğe', { n: pending })}
+        </button>
+      )}
+      <div
+        className="live-scan-list scan-found"
+        ref={parentRef}
+        role="list"
+        onScroll={onScroll}
+      >
+        {sorted.length === 0 && (
+          <p className="dim small">
+            {t('Henüz bulunan yok; dizinler tarandıkça burada listelenir.')}
+          </p>
+        )}
+        <div className="vlist-inner" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+          {virtualizer.getVirtualItems().map((row) => {
+            const item = sorted[row.index];
+            if (!item) return null;
+            const c = item.cluster;
+            return (
+              <div
+                key={row.key}
+                data-index={row.index}
+                ref={virtualizer.measureElement}
+                className="vlist-item live-scan-item"
+                role="listitem"
+                style={{ transform: `translateY(${row.start}px)` }}
+              >
+                <div className="live-scan-row" title={item.path}>
+                  <span className="live-scan-title">{c.title}</span>
+                  <span className="dim small">
+                    {t(ARCHETYPE_LABEL[c.archetype] ?? 'Tanımlanamayan')}
+                  </span>
+                  <span className={`tag tag-verdict-${c.verdict.kind}`}>
+                    {t(VERDICT_LABEL[c.verdict.kind] ?? c.verdict.kind)}
+                  </span>
+                  <span className="live-scan-size">{formatBytes(c.reclaimableBytes)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -23,14 +23,21 @@
 
 ### Faz 2 — Liste sanallaştırma + akış tamponu
 
-- [ ] `@tanstack/react-virtual` ekle; görünen satırları sanallaştır.
-- [ ] SSE olaylarını `item` düzeyine genişlet (mevcut `target-done` korunur).
-- [ ] İstemci tamponu (100–200 ms batch), `requestAnimationFrame`.
-- [ ] Kaydırma konusu korunur; "N yeni öğe" rozeti.
-- [ ] Kararlı kimlik: cluster key + path hash (yinelenen item güncellenir).
-- [ ] Bağlantı kopunca son olay kimliğiyle yeniden bağlan (`Last-Event-ID`).
-- Not: bugünkü akış küme (cluster) düzeyinde; hedef (path) düzeyine inmek
-  silme sözleşmesini değiştirir. Önce küme kimliğiyle sanallaştırma yapılır.
+- [x] `@tanstack/react-virtual` ekle; görünen satırları sanallaştır.
+      `VirtualClusterList` disk listesini, `ScanFoundList` canlı "Bulunanlar"
+      listesini sanallaştırır; satır yüksekliği `measureElement` ile ölçülür.
+- [x] SSE olaylarını `item` düzeyine genişlet (mevcut `target-done` korunur).
+      Sunucu her bulunan küme için `item` yayınlar; `done` sonucu değişmez.
+- [x] İstemci tamponu (100–200 ms batch), `requestAnimationFrame`.
+      `web/src/util/sse-batch.ts` (120 ms + rAF); terminal olaylarda `flush()`.
+- [x] Kaydırma konusu korunur; "N yeni öğe" rozeti.
+      Canlı liste kullanıcı aşağı kaydırdıysa konum atlamaz; sağ üstte rozet.
+- [x] Kararlı kimlik: cluster key + path hash (yinelenen item güncellenir).
+      `src/core/scan-items.ts` (`scanItemId`); istemci aynı kimliği günceller.
+- [x] Bağlantı kopunca son olay kimliğiyle yeniden bağlan (`Last-Event-ID`).
+      İstemci geçici kopmada EventSource'u kapatmaz (10 deneme sınırı).
+- Not: silme sözleşmesi değişmedi. `item` kimliği küme + birincil yol
+  özetidir; seçim/plan hâlâ küme anahtarıyla yapılır.
 
 ### Faz 3 — Tarama kapsamı ve ilerleme
 
@@ -71,8 +78,8 @@
 
 - [x] **Kasa:** Windows Geri Dönüşüm Kutusu iptal; `actions/vault.ts`
       (manifest, atomik rename, çakışmada `.restored-<zaman>`).
-- [ ] Kasa ekranı: parti listesi, boyut, tek tık geri yükleme, kalan gün.
-- [ ] Saklama süresi yalnızca bilgi; otomatik temizlik yok (OS Storage Sense
+- [x] Kasa ekranı: parti listesi, boyut, tek tık geri yükleme, kalan gün.
+- [x] Saklama süresi yalnızca bilgi; otomatik temizlik yok (OS Storage Sense
       zaten Recycle Bin'i yönetir; bizim kasamız kullanıcı onayıyla boşaltılır).
 - [ ] Kalıcı silme: iki aşamalı onay + metin (mevcut `SIL` akışı korunur).
 

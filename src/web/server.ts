@@ -15,6 +15,7 @@ import { findVaultEntry, listVaultEntries, restoreVaultEntry, vaultRoot } from '
 import { exists } from '../actions/restore.ts';
 import { mkdirSync } from 'node:fs';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
+import { primaryPath, scanItemId } from '../core/scan-items.ts';
 import { longPath } from '../util/longpath.ts';
 import { ScanService } from '../services/scan-service.ts';
 import { DeleteService } from '../services/delete-service.ts';
@@ -92,13 +93,11 @@ export interface WebOptions {
   /** Tarayiciyi otomatik ac */
   open?: boolean;
   /**
-   * Hangi tarayici acilsin. Varsayilan 'edge'.
+   * Hangi tarayici acilsin. Varsayilan 'default' (sistem varsayilani).
    *
-   * Neden tek tarayici: arayuz yerel ve Windows'a ozel bir aractir.
-   * Desteklenen tarayici Microsoft Edge'tir (Windows 10/11'de daima
-   * bulunur, Chromium tabanli; boylece tek bir ortam test edilir).
-   * Edge bulunamazsa sistem varsayilanina dusulur. 'default' daima
-   * sistem varsayilanini acar.
+   * Kullanici hangi tarayiciyi kullaniyorsa arayuz orada acilir.
+   * 'edge' yalnizca ACIKCA istenirse Microsoft Edge'i zorlar; Edge
+   * bulunamazsa sistem varsayilanina dusulur.
    */
   browser?: BrowserChoice;
   /**
@@ -209,7 +208,7 @@ export async function runWeb(opts: WebOptions = {}): Promise<void> {
   console.log('  Kapatmak icin Ctrl+C.');
   console.log('');
 
-  if (opts.open !== false) openBrowser(url, opts.browser ?? 'edge');
+  if (opts.open !== false) openBrowser(url, opts.browser ?? 'default');
 
   await new Promise<void>((ok) => {
     const stop = () => {
@@ -590,12 +589,16 @@ function openScanStream(
       sseSend(res, { type: 'targets', paths: job.targets } satisfies ScanStreamEvent);
     }
     for (const cluster of job.found) {
+      // Oge kimligi kararli oldugu icin gec baglanan istemci ayni ogeyi
+      // iki kez gormez; canli akista gelen guncelleme satiri tazeler.
       sseSend(res, {
-        type: 'target-done',
-        path: cluster.parts[0]?.path ?? '',
+        type: 'item',
+        id: scanItemId(cluster),
+        key: cluster.key,
+        path: primaryPath(cluster),
+        cluster,
         done: job.progress.done,
         total: job.progress.total,
-        cluster,
       } satisfies ScanStreamEvent);
     }
   }
@@ -836,8 +839,8 @@ function isSafeName(name: string): boolean {
 }
 
 /**
- * Windows'ta Microsoft Edge ikilisinin bilinen konumlari. Edge tek
- * desteklenen tarayicidir; boylece arayuz tek bir ortamda calisir.
+ * Windows'ta Microsoft Edge ikilisinin bilinen konumlari. Yalnizca
+ * Edge ACIKCA istendiginde kullanilir; varsayilan sistem tarayicisidir.
  */
 function edgeCandidates(): string[] {
   const out: string[] = [];
@@ -855,11 +858,12 @@ function edgeCandidates(): string[] {
  * nasil acilacagini yalnizca burada belirleriz.
  *
  * Oncelik: acik secim > CLICLEANER_BROWSER ortam degiskeni.
- * Edge bulunamazsa sistem varsayilanina (cmd /c start) dusulur.
+ * Varsayilan sistem tarayicisidir; 'edge' zorlanirsa ve Edge
+ * bulunamazsa yine sistem varsayilanina (cmd /c start) dusulur.
  */
 export function resolveBrowserCommand(
   url: string,
-  choice: BrowserChoice = 'edge',
+  choice: BrowserChoice = 'default',
 ): { cmd: string; args: string[] } {
   const envChoice = (process.env.CLICLEANER_BROWSER ?? '').toLowerCase();
   const eff: BrowserChoice = envChoice === 'default' ? 'default' : envChoice === 'edge' ? 'edge' : choice;
@@ -881,7 +885,7 @@ export function resolveBrowserCommand(
   return { cmd: 'xdg-open', args: [url] };
 }
 
-function openBrowser(url: string, choice: BrowserChoice = 'edge'): void {
+function openBrowser(url: string, choice: BrowserChoice = 'default'): void {
   try {
     const { cmd, args } = resolveBrowserCommand(url, choice);
     spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();

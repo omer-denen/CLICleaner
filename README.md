@@ -7,22 +7,26 @@
 
 **Türkçe (varsayılan)** · [English](README.en.md)
 
-**Kanıt tabanlı geliştirici ve AI artığı analizcisi.** AI kod araçları ve
-geliştirici araçları arkalarında önbellek, model, sanal ortam, oturum ve
-güncelleyici artığı bırakır; bunlar Windows "Program ekle/kaldır" listesinde
-**görünmez**. CLICleaner bu klasörleri **adına göre değil, içindeki kanıta
-göre** tanır: ne olduğunu, silersen tam olarak ne olacağını ve kararın
-gerekçesini gösterir. Sen onaylamadan hiçbir şeyi silmez.
+**CLI temizleyici ve kanıt denetleyicisi.** AI kod araçları ve geliştirici
+araçları arkalarında CLI önbellekleri, model depoları, sanal ortamlar, oturumlar
+ve güncelleyici artıkları bırakır; bunlar Windows "Program ekle/kaldır"
+listesinde **görünmez**. CLICleaner bu klasörleri **adına göre
+değil, içindeki kanıta göre** tanır: ne olduğunu, silersen tam olarak ne
+olacağını ve kararın gerekçesini gösterir.
 
-> **Hiçbir şey sen onaylamadan silinmez.** İlk tarama yalnızca listeler.
+> **Bu bir Windows disk temizleyici değildir.** Genel disk temizliği, kayıt
+> defteri/PATH onarımı, "PC hızlandırma" veya yer açma aracı değildir. Kapsamı
+> yalnızca geliştirici ve AI araçlarının bıraktığı, Windows'un listelemediği
+> artıklardır. **Hiçbir şey sen onaylamadan silinmez;** ilk tarama yalnızca
+> listeler.
 
 ---
 
-## Bu bir "Windows disk temizleme aracı" değil
+## Kapsam ve sınırlar
 
 | Yapmaz | Neden |
 |---|---|
-| Kayıt defteri / PATH / "Program ekle-kaldır" girdilerine dokunmaz | Geliştirici ve AI artıklarına odaklanır |
+| Kayıt defteri / PATH / "Program ekle-kaldır" girdilerine dokunmaz | Genel Windows bakımı değildir; geliştirici ve AI artıklarına odaklanır |
 | Belgelerini, fotoğraflarını, projelerini "yer açmak için" silmez | Bu klasörler karar kapsamına girmez |
 | Tanımadığı klasörü adına bakarak silmez | Kanıt yoksa "tanımlanamayan" der ve **yalnızca raporlar** |
 | Model, ajan oturumu ve becerileri silmez | Senin verindir; silme hedefi üretilmez |
@@ -42,19 +46,18 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
    npx clicleaner
    ```
 
-4. Tarayıcı otomatik açılır. Arayüz **Microsoft Edge**'te açılır; Edge
-   yüklü değilse sistem varsayılan tarayıcısı kullanılır. Açılmazsa terminalde
-   yazan `http://localhost:<port>` adresini tarayıcıya yapıştır. Farklı
-   davranış için `clicleaner ui --browser default` veya `CLICLEANER_BROWSER`
-   ortam değişkeni kullanılabilir.
+4. Tarayıcı otomatik açılır. Arayüz **sistem varsayılan tarayıcında** açılır.
+   Açılmazsa terminalde yazan `http://localhost:<port>` adresini tarayıcıya
+   yapıştır. Edge'i zorlamak için `clicleaner ui --browser edge` veya
+   `CLICLEANER_BROWSER` ortam değişkeni kullanılabilir.
 5. **İncele**'ye bas. Tarama sürerken solda taranan dizinleri, sağda bulunanları
    canlı görürsün.
 6. Tarama bitince **Tamam** → listeyi incele.
 7. Silmek istediklerini işaretle → **Planla ve onayla** → planı oku → `SIL` yaz →
    **Planı uygula**.
 
-Varsayılan mod **Geri Dönüşüm Kutusu**'dur; yanlış karar verirsen geri
-alabilirsin (`clicleaner undo --restore`).
+Varsayılan mod **aracın kendi kasası**dır; yanlış karar verirsen geri
+alabilirsin (`clicleaner undo --restore` veya web arayüzünde **Kasa**).
 
 ### Hiç terminal kullanmadıysan
 
@@ -153,7 +156,7 @@ Bu modda:
 - **Kanıt:** her kararın yanında "bunu neden öneriyorum" yazar; kanıt yetersizse
   araç "tanımlanamayan" der ve yalnızca raporlar.
 - **İki aşama:** önce plan, sonra yazılı `SIL` onayı. `--yes` bunu atlayamaz.
-- **Geri dönüşüm kutusu:** varsayılan mod; yanlışsa geri alabilirsin.
+- **Kasa:** varsayılan mod; silinenler aracın kendi kasasına taşınır ve geri alınabilir.
 - **Hedefli silme:** klasörün tamamı değil, yalnız güvenli kısım silinir.
 - **Git farkındalığı:** tracked dosya hedef olamaz; proje taramaları salt rapordur.
 - **Son savunma hattı:** silme katmanı, korunan bir yolun üstünü veya aracın
@@ -178,7 +181,7 @@ Proje taraması (`--root`) hiçbir zaman silme hedefi üretmez; yalnız raporlar
 Git tarafından takip edilen dosyalar zaten her koşulda korunur.
 
 **Yanlış sildim.**
-Geri dönüşüm kutusundan geri al: `clicleaner undo --restore`.
+Kasadan geri al: `clicleaner undo --restore` veya web arayüzünde **Kasa** sekmesi.
 
 **Bağımsız bir aracı silmeden devre dışı bırakabilir miyim?**
 Evet. Karantinaya al: web arayüzünde **Karantinaya al** düğmesi ya da terminalde
@@ -249,8 +252,8 @@ clicleaner                     # tarayıcı arayüzü (önerilen)
 clicleaner scan                # terminalde tara ve listele
 clicleaner scan --root .       # proje içi artıkları yalnız raporla
 clicleaner clean --dry-run     # yalnızca planı göster, hiçbir şey silme
-clicleaner clean               # iki aşamalı onay + geri dönüşüm kutusu
-clicleaner undo --restore      # geri dönüşüm kutusundan geri al
+clicleaner clean               # iki aşamalı onay + kasa (geri alınabilir)
+clicleaner undo --restore      # kasadan geri al
 clicleaner repair --dry-run    # bozuk / yarım kurulumları göster
 clicleaner repair              # onar (ONAR onayı; çıktı canlı akar)
 clicleaner quarantine <ad>     # bağımsız aracı silmeden kasaya taşı (KARANTINA onayı)

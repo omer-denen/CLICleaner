@@ -416,12 +416,6 @@ input {
   font-size: 12px;
 }
 
-.list-more {
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
-
 /* ---------------------------------------------------------------- sections */
 
 .sections {
@@ -463,6 +457,40 @@ input {
   color: var(--muted);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
+}
+
+/* ------------------------------------------------------------ sanal liste */
+
+/*
+  Kaydirma kabi: yalnizca gorunen satirlar cizilir. Kabin kendisi ayakta
+  kaldigi icin kaydirma konusu korunur.
+*/
+.vlist {
+  position: relative;
+  max-height: calc(100vh - 360px);
+  min-height: 200px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+
+.vlist-inner {
+  position: relative;
+  width: 100%;
+  /* Esnek kapta (Bulunanlar) sikismasin: yuksekligi virtualizer verir. */
+  flex: none;
+}
+
+.vlist-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding-bottom: 8px;
+}
+
+.vlist-item .cluster {
+  margin-bottom: 0;
 }
 
 /* ---------------------------------------------------------------- cluster */
@@ -999,6 +1027,44 @@ input {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Bulunanlar: sanal liste + "N yeni oge" rozeti. */
+.scan-found-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.scan-found {
+  position: relative;
+  min-height: 120px;
+}
+
+.vlist-item.live-scan-item {
+  padding-bottom: 6px;
+}
+
+.new-items-badge {
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.new-items-badge:hover {
+  background: var(--panel-2);
 }
 
 @keyframes scan-pulse {
