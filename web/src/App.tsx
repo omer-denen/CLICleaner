@@ -22,7 +22,6 @@ import {
   getScanStatus,
   getSettings,
   getToken,
-  openRecycleBin,
   scanStream,
   setToken,
   startScan,
@@ -506,6 +505,35 @@ export default function App() {
     [activeItems],
   );
 
+  /**
+   * Ozet kartindaki "Sec": tarama sonucundaki TUM silinebilir kumeleri
+   * (hedefi olan, report-only/keep olmayan) tek tikla sec. Iki asamali
+   * onay degismez; bu yalnizca secim kolayligidir.
+   */
+  const selectReclaimable = useCallback(() => {
+    if (!scan) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const c of scan.clusters) {
+        if (c.verdict.kind === 'report-only' || c.verdict.kind === 'keep') continue;
+        if ((c.deleteTargets?.length ?? 0) === 0) continue;
+        next.add(c.key);
+      }
+      return next;
+    });
+  }, [scan]);
+
+  const reclaimableSelectable = useMemo(
+    () =>
+      (scan?.clusters ?? []).filter(
+        (c) =>
+          c.verdict.kind !== 'report-only' &&
+          c.verdict.kind !== 'keep' &&
+          (c.deleteTargets?.length ?? 0) > 0,
+      ).length,
+    [scan],
+  );
+
   const openPlan = useCallback(async () => {
     if (!scan || selected.size === 0) return;
     setError(null);
@@ -647,12 +675,9 @@ export default function App() {
     [plan, closeStream],
   );
 
-  const openRecycle = useCallback(async () => {
-    try {
-      await openRecycleBin();
-    } catch (e) {
-      setError(errText(e));
-    }
+  /** Silme sonrasi "Kasayi ac": uygulamanin kendi Kasa sekmesine gecer. */
+  const openVaultView = useCallback(() => {
+    setView('vault');
   }, []);
 
   if (!tokenReady) {
@@ -876,7 +901,14 @@ export default function App() {
               })}
             </div>
           )}
-          <Summary scan={scan} selectedBytes={selectedBytes} targetCount={targetCount} clusterCount={selectedClusters.length} />
+          <Summary
+            scan={scan}
+            selectedBytes={selectedBytes}
+            targetCount={targetCount}
+            clusterCount={selectedClusters.length}
+            reclaimableSelectable={reclaimableSelectable}
+            onSelectReclaimable={selectReclaimable}
+          />
 
           <div className="toolbar">
             <input
@@ -1008,7 +1040,7 @@ export default function App() {
         <DoneView
           done={done}
           onRescan={() => void beginScan()}
-          onOpenRecycle={() => void openRecycle()}
+          onOpenVault={openVaultView}
         />
       )}
         </>
@@ -1321,11 +1353,15 @@ function Summary({
   selectedBytes,
   targetCount,
   clusterCount,
+  reclaimableSelectable,
+  onSelectReclaimable,
 }: {
   scan: ScanResult;
   selectedBytes: number;
   targetCount: number;
   clusterCount: number;
+  reclaimableSelectable: number;
+  onSelectReclaimable: () => void;
 }) {
   const { t } = useI18n();
   const total = scan.clusters.reduce((a, c) => a + c.totalBytes, 0);
@@ -1351,6 +1387,15 @@ function Summary({
         <span className="card-label">{t('Silinebilir')}</span>
         <strong className="green">{formatBytes(reclaim)}</strong>
         <span className="dim">{t('yeniden üretilebilir veya kullanılamaz')}</span>
+        <button
+          type="button"
+          className="btn small card-action"
+          onClick={onSelectReclaimable}
+          disabled={reclaimableSelectable === 0}
+          title={t('Silinebilir kümelerin tümünü seç')}
+        >
+          {t('Seç ({n})', { n: reclaimableSelectable })}
+        </button>
       </div>
       <div className="card">
         <span className="card-label">{t('Seçili')}</span>
@@ -1376,11 +1421,11 @@ function Summary({
 function DoneView({
   done,
   onRescan,
-  onOpenRecycle,
+  onOpenVault,
 }: {
   done: DoneState;
   onRescan: () => void;
-  onOpenRecycle: () => void;
+  onOpenVault: () => void;
 }) {
   const { t } = useI18n();
   return (
@@ -1428,7 +1473,7 @@ function DoneView({
             {t('Yeni tarama')}
           </button>
           {done.mode === 'recycle' && (
-            <button className="btn btn-primary" onClick={onOpenRecycle}>
+            <button className="btn btn-primary" onClick={onOpenVault}>
               {t('Kasayı aç')}
             </button>
           )}

@@ -11,9 +11,14 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { closeRecycle } from '../actions/delete.ts';
-import { findVaultEntry, listVaultEntries, restoreVaultEntry, vaultRoot } from '../actions/vault.ts';
+import {
+  findVaultEntry,
+  listVaultEntries,
+  purgeVault,
+  restoreAllVault,
+  restoreVaultEntry,
+} from '../actions/vault.ts';
 import { exists } from '../actions/restore.ts';
-import { mkdirSync } from 'node:fs';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
 import { longPath } from '../util/longpath.ts';
@@ -49,6 +54,9 @@ import type {
   SettingsUpdateRequest,
   VaultEntryView,
   VaultListResponse,
+  VaultPurgeRequest,
+  VaultPurgeResponse,
+  VaultRestoreAllResponse,
   VaultRestoreRequest,
   VaultRestoreResponse,
 } from './contract.ts';
@@ -467,8 +475,33 @@ async function handleRequest(
     return;
   }
 
-  if (route === 'POST /api/open-recycle-bin') {
-    openRecycleBin(res);
+  if (route === 'POST /api/vault/restore-all') {
+    const r = await restoreAllVault();
+    const out: VaultRestoreAllResponse = {
+      ok: r.failed === 0,
+      restored: r.restored,
+      conflict: r.conflict,
+      failed: r.failed,
+    };
+    sendJson(res, 200, out);
+    return;
+  }
+
+  if (route === 'POST /api/vault/purge') {
+    const body = await readJson<VaultPurgeRequest>(req);
+    // Kalici islem: yazili onay sunucuda da dogrulanir (istemciye guvenilmez).
+    if ((body.phrase ?? '').trim() !== 'BOŞALT') {
+      sendJson(res, 400, { error: 'Onay ifadesi hatali (BOŞALT)' });
+      return;
+    }
+    const r = await purgeVault();
+    const out: VaultPurgeResponse = {
+      ok: r.failed === 0,
+      batches: r.batches,
+      bytes: r.bytes,
+      failed: r.failed,
+    };
+    sendJson(res, 200, out);
     return;
   }
 
@@ -774,22 +807,6 @@ function metaResponse(ctx: WebContext): MetaResponse {
       minAgeDays: ctx.opts.minAgeDays ?? 0,
     },
   };
-}
-
-function openRecycleBin(res: ServerResponse): void {
-  try {
-    // Windows Geri Donusum Kutusu degil, ARACIN KENDI kasasi acilir.
-    const dir = vaultRoot();
-    mkdirSync(longPath(dir), { recursive: true });
-    spawn('explorer.exe', [dir], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    }).unref();
-    sendJson(res, 200, { ok: true });
-  } catch (err) {
-    sendJson(res, 500, { error: describeError(err) });
-  }
 }
 
 function isLoopbackHost(host: string | undefined): boolean {

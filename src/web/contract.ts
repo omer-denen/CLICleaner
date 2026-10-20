@@ -166,6 +166,27 @@ export interface VaultRestoreResponse {
   error?: string;
 }
 
+/** Kasadaki tum kayitlari geri yukler (cakismalar `.restored-*` olur). */
+export interface VaultRestoreAllResponse {
+  ok: boolean;
+  restored: number;
+  conflict: number;
+  failed: number;
+}
+
+/** Kasayi bosaltma: kalici, yazili onay ister. */
+export interface VaultPurgeRequest {
+  /** Sunucunun bekledigi ifade: BOŞALT */
+  phrase: string;
+}
+
+export interface VaultPurgeResponse {
+  ok: boolean;
+  batches: number;
+  bytes: number;
+  failed: number;
+}
+
 // ---------------------------------------------------------------------------
 // Plan ve silme
 // ---------------------------------------------------------------------------

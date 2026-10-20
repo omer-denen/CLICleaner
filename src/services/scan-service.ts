@@ -63,9 +63,12 @@ export class ScanService {
   private active: ScanJob | null = null;
   private lastScan: { scan: ScanResult; at: number } | null = null;
   private cacheLoaded = false;
+  /** Ayni anda gelen istekler yuklemeyi BEKLER (yarim durum donmez). */
+  private cacheLoad: Promise<void> | null = null;
   private ttlMs = SCAN_CACHE_TTL_MS;
   private dirtyAt = 0;
   private settingsLoaded = false;
+  private settingsLoad: Promise<void> | null = null;
   private readonly emit: ScanEmit;
   private readonly persistScan: boolean;
 
@@ -115,33 +118,54 @@ export class ScanService {
    * 24 saatten eskiyse loadScanCache null doner.
    */
   async ensureCacheLoaded(): Promise<void> {
-    if (this.cacheLoaded) return;
-    this.cacheLoaded = true;
     if (this.lastScan) return;
+    if (this.cacheLoaded) {
+      // Yukleme basladi ama bitmedi: YARIM durum donme, bekle.
+      if (this.cacheLoad) await this.cacheLoad;
+      return;
+    }
+    this.cacheLoaded = true;
     // Suresi dolmus sonuc da yuklenir: kullaniciya "eski" olarak
     // gosterilebilir; yeniden tarama ENGELLENMEZ.
-    const [cached, dirtyAt] = await Promise.all([
-      loadScanCache(Date.now(), Number.POSITIVE_INFINITY),
-      loadScanDirtyAt(),
-    ]);
-    this.dirtyAt = Math.max(this.dirtyAt, dirtyAt);
-    if (cached) {
-      this.lastScan = cached;
-      info('tarama onbellegi yuklendi', {
-        at: new Date(cached.at).toISOString(),
-        kume: cached.scan.clusters.length,
-      });
-    } else {
-      debug('tarama onbellegi yok');
+    this.cacheLoad = (async () => {
+      const [cached, dirtyAt] = await Promise.all([
+        loadScanCache(Date.now(), Number.POSITIVE_INFINITY),
+        loadScanDirtyAt(),
+      ]);
+      this.dirtyAt = Math.max(this.dirtyAt, dirtyAt);
+      if (cached) {
+        this.lastScan = cached;
+        info('tarama onbellegi yuklendi', {
+          at: new Date(cached.at).toISOString(),
+          kume: cached.scan.clusters.length,
+        });
+      } else {
+        debug('tarama onbellegi yok');
+      }
+    })();
+    try {
+      await this.cacheLoad;
+    } finally {
+      this.cacheLoad = null;
     }
   }
 
   /** Ayarlari (onbellek suresi) bir kez yukler. */
   async ensureSettingsLoaded(): Promise<void> {
-    if (this.settingsLoaded) return;
+    if (this.settingsLoaded) {
+      if (this.settingsLoad) await this.settingsLoad;
+      return;
+    }
     this.settingsLoaded = true;
-    const s = await loadSettings();
-    this.ttlMs = Math.max(MIN_CACHE_HOURS, s.scanCacheHours) * 3_600_000;
+    this.settingsLoad = (async () => {
+      const s = await loadSettings();
+      this.ttlMs = Math.max(MIN_CACHE_HOURS, s.scanCacheHours) * 3_600_000;
+    })();
+    try {
+      await this.settingsLoad;
+    } finally {
+      this.settingsLoad = null;
+    }
   }
 
   /** Tarama durumu: never / current / stale / scanning. */

@@ -1,6 +1,7 @@
-import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
+import { walk } from '../core/walker.ts';
 
 /**
  * CLICleaner kasasi (quarantine vault).
@@ -221,4 +222,46 @@ export async function restoreAllVault(): Promise<{ restored: number; conflict: n
     }
   }
   return { restored, conflict, failed };
+}
+
+/**
+ * Kasadaki TUM parti klasorlerini KALICI olarak siler (bosalt).
+ *
+ * Guvenlik:
+ *  - Yalnizca kasa kokunun ALTINDAKI dogrudan cocuk klasorler.
+ *  - Kasa kokunun kendisi silinmez.
+ *  - Reparse point (junction/symlink) atlanir; hedef klasore dokunulmaz.
+ *  - Kalici islem oldugu icin API katmani yazili onay ister (BOŞALT).
+ */
+export async function purgeVault(): Promise<{ batches: number; bytes: number; failed: number }> {
+  let ents;
+  try {
+    ents = await readdir(longPath(vaultRoot()), { withFileTypes: true });
+  } catch {
+    return { batches: 0, bytes: 0, failed: 0 };
+  }
+
+  const root = vaultRoot().toLowerCase();
+  let batches = 0;
+  let bytes = 0;
+  let failed = 0;
+
+  for (const e of ents) {
+    if (!e.isDirectory()) continue;
+    const dir = join(vaultRoot(), e.name);
+    // Savunma: kasa koku disina cikan bir ad (teorik) islenmez.
+    if (!dir.toLowerCase().startsWith(root + '\\')) continue;
+    try {
+      const st = await lstat(longPath(dir));
+      if (st.isSymbolicLink()) continue;
+      const w = await walk({ root: dir, largeThreshold: Infinity, maxLarge: 0 });
+      await rm(longPath(dir), { recursive: true, force: true });
+      batches++;
+      bytes += w.bytes;
+    } catch {
+      failed++;
+    }
+  }
+
+  return { batches, bytes, failed };
 }

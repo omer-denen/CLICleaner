@@ -51,6 +51,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   dosyaları korunur, eklenti bağımlılıkları yalnızca raporlanır.
 - Ayarlar'a **Güncelleme Politikası** bilgi ekranı eklendi; manuel güncelleme
   komutları ve adresleri gösterilir, ağ isteği yapılmaz.
+- Kasa erişimi düzeltildi: silme sonrası **Kasayı aç** artık uygulamanın Kasa
+  sekmesini açar. Kasa ekranına **Kasadakileri geri al** ve yazılı onaylı
+  **Kasayı boşalt** eklendi.
+- Silinebilir özetine tek tıkla **Seç** düğmesi eklendi.
 - Web arayüzü artık sistem varsayılan tarayıcısında açılır; istenirse Edge
   zorlanabilir.
 - Uzun listelerde kaydırma ve canlı tarama akışı iyileştirildi.

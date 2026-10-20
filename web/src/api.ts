@@ -25,6 +25,8 @@ import type {
   ScanStatusResponse,
   SettingsResponse,
   VaultListResponse,
+  VaultPurgeResponse,
+  VaultRestoreAllResponse,
   VaultRestoreResponse,
 } from '../../src/web/contract.ts';
 
@@ -191,8 +193,15 @@ export function restoreVault(id: string): Promise<VaultRestoreResponse> {
   });
 }
 
-export function openRecycleBin(): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>('/api/open-recycle-bin', { method: 'POST' });
+export function restoreAllVault(): Promise<VaultRestoreAllResponse> {
+  return request<VaultRestoreAllResponse>('/api/vault/restore-all', { method: 'POST' });
+}
+
+export function purgeVault(phrase: string): Promise<VaultPurgeResponse> {
+  return request<VaultPurgeResponse>('/api/vault/purge', {
+    method: 'POST',
+    body: JSON.stringify({ phrase }),
+  });
 }
 
 // ---------------------------------------------------------------------------

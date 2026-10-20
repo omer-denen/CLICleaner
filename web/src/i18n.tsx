@@ -76,6 +76,8 @@ const EN: Record<string, string> = {
   '{clusters} küme · {targets} hedef': '{clusters} clusters · {targets} targets',
   '{n} küme': '{n} clusters',
   '{rec} önerilen · {ask} doğrulama · {ro} rapor': '{rec} recommended · {ask} verify · {ro} report',
+  'Seç ({n})': 'Select ({n})',
+  'Silinebilir kümelerin tümünü seç': 'Select all reclaimable clusters',
 
   // --- toolbar ---
   'Ara: başlık, anahtar, yol…': 'Search: title, key, path…',
@@ -409,6 +411,18 @@ const EN: Record<string, string> = {
   'Orijinal yol doluydu; {path} olarak geri kondu.':
     'Original path was occupied; restored as {path}.',
   'Geri yükleme başarısız.': 'Restore failed.',
+  'Kasadakileri geri al': 'Restore everything in the vault',
+  '{n} kayıt ({bytes}) orijinal yollarına geri yüklenecek. Yol doluysa {suffix} olarak geri konur.':
+    '{n} entries ({bytes}) will be restored to their original paths. If a path is occupied it is restored as {suffix}.',
+  '{n} kayıt geri yüklendi ({c} çakışma).': '{n} entries restored ({c} conflicts).',
+  '{n} kayıt geri yüklenemedi.': '{n} entries could not be restored.',
+  'Kasayı boşalt': 'Empty the vault',
+  '{n} kayıt ({bytes}) kalıcı olarak silinecek. Bu işlem geri alınamaz.':
+    '{n} entries ({bytes}) will be permanently deleted. This cannot be undone.',
+  'Boşaltılıyor…': 'Emptying…',
+  'Kalıcı olarak boşalt': 'Permanently empty',
+  'Kasa boşaltıldı: {n} parti, {bytes}.': 'Vault emptied: {n} batches, {bytes}.',
+  '{n} parti boşaltılamadı.': '{n} batches could not be removed.',
   'Kasa saklama süresi (gün)': 'Vault retention (days)',
   'Yalnızca bilgi amaçlıdır; kasa otomatik silinmez.':
     'Informational only; the vault is never auto-deleted.',

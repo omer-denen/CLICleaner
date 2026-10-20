@@ -290,6 +290,11 @@ input {
   font-size: 20px;
 }
 
+.card-action {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
 .green {
   color: var(--green);
 }
@@ -1915,6 +1920,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1 1 auto;
   overflow-y: auto;
   min-height: 120px;
   padding-right: 4px;
@@ -1924,6 +1930,9 @@ input {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  /* ONEMLI: gruplar sikismasin. Aksi halde plan listesi yarim gorunur
+     ve kaydirilamaz (satirlar overflow:hidden ile kirpilir). */
+  flex: 0 0 auto;
 }
 
 .plan-group-high {
