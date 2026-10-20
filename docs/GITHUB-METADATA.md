@@ -4,53 +4,56 @@
 > kullanır: **CLI temizleyici / kanıt denetleyicisi** — genel Windows disk
 > temizleyici değil.
 
-## GitHub "About" (sağ üstteki açıklama)
+## GitHub "About" açıklaması (uygulandı)
 
-Türkçe:
+```
+CLI cleaner that audits developer caches, CLI installs and AI tool leftovers with evidence; shows what each folder is and deletes nothing without approval.
+```
+
+Türkçe karşılığı (gerekirse):
 
 ```
 CLI temizleyici: geliştirici ve AI araçlarının bıraktığı önbellek, kurulum ve çalışma zamanı artıklarını kanıtla inceler; onaysız silmez.
 ```
 
-English:
-
-```
-CLI cleaner that audits developer and AI tool leftovers with evidence; nothing is deleted without approval.
-```
-
 **Kullanmayın:** "Windows disk cleaner", "PC cleaner", "hızlandırıcı",
 "yer açma aracı" gibi genel temizlik ifadeleri. Ürün bunları yapmaz.
 
-## GitHub Topics (arama etiketleri)
-
-Depo sayfasında **About → dişli → Topics** alanına şunlar girilir
-(küçük harf, tire; boşluk yok):
+## GitHub Topics (uygulandı)
 
 ```
+ai-agents
+ai-artifacts
+ai-tools
+cache-analyzer
+cli-cache
 cli-cleaner
 cli-temizleyici
-clicleaner
 cli-tools
-cli-cache
+clicleaner
+conda
+cuda
 developer-tools
-cache-analyzer
+devtools
 disk-usage
-ai-agents
-ai-tools
-ai-artifacts
+nodejs
 npm-cache
 nuget
-conda
 onnx
-cuda
+python
 windows
 ```
 
+Eski genel temizlik etiketleri (`disk-cleaner`, `disk-space`, `cleanup`,
+`cache`, `cli`, `web-ui`, `react`, `typescript`) kaldırıldı; yerine CLI
+odaklı ve kanıt/denetim odaklı etiketler geldi. GitHub en fazla 20 konu
+kabul eder.
+
 ## npm keywords
 
-`package.json` içindeki `keywords` dizini yukarıdaki listeyle aynı çerçevede
-tutulur (`cli-cleaner`, `cli-temizleyici` dahil). npm'de yayınlanan sürümün
-arama etiketleri o dosyadan okunur; değişiklik bir sonraki yayınla görünür.
+`package.json` içindeki `keywords` dizini aynı çerçevede tutulur
+(`cli-cleaner`, `cli-temizleyici` dahil). npm'de yayınlanan sürümün arama
+etiketleri o dosyadan okunur; değişiklik bir sonraki yayınla görünür.
 
 ## README başlığı
 
