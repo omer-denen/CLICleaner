@@ -10,7 +10,7 @@ import type {
   CliRepairExecuteResponse,
   CliRepairItemView,
   CliRepairPlanResponse,
-} from '../web/contract.ts';
+} from '../core/contract.ts';
 
 /**
  * Bozuk / yarim kurulum onarim servisi.

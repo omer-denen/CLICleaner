@@ -72,7 +72,7 @@ import type {
   VaultRestoreAllResponse,
   VaultRestoreRequest,
   VaultRestoreResponse,
-} from './contract.ts';
+} from '../core/contract.ts';
 
 /**
  * CLICleaner yerel web arayuzu — YALNIZ HTTP/SSE adaptoru.

@@ -12,6 +12,7 @@ import {
   VERDICT_LABEL,
 } from '../labels.ts';
 import { EvidenceReader } from '../../../src/core/evidence-text.ts';
+import { TargetMap } from '../../../src/core/target-map.ts';
 
 /**
  * Sag sutun — baglam / "rontgen" paneli (T42 / D3 P2).
@@ -78,8 +79,8 @@ export function ContextPanel({ cluster, pinned, onTogglePin }: Props) {
     kind: target.kind,
   }));
 
-  const targetsByPart = (partPath: string) =>
-    targets.filter((t) => t.path.toLowerCase().startsWith(partPath.toLowerCase()));
+  const targetMap = new TargetMap(targets);
+  const targetsByPart = (partPath: string) => targetMap.underPart(partPath);
 
   return (
     <aside className="ctx" aria-label={t('Bağlam')}>

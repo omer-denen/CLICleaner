@@ -1,5 +1,5 @@
-import type { Cluster, ScanResult } from '../core/types.ts';
-import type { CliInventory, CliTool } from '../core/cli-inventory-types.ts';
+import type { Cluster, ScanResult } from './types.ts';
+import type { CliInventory, CliTool } from './cli-inventory-types.ts';
 
 /**
  * Web arayuzu ile sunucu arasindaki veri sozlesmesi.

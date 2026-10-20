@@ -1,4 +1,4 @@
-import type { ScanStatusResponse } from '../../../src/web/contract.ts';
+import type { ScanStatusResponse } from '../../../src/core/contract.ts';
 import { useI18n } from '../i18n.tsx';
 import { ageLabel } from '../labels.ts';
 

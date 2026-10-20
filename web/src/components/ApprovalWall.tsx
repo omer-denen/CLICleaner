@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlanResponse } from '../../../src/web/contract.ts';
+import type { PlanResponse } from '../../../src/core/contract.ts';
+import { PlanSummary } from '../../../src/core/plan-summary.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 
@@ -30,8 +31,8 @@ export function ApprovalWall({ plan, busy, onCancel, onConfirm, focusSignal }: P
   const phraseRef = useRef<HTMLInputElement | null>(null);
 
   const view = plan.plan;
-  const mediumOrHigh = view.clusters.filter((c) => c.risk === 'medium' || c.risk === 'high');
-  const high = view.clusters.filter((c) => c.risk === 'high');
+  const summary = new PlanSummary(view.clusters);
+  const { mediumOrHigh, high } = summary.riskCounts();
   const phraseOk = !plan.requiresPhrase || phrase.trim() === 'SIL';
   const ackOk = !plan.requiresHighAck || ack;
   const canConfirm = phraseOk && ackOk && !busy;
@@ -40,10 +41,7 @@ export function ApprovalWall({ plan, busy, onCancel, onConfirm, focusSignal }: P
     if (plan.requiresPhrase) phraseRef.current?.focus();
   }, [focusSignal, plan.requiresPhrase]);
 
-  const byKind = {
-    whole: view.targets.filter((x) => x.target.kind === 'whole').length,
-    older: view.targets.filter((x) => x.target.kind === 'older').length,
-  };
+  const byKind = summary.targetCounts(view.targets);
 
   return (
     <aside className="ctx ctx-approval" aria-label={t('Onay')}>
@@ -78,16 +76,16 @@ export function ApprovalWall({ plan, busy, onCancel, onConfirm, focusSignal }: P
         </ul>
       </section>
 
-      {mediumOrHigh.length > 0 && (
+      {mediumOrHigh > 0 && (
         <section className="ctx-block">
           <h3>{t('Risk')}</h3>
           <ul className="ctx-list">
             <li>
-              {t('{n} küme orta veya yüksek riskli.', { n: mediumOrHigh.length })}
+              {t('{n} küme orta veya yüksek riskli.', { n: mediumOrHigh })}
             </li>
-            {high.length > 0 && (
+            {high > 0 && (
               <li>
-                {t('{n} küme yüksek riskli.', { n: high.length })}
+                {t('{n} küme yüksek riskli.', { n: high })}
               </li>
             )}
           </ul>
@@ -105,7 +103,7 @@ export function ApprovalWall({ plan, busy, onCancel, onConfirm, focusSignal }: P
             />
             <span>
               {t('{n} yüksek riskli kümenin ne kaybettireceğini okudum ve yine de silmek istiyorum.', {
-                n: high.length,
+                n: high,
               })}
             </span>
           </label>

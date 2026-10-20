@@ -11,7 +11,7 @@ import type {
   CliQuarantineExecuteResponse,
   CliQuarantineItemView,
   CliQuarantinePlanResponse,
-} from '../web/contract.ts';
+} from '../core/contract.ts';
 
 /**
  * Karantina servisi (web).

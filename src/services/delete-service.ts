@@ -17,7 +17,7 @@ import type {
   ExecuteStartResponse,
   PlanResponse,
   PlanView,
-} from '../web/contract.ts';
+} from '../core/contract.ts';
 
 /**
  * Disk silme servisi: plan uretimi, 10 dakikalik TTL ve yurutme isleri.

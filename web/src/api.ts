@@ -30,7 +30,7 @@ import type {
   VaultPurgeResponse,
   VaultRestoreAllResponse,
   VaultRestoreResponse,
-} from '../../src/web/contract.ts';
+} from '../../src/core/contract.ts';
 
 /**
  * Tarayici API istemcisi.

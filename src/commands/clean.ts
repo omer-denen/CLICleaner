@@ -7,7 +7,7 @@ import type { Env, SensitiveAllow } from '../core/types.ts';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { longPath, prettyPath } from '../util/longpath.ts';
-import { markScanDirty } from '../web/scan-store.ts';
+import { markScanDirty } from '../store/scan-cache.ts';
 
 const C = {
   reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m',

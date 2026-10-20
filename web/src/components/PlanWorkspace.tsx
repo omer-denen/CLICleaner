@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { PlanResponse } from '../../../src/web/contract.ts';
+import type { PlanResponse } from '../../../src/core/contract.ts';
 import { ScanSummary } from '../../../src/core/scan-summary.ts';
+import { PlanSummary } from '../../../src/core/plan-summary.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 import { RISK_LABEL, shortPath } from '../labels.ts';
@@ -57,6 +58,8 @@ export function PlanWorkspace({
   }, []);
 
   const groups = useMemo(() => ScanSummary.groupByRisk(view.clusters, (c) => c.risk), [view.clusters]);
+
+  const planSummary = useMemo(() => new PlanSummary(view.clusters), [view.clusters]);
 
   const flatRows = useMemo(() => groups.flatMap((g) => g.clusters), [groups]);
 
@@ -202,10 +205,7 @@ export function PlanWorkspace({
         </div>
 
         {groups.map((g) => {
-          const groupBytes = g.clusters.reduce(
-            (sum, c) => sum + c.targets.reduce((a, pt) => a + pt.bytes, 0),
-            0,
-          );
+          const groupBytes = planSummary.clusterBytes(g.clusters);
           return (
             <section className={`plan-group plan-group-${g.risk}`} key={g.risk}>
               <header className="plan-group-head">
@@ -218,9 +218,8 @@ export function PlanWorkspace({
               {g.clusters.map((c) => {
                 const index = flatRows.indexOf(c);
                 const open = openPaths.has(c.key);
-                const bytes = c.targets.reduce((a, pt) => a + pt.bytes, 0);
-                const whole = c.targets.filter((x) => x.target.kind === 'whole').length;
-                const older = c.targets.length - whole;
+                const bytes = planSummary.clusterBytes([c]);
+                const { whole, older } = planSummary.targetCounts(c.targets);
                 return (
                   <div
                     className={`plan-line${index === rowIndex ? ' is-cursor' : ''}`}

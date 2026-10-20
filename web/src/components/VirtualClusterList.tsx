@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Cluster } from '../../../src/core/types.ts';
+import { SelectionScope } from '../../../src/core/selection-scope.ts';
 import { useI18n } from '../i18n.tsx';
 import { ClusterRow } from './ClusterRow.tsx';
 
@@ -201,8 +202,7 @@ export function VirtualClusterList({
         {virtualizer.getVirtualItems().map((row) => {
           const cluster = items[row.index];
           if (!cluster) return null;
-          const selectable =
-            cluster.verdict.kind !== 'report-only' && (cluster.deleteTargets?.length ?? 0) > 0;
+          const selectable = SelectionScope.isSelectable(cluster);
           return (
             <div
               key={row.key}

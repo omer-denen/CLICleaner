@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { VaultListResponse } from '../../../src/web/contract.ts';
+import type { VaultListResponse } from '../../../src/core/contract.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { getVault, purgeVault, restoreAllVault, restoreVault } from '../api.ts';
 import { useI18n } from '../i18n.tsx';

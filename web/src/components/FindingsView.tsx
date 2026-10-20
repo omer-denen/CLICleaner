@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FindingView, FindingsResponse } from '../../../src/web/contract.ts';
+import type { FindingView, FindingsResponse } from '../../../src/core/contract.ts';
 import { CATEGORY_LABEL } from '../../../src/core/categories.ts';
 import { FindingsQuery } from '../../../src/core/findings-query.ts';
 import { formatBytes } from '../../../src/util/format.ts';

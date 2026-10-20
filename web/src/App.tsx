@@ -12,7 +12,7 @@ import type {
   ScanStatusResponse,
   ScanStreamEvent,
   SettingsResponse,
-} from '../../src/web/contract.ts';
+} from '../../src/core/contract.ts';
 import {
   ApiError,
   cancelScan,

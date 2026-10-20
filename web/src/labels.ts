@@ -1,4 +1,4 @@
-import type { RiskLevel } from '../../src/web/contract.ts';
+import type { RiskLevel } from '../../src/core/contract.ts';
 import { formatAge } from '../../src/util/format.ts';
 
 /** Mimari tip etiketleri: kullaniciya "bu ne" sorusunun kisa cevabi. */

@@ -3,7 +3,7 @@ import { error as logError, info } from '../util/log.ts';
 import { ServiceError, describeError } from './errors.ts';
 import { newId } from './ids.ts';
 import type { CliInventory, CliTool } from '../core/cli-inventory-types.ts';
-import type { CliInventoryStreamEvent } from '../web/contract.ts';
+import type { CliInventoryStreamEvent } from '../core/contract.ts';
 
 /**
  * CLI envanteri servisi.

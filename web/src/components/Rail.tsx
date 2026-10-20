@@ -1,5 +1,5 @@
 import { formatBytes } from '../../../src/util/format.ts';
-import type { DiskUsageView } from '../../../src/web/contract.ts';
+import type { DiskUsageView } from '../../../src/core/contract.ts';
 import { useI18n } from '../i18n.tsx';
 import { CATEGORY_ORDER, type CategoryKey, type CategoryStat } from '../../../src/core/categories.ts';
 

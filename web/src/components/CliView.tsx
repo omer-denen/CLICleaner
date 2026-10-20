@@ -7,7 +7,7 @@ import type {
   CliPlanResponse,
   CliQuarantinePlanResponse,
   CliRepairPlanResponse,
-} from '../../../src/web/contract.ts';
+} from '../../../src/core/contract.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import {
   cancelCliInventory,

@@ -260,11 +260,18 @@ Marka adı yalnızca kullanıcı yolunda görünür; motor yapıyı okur.
 > sorumluluğu taşıyan ayrı sınıflar halinde yazıldı:
 > `ClusterQuery` (liste) · `SelectionScope` (seçim/plan kapsamı) ·
 > `ScanSummary` (özetler) · `CliInventoryQuery` (envanter) ·
-> `FindingsQuery` (birleşik bulgular) · `EvidenceReader` (kanıt yorumu).
+> `FindingsQuery` (birleşik bulgular) · `PlanSummary` (plan sayımları) ·
+> `TargetMap` (hedef ↔ parça) · `EvidenceReader` (kanıt yorumu).
+>
+> **Ayrım tam:** `src/` → `src/web/` bağı **sıfır**. Sözleşme tipleri
+> `src/core/contract.ts`, kalıcı uygulama durumu `src/store/` altındadır;
+> `src/web/` yalnızca HTTP/SSE adaptörüdür (`server.ts` + `http.ts`).
+>
 > Bu, "liste bazlı seçim işlemleri" için arayüzün tek doğru yeri olduğu
 > fikrini kod seviyesinde garanti eder: CLI ile web aynı soruya aynı cevabı
 > verir. Test: `scratch/test-cluster-query.ts` (52/52) ·
-> `scratch/test-cli-query.ts` (31/31) · CDP 24/24.
+> `scratch/test-cli-query.ts` (31/31) · `scratch/test-plan-summary.ts` (14/14)
+> · CDP 24/24.
 
 - Odak/hover takibi, `Enter` ile sabitleme.
 - Kanıt, bağımlılık ağacı, deterministik yorum, komut kopyalama.

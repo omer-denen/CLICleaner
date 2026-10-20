@@ -12,7 +12,7 @@ import type {
   CliExecuteResponse,
   CliPlanItemView,
   CliPlanResponse,
-} from '../web/contract.ts';
+} from '../core/contract.ts';
 
 /**
  * CLI kaldirma servisi: plan uretimi, 10 dakikalik TTL ve yurutme.

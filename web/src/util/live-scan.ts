@@ -1,6 +1,6 @@
 import type { Cluster } from '../../../src/core/types.ts';
 import { primaryPath, scanItemId } from '../../../src/core/scan-items.ts';
-import type { ScanStreamEvent } from '../../../src/web/contract.ts';
+import type { ScanStreamEvent } from '../../../src/core/contract.ts';
 
 /**
  * Canli tarama durumu.

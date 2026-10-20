@@ -5,13 +5,13 @@ import {
   markScanDirty,
   saveScanCache,
   SCAN_CACHE_TTL_MS,
-} from '../web/scan-store.ts';
+} from '../store/scan-cache.ts';
 import {
   MAX_CACHE_HOURS,
   MIN_CACHE_HOURS,
   loadSettings,
   saveSettings,
-} from '../web/settings-store.ts';
+} from '../store/settings.ts';
 import { debug, info } from '../util/log.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
 import { diskUsage } from '../core/disk-usage.ts';
@@ -22,7 +22,7 @@ import type {
   ScanStatusResponse,
   ScanStreamEvent,
   SettingsResponse,
-} from '../web/contract.ts';
+} from '../core/contract.ts';
 
 /**
  * Disk tarama servisi.
