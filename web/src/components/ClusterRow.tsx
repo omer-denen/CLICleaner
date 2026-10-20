@@ -32,7 +32,6 @@ interface Props {
   onToggle: () => void;
   onExpand: () => void;
   onFocus: () => void;
-  onHover: (hovering: boolean) => void;
 }
 
 export function ClusterRow({
@@ -44,7 +43,6 @@ export function ClusterRow({
   onToggle,
   onExpand,
   onFocus,
-  onHover,
 }: Props) {
   const { t, lang } = useI18n();
   const v = cluster.verdict;
@@ -78,8 +76,6 @@ export function ClusterRow({
           onFocus();
           onExpand();
         }}
-        onMouseEnter={() => onHover(true)}
-        onMouseLeave={() => onHover(false)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();

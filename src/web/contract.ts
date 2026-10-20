@@ -29,6 +29,8 @@ export interface PlannedTargetView {
 }
 
 export interface PlannedClusterView {
+  /** Kume anahtari: plan ekraninda "plandan cikar" islemi icin. */
+  key: string;
   title: string;
   reason: string;
   risk: RiskLevel;

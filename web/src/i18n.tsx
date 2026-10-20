@@ -436,6 +436,17 @@ const EN: Record<string, string> = {
 
   // --- sağ panel / bağlam (T42 / D3 P2) ---
   Bağlam: 'Context',
+  Akış: 'Flow',
+  'Kaldırılacak': 'To be removed',
+  Hedef: 'Targets',
+  Etki: 'Effect',
+  'Küme / gerekçe': 'Cluster / reason',
+  tamamı: 'whole',
+  '{n} küme plana girmiyor (korunuyor).': '{n} clusters are not in the plan (kept).',
+  '{title} kümesini plandan çıkar': 'Remove {title} from the plan',
+  'Plan boşaldı; hiçbir şey silinmedi.': 'The plan is empty; nothing was deleted.',
+  '↑↓ satır · Space yollar · X plandan çıkar · Enter onaya geç · Esc planı bırak (silme yok)':
+    '↑↓ row · Space paths · X remove from plan · Enter go to approval · Esc leave the plan (nothing is deleted)',
   'Odaklanan öğe yok.': 'No focused item.',
   'Bir satıra tıkla, ↑↓ ile gezin veya Enter ile sabitle.':
     'Click a row, browse with ↑↓, or press Enter to pin it.',

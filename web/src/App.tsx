@@ -27,9 +27,10 @@ import {
   startScan,
   updateSettings,
 } from './api.ts';
+import { ApprovalWall } from './components/ApprovalWall.tsx';
 import { CliView } from './components/CliView.tsx';
-import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ContextPanel } from './components/ContextPanel.tsx';
+import { PlanWorkspace } from './components/PlanWorkspace.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Rail, type PlanState } from './components/Rail.tsx';
 import { ScanStatusBar } from './components/ScanStatusBar.tsx';
@@ -180,10 +181,10 @@ export default function App() {
   const [railOpen, setRailOpen] = useState(true);
   /** Klavye imleci (odaklanan satir). P2'de sag panel bunu okur. */
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
-  /** Hover ile gecici onizleme; sabitle (Enter) ustune yazar. */
-  const [hoverKey, setHoverKey] = useState<string | null>(null);
   /** Sabitlenen oge (Enter). Panelde kalici gorunur. */
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
+  /** Onay duvarina odaklanma sinyali (plan "Enter"). */
+  const [approveSignal, setApproveSignal] = useState(0);
   /** Satir yogunlugu: yogun (32px) / rahat (40px). */
   const [density, setDensity] = useState<'dense' | 'comfortable'>('dense');
   /** Triyaj cipleri: hizli eleme (boyut / risk / zombi). */
@@ -548,17 +549,26 @@ export default function App() {
     searchRef.current?.select();
   }, []);
 
-  /** Enter ile sabitleme: ayni ogeye ikinci kez basmak sabitlemeyi kaldirir. */
+  /**
+   * Odak (imleç) degisimi. Sag panel SECIM/IMLECE gore guncellenir;
+   * gezinirken sabitleme kalkar (panel her zaman odaktakini gosterir).
+   */
+  const focusItem = useCallback((key: string) => {
+    setFocusedKey(key);
+    setPinnedKey(null);
+  }, []);
+
+  /** Enter/düğme ile sabitleme: ayni ogeye ikinci kez basmak sabitlemeyi kaldirir. */
   const togglePin = useCallback((key: string) => {
+    setFocusedKey(key);
     setPinnedKey((prev) => (prev === key ? null : key));
   }, []);
 
-  /** Sag panelin gosterdigi oge: sabit > hover > klavye imleci. */
+  /** Sag panelin gosterdigi oge: odaklanan (secili) kume. */
   const contextCluster = useMemo(() => {
-    const key = pinnedKey ?? hoverKey ?? focusedKey;
-    if (!key || !scan) return null;
-    return scan.clusters.find((c) => c.key === key) ?? null;
-  }, [pinnedKey, hoverKey, focusedKey, scan]);
+    if (!focusedKey || !scan) return null;
+    return scan.clusters.find((c) => c.key === focusedKey) ?? null;
+  }, [focusedKey, scan]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpanded((prev) => {
@@ -666,6 +676,36 @@ export default function App() {
     setSelected(new Set(scopeKeys));
     await openPlanFor(scopeKeys);
   }, [scopeKeys, openPlanFor]);
+
+  /**
+   * Plandan bir kumeyi cikarir (onay ekraninda secim duzeltme).
+   *
+   * Sunucu tarafi yeniden plan uretilir: uygulanan plan ile gosterilen plan
+   * birebir ayni kalir. Kalan kume yoksa plan birakilir (hicbir sey silinmez).
+   */
+  const deselectFromPlan = useCallback(
+    async (key: string) => {
+      if (!plan) return;
+      const remaining = [...selected].filter((k) => k !== key);
+      if (remaining.length === 0) {
+        setPlan(null);
+        setPhase('review');
+        setSelected(new Set());
+        notify(t('Plan boşaldı; hiçbir şey silinmedi.'));
+        return;
+      }
+      try {
+        const p = await createPlan({ scanId: scanId ?? undefined, keys: remaining, mode });
+        setPlan(p);
+        setSelected(new Set(remaining));
+      } catch (e) {
+        setError(errText(e));
+        setPlan(null);
+        setPhase('review');
+      }
+    },
+    [plan, selected, scanId, mode, notify, t],
+  );
 
   const confirmDelete = useCallback(
     async (phrase: string, acknowledgeHigh: boolean) => {
@@ -1044,7 +1084,7 @@ export default function App() {
         </div>
       )}
 
-      {scan && phase !== 'scanning' && (
+      {scan && phase !== 'scanning' && phase !== 'confirm' && (
         <>
           {lastScanAt && (
             <div className="scan-note dim small">
@@ -1177,8 +1217,7 @@ export default function App() {
                   resetKey={`${kindFilter}|${sortMode}|${filter}|${category}|${scan.finishedAt}`}
                   onToggle={toggleSelect}
                   onExpand={toggleExpand}
-                  onFocus={setFocusedKey}
-                  onHover={setHoverKey}
+                  onFocus={focusItem}
                   onPin={togglePin}
                   onSelectMany={setSelectionFor}
                   onSearchFocus={focusSearch}
@@ -1211,7 +1250,17 @@ export default function App() {
       )}
 
       {plan && phase === 'confirm' && (
-        <ConfirmDialog plan={plan} busy={false} onCancel={() => { setPlan(null); setPhase('review'); }} onConfirm={(p, a) => void confirmDelete(p, a)} />
+        <PlanWorkspace
+          plan={plan}
+          protectedCount={Math.max(0, selected.size - plan.plan.clusters.length)}
+          busy={false}
+          onCancel={() => {
+            setPlan(null);
+            setPhase('review');
+          }}
+          onApprove={() => setApproveSignal((n) => n + 1)}
+          onDeselect={(key) => void deselectFromPlan(key)}
+        />
       )}
 
       {phase === 'deleting' && deleting && (
@@ -1509,13 +1558,26 @@ export default function App() {
       </div>
 
       {ctxOpen && (
-        <ContextPanel
-          cluster={contextCluster}
-          pinned={pinnedKey !== null && pinnedKey === contextCluster?.key}
-          onTogglePin={() => {
-            if (contextCluster) togglePin(contextCluster.key);
-          }}
-        />
+        plan && phase === 'confirm' ? (
+          <ApprovalWall
+            plan={plan}
+            busy={false}
+            focusSignal={approveSignal}
+            onCancel={() => {
+              setPlan(null);
+              setPhase('review');
+            }}
+            onConfirm={(p, a) => void confirmDelete(p, a)}
+          />
+        ) : (
+          <ContextPanel
+            cluster={contextCluster}
+            pinned={pinnedKey !== null && pinnedKey === contextCluster?.key}
+            onTogglePin={() => {
+              if (contextCluster) togglePin(contextCluster.key);
+            }}
+          />
+        )
       )}
     </div>
   );

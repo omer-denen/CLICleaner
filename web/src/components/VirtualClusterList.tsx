@@ -16,7 +16,6 @@ interface Props {
   onToggle: (key: string) => void;
   onExpand: (key: string) => void;
   onFocus: (key: string) => void;
-  onHover: (key: string | null) => void;
   onPin: (key: string) => void;
   onSelectMany: (keys: string[], on: boolean) => void;
   onSearchFocus: () => void;
@@ -48,7 +47,6 @@ export function VirtualClusterList({
   onToggle,
   onExpand,
   onFocus,
-  onHover,
   onPin,
   onSelectMany,
   onSearchFocus,
@@ -223,7 +221,6 @@ export function VirtualClusterList({
                 onToggle={() => onToggle(cluster.key)}
                 onExpand={() => onExpand(cluster.key)}
                 onFocus={() => onFocus(cluster.key)}
-                onHover={(hovering) => onHover(hovering ? cluster.key : null)}
               />
             </div>
           );

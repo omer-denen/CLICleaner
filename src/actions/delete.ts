@@ -32,6 +32,12 @@ export interface PlannedTarget {
 }
 
 export interface PlannedCluster {
+  /**
+   * Kume anahtari. Plan ekraninda "plandan cikar" isleminde hangi kumenin
+   * cikarildigini TUTARLI secmek icin gereklidir (basliga gore eslestirme
+   * kirilgandir).
+   */
+  key: string;
   title: string;
   reason: string;
   risk: RiskLevel;
@@ -88,6 +94,7 @@ export function buildPlan(
 
     const bytes = targets.reduce((a, t) => a + t.bytes, 0);
     planned.push({
+      key: c.key,
       title: c.title,
       reason: c.verdict.consequence,
       risk: c.verdict.risk,
