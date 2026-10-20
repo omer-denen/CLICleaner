@@ -21,8 +21,10 @@
     "npm-cache",
     "nuget",
     "conda",
+    "python",
     "onnx",
     "cuda",
+    "nodejs",
     "windows"
   ],
   "repository": {
