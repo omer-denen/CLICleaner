@@ -1,6 +1,7 @@
 import { formatBytes } from '../../../src/util/format.ts';
+import type { DiskUsageView } from '../../../src/web/contract.ts';
 import { useI18n } from '../i18n.tsx';
-import { CATEGORY_ORDER, type CategoryKey, type CategoryStat } from '../util/categories.ts';
+import { CATEGORY_ORDER, type CategoryKey, type CategoryStat } from '../../../src/core/categories.ts';
 
 /**
  * Sol sutun — kontrol merkezi (T42 / D3, P0).
@@ -24,6 +25,8 @@ interface RailProps {
   totalBytes: number;
   reclaimableBytes: number;
   aiRatio: number;
+  /** Surucu dolulugu (sunucudan gelen salt okunur olcum). */
+  disk: DiskUsageView | null;
   selectedCount: number;
   selectedBytes: number;
   planState: PlanState;
@@ -45,11 +48,13 @@ function Meter({
   value,
   frac,
   tone,
+  sub,
 }: {
   label: string;
   value: string;
   frac: number;
-  tone: 'accent' | 'green' | 'purple';
+  tone: 'accent' | 'green' | 'purple' | 'yellow' | 'red';
+  sub?: string;
 }) {
   const pct = Math.max(0, Math.min(1, frac));
   return (
@@ -61,6 +66,7 @@ function Meter({
       <div className="meter-bar" role="presentation">
         <i className={`tone-${tone}`} style={{ width: `${(pct * 100).toFixed(1)}%` }} />
       </div>
+      {sub && <span className="meter-sub dim">{sub}</span>}
     </div>
   );
 }
@@ -72,6 +78,7 @@ export function Rail({
   totalBytes,
   reclaimableBytes,
   aiRatio,
+  disk,
   selectedCount,
   selectedBytes,
   planState,
@@ -104,6 +111,20 @@ export function Rail({
 
       <section className="rail-block rail-health">
         <h3 className="rail-title">{t('Sağlık')}</h3>
+        <Meter
+          label={`${t('Disk')} ${disk ? disk.drive : ''}`.trim()}
+          value={disk ? `%${Math.round(disk.usedRatio * 100)}` : '--'}
+          frac={disk?.usedRatio ?? 0}
+          tone={disk ? (disk.usedRatio >= 0.9 ? 'red' : disk.usedRatio >= 0.75 ? 'yellow' : 'accent') : 'accent'}
+          sub={
+            disk
+              ? t('{free} boş · {total} toplam', {
+                  free: formatBytes(disk.freeBytes),
+                  total: formatBytes(disk.totalBytes),
+                })
+              : undefined
+          }
+        />
         <Meter
           label={t('Taranan')}
           value={hasScan ? formatBytes(totalBytes) : '--'}

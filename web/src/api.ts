@@ -16,6 +16,7 @@ import type {
   CliQuarantinePlanResponse,
   ExecuteRequest,
   ExecuteStartResponse,
+  FindingsResponse,
   LatestResponse,
   MetaResponse,
   PlanRequest,
@@ -129,6 +130,11 @@ export function getLatest(): Promise<LatestResponse> {
 
 export function getScanStatus(): Promise<ScanStatusResponse> {
   return request<ScanStatusResponse>('/api/scan/status');
+}
+
+/** Birlesik bulgular (disk + CLI). SALT OKUNUR. */
+export function getFindings(): Promise<FindingsResponse> {
+  return request<FindingsResponse>('/api/findings');
 }
 
 export function getSettings(): Promise<SettingsResponse> {

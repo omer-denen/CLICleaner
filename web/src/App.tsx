@@ -6,6 +6,7 @@ import type { Cluster, ScanResult } from '../../src/core/types.ts';
 import type {
   DeleteMode,
   ExecuteEvent,
+  FindingView,
   PlanResponse,
   RiskLevel,
   ScanStatusResponse,
@@ -28,8 +29,10 @@ import {
   updateSettings,
 } from './api.ts';
 import { ApprovalWall } from './components/ApprovalWall.tsx';
+import { CliFindingPanel } from './components/CliFindingPanel.tsx';
 import { CliView } from './components/CliView.tsx';
 import { ContextPanel } from './components/ContextPanel.tsx';
+import { FindingsView } from './components/FindingsView.tsx';
 import { PlanWorkspace } from './components/PlanWorkspace.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Rail, type PlanState } from './components/Rail.tsx';
@@ -44,7 +47,7 @@ import {
   categoryOf,
   categoryStats,
   type CategoryKey,
-} from './util/categories.ts';
+} from '../../src/core/categories.ts';
 import {
   EMPTY_LIVE_SCAN,
   EMPTY_SCAN_PROGRESS,
@@ -113,7 +116,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [view, setView] = useState<'disk' | 'cli' | 'vault'>('disk');
+  const [view, setView] = useState<'disk' | 'cli' | 'vault' | 'unified'>('disk');
 
 
   const [phase, setPhase] = useState<Phase>('idle');
@@ -185,6 +188,8 @@ export default function App() {
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
   /** Onay duvarina odaklanma sinyali (plan "Enter"). */
   const [approveSignal, setApproveSignal] = useState(0);
+  /** Birlesik gorunumde odaklanan bulgu (P5). */
+  const [unifiedFocus, setUnifiedFocus] = useState<FindingView | null>(null);
   /** Satir yogunlugu: yogun (32px) / rahat (40px). */
   const [density, setDensity] = useState<'dense' | 'comfortable'>('dense');
   /** Triyaj cipleri: hizli eleme (boyut / risk / zombi). */
@@ -856,8 +861,8 @@ export default function App() {
           ? 'deleting'
           : 'idle';
 
-  /** Sag sutun yalniz Disk sekmesinde acik (CLI/Kasa kendi ekraninda). */
-  const ctxOpen = view === 'disk';
+  /** Sag sutun Disk ve Birlesik sekmelerinde acik (CLI/Kasa kendi ekraninda). */
+  const ctxOpen = view === 'disk' || view === 'unified';
 
   return (
     <div className={`app${railOpen ? '' : ' rail-closed'}${ctxOpen ? ' with-ctx' : ''}`}>
@@ -869,6 +874,7 @@ export default function App() {
           totalBytes={scannedBytes}
           reclaimableBytes={scannedReclaimable}
           aiRatio={aiRatio}
+          disk={scanStatus?.disk ?? null}
           selectedCount={selected.size}
           selectedBytes={selectedBytes}
           planState={planState}
@@ -921,6 +927,16 @@ export default function App() {
             disabled={phase === 'deleting'}
           >
             {t('Kasa')}
+          </button>
+          <button
+            role="tab"
+            aria-selected={view === 'unified'}
+            className={view === 'unified' ? 'active' : ''}
+            onClick={() => setView('unified')}
+            disabled={phase === 'deleting'}
+            title={t('Disk ve CLI bulguları tek listede (salt okunur)')}
+          >
+            {t('Birleşik')}
           </button>
         </nav>
 
@@ -1300,6 +1316,16 @@ export default function App() {
         <VaultView active={view === 'vault'} onError={setError} onNotice={notify} />
       </div>
 
+      {view === 'unified' && (
+        <FindingsView
+          focusedId={unifiedFocus?.id ?? null}
+          onFocus={(f) => {
+            setUnifiedFocus(f);
+            if (f?.source === 'disk') setFocusedKey(f.id.replace(/^disk:/, ''));
+          }}
+        />
+      )}
+
       {settingsOpen && (
         <div
           className="modal-overlay"
@@ -1569,6 +1595,8 @@ export default function App() {
             }}
             onConfirm={(p, a) => void confirmDelete(p, a)}
           />
+        ) : view === 'unified' && unifiedFocus?.source === 'cli' ? (
+          <CliFindingPanel finding={unifiedFocus} />
         ) : (
           <ContextPanel
             cluster={contextCluster}

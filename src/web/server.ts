@@ -20,6 +20,7 @@ import {
 } from '../actions/vault.ts';
 import { exists } from '../actions/restore.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
+import { buildFindings } from '../core/findings.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
 import { longPath } from '../util/longpath.ts';
 import { ScanService } from '../services/scan-service.ts';
@@ -43,6 +44,7 @@ import type {
   CliQuarantineExecuteRequest,
   CliQuarantinePlanRequest,
   ExecuteRequest,
+  FindingsResponse,
   LatestResponse,
   MetaResponse,
   PlanRequest,
@@ -293,6 +295,21 @@ async function handleRequest(
 
   if (route === 'GET /api/scan/status') {
     const body: ScanStatusResponse = await ctx.scan.status();
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'GET /api/findings') {
+    // Birlesik gorunum: disk kumeleri + CLI envanteri. SALT OKUNUR.
+    const last = ctx.scan.last();
+    const inv = ctx.inventory.getLast();
+    const findings = buildFindings(last?.scan ?? null, inv);
+    const body: FindingsResponse = {
+      findings,
+      disk: findings.filter((f) => f.source === 'disk').length,
+      cli: findings.filter((f) => f.source === 'cli').length,
+      at: last?.at ?? null,
+    };
     sendJson(res, 200, body);
     return;
   }

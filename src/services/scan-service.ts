@@ -14,6 +14,7 @@ import {
 } from '../web/settings-store.ts';
 import { debug, info } from '../util/log.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
+import { diskUsage } from '../core/disk-usage.ts';
 import { ServiceError, describeError } from './errors.ts';
 import { newId } from './ids.ts';
 import type { Cluster, Env, ScanResult } from '../core/types.ts';
@@ -194,6 +195,8 @@ export class ScanService {
       dirty,
       scanning: !!this.active,
       clusters: this.lastScan?.scan.clusters.length ?? null,
+      // Surucu dolulugu: salt okunur tek sistem cagrisi (P4 gostergesi).
+      disk: diskUsage(),
     };
   }
 

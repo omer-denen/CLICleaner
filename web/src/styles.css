@@ -2262,6 +2262,22 @@ input {
   background: var(--purple);
 }
 
+.meter-bar > i.tone-yellow {
+  background: var(--yellow);
+}
+
+.meter-bar > i.tone-red {
+  background: var(--red);
+}
+
+.meter-sub {
+  font-size: 10px;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* kategori listesi */
 
 .rail-cat {
@@ -3107,6 +3123,137 @@ input {
 
 .plan-space-hint {
   padding: 0 2px;
+}
+
+/* =====================================================================
+   T42 / D3 — P5: birleşik görünüm (salt okunur)
+   ===================================================================== */
+
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.findings-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.findings-bar .triage {
+  margin-left: 18px;
+}
+
+.findings-note {
+  margin-left: auto;
+  padding-left: 18px;
+  max-width: 380px;
+  text-align: right;
+}
+
+.findings-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.findings-head,
+.finding-line {
+  display: grid;
+  grid-template-columns: 68px minmax(200px, 1fr) 108px 62px 92px 58px 84px;
+  gap: 10px;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.findings-head {
+  height: 26px;
+  border-bottom: 1px solid var(--border-strong);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.findings-head > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.findings-head .cell.num {
+  justify-content: flex-end;
+}
+
+.finding-line {
+  width: 100%;
+  min-height: 32px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.finding-line:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.finding-line.is-cursor {
+  background: rgba(76, 194, 255, 0.09);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.finding-line .cell.title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.finding-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.finding-line .cell.num {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.finding-line .cell.num.idle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.finding-line .cell.risk,
+.finding-line .cell.verdict {
+  text-align: right;
+}
+
+.cell.src {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cell.src-cli {
+  color: var(--yellow);
 }
 
 /* dar ekran: rail üstte yatay bloğa düşer */

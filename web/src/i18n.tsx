@@ -434,6 +434,21 @@ const EN: Record<string, string> = {
   'Yolları göster ({n})': 'Show paths ({n})',
   'Yolları gizle': 'Hide paths',
 
+  // --- birleşik görünüm (P5) ---
+  Birleşik: 'Unified',
+  Boşta: 'Idle',
+  '{n} araç': '{n} tools',
+  '{n} gündür kullanılmadı': 'unused for {n} days',
+  'Kullanım bilgisi yok': 'no usage evidence',
+  'Kurulum yolu: {path}': 'Install path: {path}',
+  'CLI kaldırma planı kendi sekmesinde üretilir ve ayrı yazılı onay ister. Buradan kaldırma yapılmaz.':
+    'The CLI removal plan is created in its own tab and needs a separate written approval. Nothing is removed from here.',
+  'Disk ve CLI bulguları tek listede (salt okunur)': 'Disk and CLI findings in one list (read-only)',
+  'Bu liste salt okunur. Planlar ayrı: disk planı ve CLI kaldırma planı ayrı onayla uygulanır.':
+    'This list is read-only. Plans stay separate: the disk plan and the CLI removal plan are applied with separate approvals.',
+  'Tarama veya CLI envanteri yok. Önce “İncele” ile tara.':
+    'No scan or CLI inventory yet. Start with “Inspect”.',
+
   // --- sağ panel / bağlam (T42 / D3 P2) ---
   Bağlam: 'Context',
   Akış: 'Flow',
@@ -475,6 +490,7 @@ const EN: Record<string, string> = {
   Sağlık: 'Health',
   'Geri kazanılır': 'Reclaimable',
   'Ajan kirliliği': 'Agent clutter',
+  '{free} boş · {total} toplam': '{free} free · {total} total',
   'AI Debris': 'AI Debris',
   'Orphaned CLI': 'Orphaned CLI',
   'Ghost Envs': 'Ghost Envs',

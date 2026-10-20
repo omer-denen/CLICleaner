@@ -117,6 +117,44 @@ export interface ScanStatusResponse {
   dirty: boolean;
   scanning: boolean;
   clusters: number | null;
+  /** Surucu dolulugu (salt okunur sistem olcumu). */
+  disk: DiskUsageView | null;
+}
+
+export interface DiskUsageView {
+  drive: string;
+  totalBytes: number;
+  freeBytes: number;
+  /** Doluluk orani 0..1 */
+  usedRatio: number;
+}
+
+/**
+ * Birlesik bulgu (disk + CLI). SALT OKUNUR: planlar kaynak basina ayridir,
+ * birlesik bir uygulama YOKTUR (iki ayri yazili onay).
+ */
+export interface FindingView {
+  id: string;
+  source: 'disk' | 'cli';
+  title: string;
+  path: string;
+  category: string;
+  bytes: number;
+  idleDays: number | null;
+  risk: RiskLevel;
+  verdict: string;
+  selectable: boolean;
+  reason: string;
+  evidence: string[];
+  targets: number;
+  ref?: string;
+}
+
+export interface FindingsResponse {
+  findings: FindingView[];
+  disk: number;
+  cli: number;
+  at: number | null;
 }
 
 export interface SettingsResponse {

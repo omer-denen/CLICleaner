@@ -1,20 +1,28 @@
-import type { Cluster } from '../../../src/core/types.ts';
+import type { Cluster } from './types.ts';
 
 /**
- * Kategori tureti (T42 / D3 sol sutun).
+ * Kategori tureti — TEK kaynak (T42 / D3 P0 + P5).
  *
  * Kategoriler UYGULAMA ADINDAN degil, KANITTAN turetilir: mimari tip
  * (archetype) ve dosya turu (fileKind) sinyallerine bakilir. Cekirdekte
- * yeni bir siniflandirma kurali eklenmeden buradaki eslesme de guncellenir.
+ * yeni bir siniflandirma kurali eklenince burasi da guncellenir; arayuz
+ * AYRI bir liste tutmaz.
  *
- * Bu dosya yalnizca ARAYUZ katmanidir; hicbir karar uretmez, hicbir yolu
- * silmez.
+ * Bu modul yalnizca SINIFLANDIRIR: hicbir yolu silmez, hedef uretmez.
  */
 
 export type CategoryKey = 'ai-debris' | 'orphaned-cli' | 'ghost-envs' | 'other';
 
-/** Rail sirasi (kararli). */
+/** Kategori sirasi (kararli). */
 export const CATEGORY_ORDER: CategoryKey[] = ['ai-debris', 'orphaned-cli', 'ghost-envs', 'other'];
+
+/** Kullaniciya gosterilen adlar (arayuz bunu cevirir). */
+export const CATEGORY_LABEL: Record<CategoryKey, string> = {
+  'ai-debris': 'AI Debris',
+  'orphaned-cli': 'Orphaned CLI',
+  'ghost-envs': 'Ghost Envs',
+  other: 'Diğer',
+};
 
 /** AI artiklari: model depolari, ajan calisma alanlari, GPU/vektor runtime. */
 const AI_ARCHETYPES = new Set(['model-store', 'agent-workspace', 'accelerator-runtime']);
@@ -47,7 +55,7 @@ export function categoryOf(c: Cluster): CategoryKey {
   return 'other';
 }
 
-/** Kategori bazli ozet (sol sutun). */
+/** Kategori bazli ozet. */
 export function categoryStats(clusters: Cluster[]): Record<CategoryKey, CategoryStat> {
   const out = {} as Record<CategoryKey, CategoryStat>;
   for (const key of CATEGORY_ORDER) out[key] = { key, count: 0, bytes: 0, reclaimable: 0 };
@@ -62,7 +70,7 @@ export function categoryStats(clusters: Cluster[]): Record<CategoryKey, Category
 
 /**
  * "Ajan kirliligi": AI artiklarinin toplam taranan bayt icindeki payi.
- * Disk dolulugu sunucu tarafinda olcumlenir; bu oran tarama sonucundan
+ * Disk dolulugu ayrica `diskUsage` ile olculur; bu oran tarama sonucundan
  * hesaplanir ve ayri bir gostergedir.
  */
 export function agentClutter(clusters: Cluster[]): number {

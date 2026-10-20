@@ -75,12 +75,7 @@ export const VERDICT_SHORT: Record<string, string> = {
 };
 
 /** Sol rail kategorilerinin kısa adları (P1'de ızgara sütununda da kullanılır). */
-export const CATEGORY_LABEL: Record<string, string> = {
-  'ai-debris': 'AI Debris',
-  'orphaned-cli': 'Orphaned CLI',
-  'ghost-envs': 'Ghost Envs',
-  other: 'Diğer',
-};
+export { CATEGORY_LABEL } from '../../src/core/categories.ts';
 
 /**
  * Kume anahtarini kisaltir.

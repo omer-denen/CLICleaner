@@ -13,7 +13,7 @@ import {
   shortPath,
   VERDICT_SHORT,
 } from '../labels.ts';
-import { categoryOf } from '../util/categories.ts';
+import { categoryOf } from '../../../src/core/categories.ts';
 
 /**
  * Yoğun ızgara satırı (T42 / D3 P1).
