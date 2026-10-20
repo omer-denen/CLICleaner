@@ -49,6 +49,17 @@ Eski genel temizlik etiketleri (`disk-cleaner`, `disk-space`, `cleanup`,
 odaklı ve kanıt/denetim odaklı etiketler geldi. GitHub en fazla 20 konu
 kabul eder.
 
+## GitHub Release kuralı (20.10.2026)
+
+Release oluşturulurken **özel başlık/etiket verilmez**; GitHub'un varsayılanı
+kullanılır — yani başlık **tag adıdır** (`v1.0.0`).
+
+- `gh release create v1.0.0` → `--title` **verilmez**.
+- Release açıklaması istenirse yalnız kısa birkaç satır; sürüm notlarının
+  tamamı `CHANGELOG.md` içindedir.
+
+Bu kural `AGENTS.md` 17. maddede de yer alır.
+
 ## npm keywords
 
 `package.json` içindeki `keywords` dizini aynı çerçevede tutulur
