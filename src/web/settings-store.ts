@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { isUpdateMode, type UpdateCheckMode } from '../core/update-check.ts';
 import { longPath } from '../util/longpath.ts';
 
 /**
@@ -14,9 +15,18 @@ export interface WebSettings {
   scanCacheHours: number;
   /** Kasa kayitlari icin onerilen saklama suresi (gun). Bilgi amacli. */
   vaultRetentionDays: number;
+  /**
+   * Surum kontrolu (T41). Varsayilan KAPALI: acikca opt-in.
+   * 'off' | 'daily' | 'weekly'
+   */
+  updateCheck: UpdateCheckMode;
 }
 
-export const DEFAULT_SETTINGS: WebSettings = { scanCacheHours: 24, vaultRetentionDays: 30 };
+export const DEFAULT_SETTINGS: WebSettings = {
+  scanCacheHours: 24,
+  vaultRetentionDays: 30,
+  updateCheck: 'off',
+};
 export const MIN_CACHE_HOURS = 1;
 export const MAX_CACHE_HOURS = 720;
 export const MIN_VAULT_DAYS = 1;
@@ -45,6 +55,7 @@ export async function loadSettings(): Promise<WebSettings> {
     return {
       scanCacheHours: clampHours(j.scanCacheHours),
       vaultRetentionDays: clampVaultDays(j.vaultRetentionDays),
+      updateCheck: isUpdateMode(j.updateCheck) ? j.updateCheck : DEFAULT_SETTINGS.updateCheck,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -59,6 +70,7 @@ export async function saveSettings(patch: Partial<WebSettings>): Promise<WebSett
     ...(patch.vaultRetentionDays !== undefined
       ? { vaultRetentionDays: clampVaultDays(patch.vaultRetentionDays) }
       : {}),
+    ...(isUpdateMode(patch.updateCheck) ? { updateCheck: patch.updateCheck } : {}),
   };
   try {
     const file = settingsPath();

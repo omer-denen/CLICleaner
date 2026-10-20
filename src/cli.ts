@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { runScan, renderReport } from './commands/scan.ts';
+import { currentVersion } from './util/version.ts';
 import { runClean } from './commands/clean.ts';
 import { runExplain } from './commands/explain.ts';
 import { runDoctor } from './commands/doctor.ts';
@@ -97,6 +98,15 @@ ${C.bold}Ornekler${C.reset}
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+
+  // Sürüm: ag isteği YAPMAZ; sadece paketin sürümünü okur.
+  // NOT: bu bayraklar '-' ile basladigi icin komut cozumlemesinden ONCE
+  // kontrol edilir (aksi halde 'ui' varsayilir ve web sunucusu acilir).
+  if (argv.length > 0 && (argv[0] === '-v' || argv[0] === '--version' || argv[0] === 'version')) {
+    console.log(currentVersion());
+    return;
+  }
+
   // Komut verilmezse web arayuzu acilir: asil urun budur; terminal
   // komutlari (scan/clean) bilincli olarak secilir.
   const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'ui';

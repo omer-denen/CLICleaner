@@ -163,11 +163,25 @@ export interface SettingsResponse {
   maxCacheHours: number;
   /** Bilgi amacli: kasa kayitlari icin onerilen saklama suresi. */
   vaultRetentionDays: number;
+  /** Surum kontrolu (T41): off | daily | weekly. Varsayilan off. */
+  updateCheck: 'off' | 'daily' | 'weekly';
 }
 
 export interface SettingsUpdateRequest {
   scanCacheHours?: number;
   vaultRetentionDays?: number;
+  updateCheck?: 'off' | 'daily' | 'weekly';
+}
+
+/** Surum kontrolu sonucu (T41). Kapaliyken checked=false, ag istegi yapilmaz. */
+export interface UpdateCheckView {
+  checked: boolean;
+  mode: 'off' | 'daily' | 'weekly';
+  latest?: string;
+  current?: string;
+  updateAvailable: boolean;
+  checkedAt?: number;
+  error?: string;
 }
 
 // ---------------------------------------------------------------------------

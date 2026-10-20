@@ -208,6 +208,7 @@ export class ScanService {
       minCacheHours: MIN_CACHE_HOURS,
       maxCacheHours: MAX_CACHE_HOURS,
       vaultRetentionDays: s.vaultRetentionDays,
+      updateCheck: s.updateCheck,
     };
   }
 

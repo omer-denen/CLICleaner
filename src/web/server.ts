@@ -28,6 +28,8 @@ import {
 } from '../actions/desktop-shortcut.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { buildFindings } from '../core/findings.ts';
+import { checkForUpdate } from '../core/update-check.ts';
+import { currentVersion } from '../util/version.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
 import { longPath } from '../util/longpath.ts';
 import { ScanService } from '../services/scan-service.ts';
@@ -62,6 +64,7 @@ import type {
   ScanStreamEvent,
   SettingsResponse,
   SettingsUpdateRequest,
+  UpdateCheckView,
   VaultEntryView,
   VaultListResponse,
   VaultPurgeRequest,
@@ -348,6 +351,24 @@ async function handleRequest(
       exists: info.exists,
       ours: info.ours,
       error: result.removed ? undefined : 'Kisayol bulunamadi veya bize ait degil.',
+    };
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'GET /api/update') {
+    // T41: varsayilan KAPALI. Kapaliyken HICBIR ag istegi yapilmaz.
+    const settings = await ctx.scan.settings();
+    const force = url.searchParams.get('force') === '1';
+    const result = await checkForUpdate(settings.updateCheck, currentVersion(), force);
+    const body: UpdateCheckView = {
+      checked: result.checked,
+      mode: result.mode,
+      latest: result.latest,
+      current: result.current,
+      updateAvailable: result.updateAvailable,
+      checkedAt: result.checkedAt,
+      error: result.error,
     };
     sendJson(res, 200, body);
     return;
