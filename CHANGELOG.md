@@ -33,6 +33,12 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
 ### İyileştirildi
 
+- **Tarama durumu:** son tarama zamanı, güncel/eski durumu ve yeniden tarama
+  önerisi arayüzde görünür. Tarama hiçbir zaman engellenmez; "önceki sonuçları
+  göster" ve "yine de yeniden tara" seçenekleri sunulur. Önbellek süresi
+  ayarlardan değiştirilebilir; silme sonrası sonuç "eski" işaretlenir.
+- **Plan görünümü:** silme planı risk gruplarına ayrıldı; özet üstte sabit,
+  hedef yolları isteğe bağlı açılıyor.
 - Varsayılan seçim yalnızca yeniden oluşturulabilirliği kanıtlanmış ve
   güven düzeyi düşük olmayan klasörleri işaretler.
 - Web arayüzünün hangi tarayıcıda açıldığı ve nasıl değiştirileceği

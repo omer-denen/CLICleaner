@@ -1,10 +1,26 @@
 import { runScan } from '../commands/scan.ts';
-import { loadScanCache, saveScanCache } from '../web/scan-store.ts';
+import {
+  loadScanCache,
+  loadScanDirtyAt,
+  markScanDirty,
+  saveScanCache,
+  SCAN_CACHE_TTL_MS,
+} from '../web/scan-store.ts';
+import {
+  MAX_CACHE_HOURS,
+  MIN_CACHE_HOURS,
+  loadSettings,
+  saveSettings,
+} from '../web/settings-store.ts';
 import { debug, info } from '../util/log.ts';
 import { ServiceError, describeError } from './errors.ts';
 import { newId } from './ids.ts';
 import type { Cluster, Env, ScanResult } from '../core/types.ts';
-import type { ScanStreamEvent } from '../web/contract.ts';
+import type {
+  ScanStatusResponse,
+  ScanStreamEvent,
+  SettingsResponse,
+} from '../web/contract.ts';
 
 /**
  * Disk tarama servisi.
@@ -43,6 +59,9 @@ export class ScanService {
   private active: ScanJob | null = null;
   private lastScan: { scan: ScanResult; at: number } | null = null;
   private cacheLoaded = false;
+  private ttlMs = SCAN_CACHE_TTL_MS;
+  private dirtyAt = 0;
+  private settingsLoaded = false;
   private readonly emit: ScanEmit;
   private readonly persistScan: boolean;
 
@@ -93,7 +112,13 @@ export class ScanService {
     if (this.cacheLoaded) return;
     this.cacheLoaded = true;
     if (this.lastScan) return;
-    const cached = await loadScanCache();
+    // Suresi dolmus sonuc da yuklenir: kullaniciya "eski" olarak
+    // gosterilebilir; yeniden tarama ENGELLENMEZ.
+    const [cached, dirtyAt] = await Promise.all([
+      loadScanCache(Date.now(), Number.POSITIVE_INFINITY),
+      loadScanDirtyAt(),
+    ]);
+    this.dirtyAt = Math.max(this.dirtyAt, dirtyAt);
     if (cached) {
       this.lastScan = cached;
       info('tarama onbellegi yuklendi', {
@@ -101,8 +126,68 @@ export class ScanService {
         kume: cached.scan.clusters.length,
       });
     } else {
-      debug('taze tarama onbellegi yok (24 saat)');
+      debug('tarama onbellegi yok');
     }
+  }
+
+  /** Ayarlari (onbellek suresi) bir kez yukler. */
+  async ensureSettingsLoaded(): Promise<void> {
+    if (this.settingsLoaded) return;
+    this.settingsLoaded = true;
+    const s = await loadSettings();
+    this.ttlMs = Math.max(MIN_CACHE_HOURS, s.scanCacheHours) * 3_600_000;
+  }
+
+  /** Tarama durumu: never / current / stale / scanning. */
+  async status(): Promise<ScanStatusResponse> {
+    await Promise.all([this.ensureCacheLoaded(), this.ensureSettingsLoaded()]);
+    // CLI temizligi ayri surecte dirty.json yazar; her durum sorgusunda
+    // diskteki isaret okunur (ucuz tek dosya).
+    this.dirtyAt = Math.max(this.dirtyAt, await loadScanDirtyAt());
+    const at = this.lastScan?.at ?? null;
+    const ageMs = at !== null ? Math.max(0, Date.now() - at) : null;
+    const dirty = at !== null && this.dirtyAt > at;
+    const expired = ageMs !== null && ageMs > this.ttlMs;
+    const state = this.active
+      ? 'scanning'
+      : at === null
+        ? 'never'
+        : dirty || expired
+          ? 'stale'
+          : 'current';
+    return {
+      state,
+      lastScanAt: at,
+      ageMs,
+      ttlMs: this.ttlMs,
+      nextRecommendedAt: at !== null ? at + this.ttlMs : null,
+      dirty,
+      scanning: !!this.active,
+      clusters: this.lastScan?.scan.clusters.length ?? null,
+    };
+  }
+
+  async settings(): Promise<SettingsResponse> {
+    await this.ensureSettingsLoaded();
+    return {
+      scanCacheHours: Math.round(this.ttlMs / 3_600_000),
+      minCacheHours: MIN_CACHE_HOURS,
+      maxCacheHours: MAX_CACHE_HOURS,
+    };
+  }
+
+  async updateSettings(patch: { scanCacheHours?: number }): Promise<SettingsResponse> {
+    const saved = await saveSettings(patch);
+    this.ttlMs = saved.scanCacheHours * 3_600_000;
+    this.settingsLoaded = true;
+    info('ayarlar guncellendi', { scanCacheHours: saved.scanCacheHours });
+    return this.settings();
+  }
+
+  /** Disk degisti (silme vb.): sonucu eski isaretle. */
+  async markDirty(): Promise<void> {
+    this.dirtyAt = Date.now();
+    if (this.persistScan) await markScanDirty(this.dirtyAt);
   }
 
   cancel(id: string): void {

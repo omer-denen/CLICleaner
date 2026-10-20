@@ -8,7 +8,9 @@ import type {
   ExecuteEvent,
   PlanResponse,
   RiskLevel,
+  ScanStatusResponse,
   ScanStreamEvent,
+  SettingsResponse,
 } from '../../src/web/contract.ts';
 import {
   ApiError,
@@ -17,16 +19,20 @@ import {
   executePlan,
   executeStream,
   getLatest,
+  getScanStatus,
+  getSettings,
   getToken,
   openRecycleBin,
   scanStream,
   setToken,
   startScan,
+  updateSettings,
 } from './api.ts';
 import { CliView } from './components/CliView.tsx';
 import { ClusterRow } from './components/ClusterRow.tsx';
 import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
+import { ScanStatusBar } from './components/ScanStatusBar.tsx';
 import { useI18n } from './i18n.tsx';
 import { VERDICT_HINT } from './labels.ts';
 
@@ -164,6 +170,10 @@ export default function App() {
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [deleting, setDeleting] = useState<DeletingState | null>(null);
   const [done, setDone] = useState<DoneState | null>(null);
+  const [scanStatus, setScanStatus] = useState<ScanStatusResponse | null>(null);
+  const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hoursDraft, setHoursDraft] = useState('24');
 
   const streamRef = useRef<EventSource | null>(null);
 
@@ -193,6 +203,57 @@ export default function App() {
     },
     [],
   );
+
+  const refreshScanStatus = useCallback(async () => {
+    try {
+      setScanStatus(await getScanStatus());
+    } catch {
+      /* durum alinamadi: bant gizli kalir */
+    }
+  }, []);
+
+  const openSettings = useCallback(async () => {
+    try {
+      const s = await getSettings();
+      setSettings(s);
+      setHoursDraft(String(s.scanCacheHours));
+    } catch (e) {
+      setError(errText(e));
+    }
+    setSettingsOpen(true);
+  }, []);
+
+  const saveHours = useCallback(async () => {
+    const n = Number(hoursDraft);
+    if (!Number.isFinite(n)) return;
+    try {
+      const s = await updateSettings(n);
+      setSettings(s);
+      setSettingsOpen(false);
+      await refreshScanStatus();
+      notify(t('Ayarlar kaydedildi.'));
+    } catch (e) {
+      setError(errText(e));
+    }
+  }, [hoursDraft, refreshScanStatus, notify, t]);
+
+  const showPreviousScan = useCallback(async () => {
+    if (scan) {
+      setPhase('review');
+      return;
+    }
+    try {
+      const latest = await getLatest();
+      if (!latest.scan) return;
+      setScan(latest.scan);
+      setScanId(null);
+      setSelected(defaultSelection(latest.scan));
+      setLastScanAt(latest.at ?? latest.scan.finishedAt);
+      setPhase('review');
+    } catch (e) {
+      setError(errText(e));
+    }
+  }, [scan]);
 
   // Tarama tamamlandi diyalogu: Enter/Esc ile de kapanir.
   useEffect(() => {
@@ -292,6 +353,7 @@ export default function App() {
           setScan(data.result);
           setSelected(defaultSelection(data.result));
           setLastScanAt(Date.now());
+          void refreshScanStatus();
           setPhase('review');
           // Proje taramasi rapor-only'dir; bunu sessizce yapmayalim.
           if (root) notify(t('Proje taraması salt rapordur; silme hedefi üretilmez.'));
@@ -346,6 +408,14 @@ export default function App() {
   useEffect(() => {
     if (!tokenReady) return;
     let alive = true;
+    void refreshScanStatus();
+    getSettings()
+      .then((s) => {
+        if (alive) setSettings(s);
+      })
+      .catch(() => {
+        /* ayar alinamadi */
+      });
     (async () => {
       try {
         const latest = await getLatest();
@@ -365,7 +435,7 @@ export default function App() {
       alive = false;
       closeStream();
     };
-  }, [tokenReady, closeStream]);
+  }, [tokenReady, closeStream, refreshScanStatus]);
 
   // Sekme, arama veya siralama degisince ilk 30 kayda don.
   useEffect(() => {
@@ -552,6 +622,8 @@ export default function App() {
             });
             setPlan(null);
             setDeleting(null);
+            // Disk degisti: tarama sonucu artik "eski".
+            void refreshScanStatus();
             setPhase('done');
           } else if (data.type === 'error') {
             finished = true;
@@ -707,6 +779,16 @@ export default function App() {
             ×
           </button>
         </div>
+      )}
+
+      {phase !== 'deleting' && (
+        <ScanStatusBar
+          status={scanStatus}
+          hasPrevious={!!scan || scanStatus?.lastScanAt != null}
+          onShowPrevious={() => void showPreviousScan()}
+          onRescan={() => void beginScan()}
+          onOpenSettings={() => void openSettings()}
+        />
       )}
 
       {view === 'disk' && (
@@ -947,6 +1029,57 @@ export default function App() {
       <div style={{ display: view === 'cli' ? undefined : 'none' }}>
         <CliView onError={setError} onNotice={notify} />
       </div>
+
+      {settingsOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('Ayarlar')}
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div className="modal modal-small" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-head">
+              <h2>{t('Ayarlar')}</h2>
+              <button
+                className="icon-btn"
+                onClick={() => setSettingsOpen(false)}
+                aria-label={t('Kapat')}
+              >
+                ×
+              </button>
+            </header>
+            <label className="settings-field">
+              <span>{t('Tarama önbelleği (saat)')}</span>
+              <input
+                type="number"
+                min={settings?.minCacheHours ?? 1}
+                max={settings?.maxCacheHours ?? 720}
+                value={hoursDraft}
+                onChange={(e) => setHoursDraft(e.target.value)}
+                autoFocus
+              />
+              <span className="dim small">
+                {t(
+                  'Son tarama bu süre içinde güncel sayılır. Varsayılan 24 saat; tarama hiçbir zaman engellenmez.',
+                )}
+              </span>
+            </label>
+            <footer className="modal-actions">
+              <button className="btn" onClick={() => setSettingsOpen(false)}>
+                {t('İptal')}
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!Number.isFinite(Number(hoursDraft))}
+                onClick={() => void saveHours()}
+              >
+                {t('Kaydet')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {pickerOpen && (
         <div

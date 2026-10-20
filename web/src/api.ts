@@ -22,6 +22,8 @@ import type {
   PlanResponse,
   ScanRequest,
   ScanStartResponse,
+  ScanStatusResponse,
+  SettingsResponse,
 } from '../../src/web/contract.ts';
 
 /**
@@ -119,6 +121,21 @@ export function getMeta(): Promise<MetaResponse> {
 
 export function getLatest(): Promise<LatestResponse> {
   return request<LatestResponse>('/api/latest');
+}
+
+export function getScanStatus(): Promise<ScanStatusResponse> {
+  return request<ScanStatusResponse>('/api/scan/status');
+}
+
+export function getSettings(): Promise<SettingsResponse> {
+  return request<SettingsResponse>('/api/settings');
+}
+
+export function updateSettings(scanCacheHours: number): Promise<SettingsResponse> {
+  return request<SettingsResponse>('/api/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ scanCacheHours }),
+  });
 }
 
 export function startScan(body: ScanRequest): Promise<ScanStartResponse> {

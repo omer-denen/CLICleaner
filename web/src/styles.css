@@ -1718,3 +1718,201 @@ input {
   background: var(--panel-2);
   outline: none;
 }
+
+
+/* ---------------------------------------------------- tarama durumu (Faz 1) */
+
+.scan-status-wrap {
+  margin: 0 0 10px;
+}
+
+.scan-status-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 2px;
+}
+
+.scan-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+}
+
+.scan-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.scan-current {
+  color: var(--green);
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.scan-current::before {
+  background: var(--green);
+}
+
+.scan-stale {
+  color: var(--yellow);
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.scan-stale::before {
+  background: var(--yellow);
+}
+
+.scan-never {
+  color: var(--muted);
+}
+
+.scan-scanning {
+  color: var(--accent);
+  border-color: rgba(76, 194, 255, 0.45);
+}
+
+.scan-scanning::before {
+  background: var(--accent);
+  animation: scan-pulse 1s ease-in-out infinite;
+}
+
+@keyframes scan-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.scan-settings {
+  margin-left: auto;
+}
+
+.scan-banner {
+  margin: 8px 0;
+}
+
+.scan-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn.ghost:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* ------------------------------------------------ plan görünümü (Faz 1) */
+
+.modal-plan {
+  width: min(920px, 100%);
+}
+
+.modal-small {
+  width: min(460px, 100%);
+}
+
+.plan-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+
+.plan-summary strong {
+  font-size: 18px;
+}
+
+.plan-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 120px;
+  padding-right: 4px;
+}
+
+.plan-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.plan-group-high {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.plan-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-row:last-child {
+  border-bottom: 0;
+}
+
+.plan-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.plan-row-main strong {
+  flex: 1 1 260px;
+}
+
+.plan-paths {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 0;
+}
+
+.settings-field input {
+  width: 140px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel-2);
+}

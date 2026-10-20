@@ -39,7 +39,10 @@ import type {
   PlanRequest,
   ScanRequest,
   ScanStartResponse,
+  ScanStatusResponse,
   ScanStreamEvent,
+  SettingsResponse,
+  SettingsUpdateRequest,
 } from './contract.ts';
 
 /**
@@ -274,6 +277,25 @@ async function handleRequest(
     return;
   }
 
+  if (route === 'GET /api/scan/status') {
+    const body: ScanStatusResponse = await ctx.scan.status();
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'GET /api/settings') {
+    const body: SettingsResponse = await ctx.scan.settings();
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'PUT /api/settings' || route === 'POST /api/settings') {
+    const body = await readJson<SettingsUpdateRequest>(req);
+    const out = await ctx.scan.updateSettings({ scanCacheHours: Number(body.scanCacheHours) });
+    sendJson(res, 200, out);
+    return;
+  }
+
   if (route === 'POST /api/scan') {
     await handleStartScan(req, res, ctx);
     return;
@@ -303,6 +325,9 @@ async function handleRequest(
       body.phrase,
       body.acknowledgeHigh === true,
     );
+    // T28/24s: silme basladi -> disk degisecek; son tarama artik guncel
+    // sayilmaz. Plan gecersizse execute yukarida hata verir.
+    await ctx.scan.markDirty();
     sendJson(res, 202, out);
     return;
   }

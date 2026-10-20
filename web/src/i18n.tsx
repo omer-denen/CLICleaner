@@ -322,6 +322,40 @@ const EN: Record<string, string> = {
   tarandı: 'scanned',
   silinebilir: 'reclaimable',
   Tamam: 'OK',
+
+  // --- tarama durumu / ayarlar (Faz 1) ---
+  Ayarlar: 'Settings',
+  Taranıyor: 'Scanning',
+  Güncel: 'Up to date',
+  Eski: 'Outdated',
+  'Hiç taranmadı': 'Never scanned',
+  'Son tarama: {age}': 'Last scan: {age}',
+  'Son tarama {age} yapıldı': 'Last scan was {age}',
+  'Henüz tarama yapılmadı. İlk taramayı başlatabilirsin.':
+    'No scan yet. You can start the first scan.',
+  'Dosyalar değişti (silme veya ayar). Sonuçlar eski olabilir; yeniden tarama önerilir.':
+    'Files changed (deletion or settings). Results may be outdated; a rescan is recommended.',
+  'Son tarama {age} yapıldı. Sonuçlar güncel olabilir. Yeniden taramak için {hours} saat sonra önerilir.':
+    'Last scan was {age}. Results may still be current. A rescan is recommended in {hours} hours.',
+  'Son tarama {age} yapıldı. Yeniden tarama önerilir.':
+    'Last scan was {age}. A rescan is recommended.',
+  'Sonuçlar eski olabilir; yeniden tarama önerilir.':
+    'Results may be outdated; a rescan is recommended.',
+  'Önceki sonuçları göster': 'Show previous results',
+  'Yine de yeniden tara': 'Rescan anyway',
+  'Taramayı başlat': 'Start scan',
+  'Tarama önbelleği (saat)': 'Scan cache (hours)',
+  'Son tarama bu süre içinde güncel sayılır. Varsayılan 24 saat; tarama hiçbir zaman engellenmez.':
+    'The last scan is considered current within this period. Default 24 hours; scanning is never blocked.',
+  Kaydet: 'Save',
+  'Ayarlar kaydedildi.': 'Settings saved.',
+
+  // --- plan görünümü (Faz 1) ---
+  'Planı gözden geçir': 'Review the plan',
+  toplam: 'total',
+  '{n} hedef': '{n} targets',
+  'Yolları göster ({n})': 'Show paths ({n})',
+  'Yolları gizle': 'Hide paths',
 };
 
 interface Ctx {

@@ -89,6 +89,30 @@ export interface LatestResponse {
   at: number | null;
 }
 
+export type ScanFreshness = 'never' | 'current' | 'stale' | 'scanning';
+
+export interface ScanStatusResponse {
+  state: ScanFreshness;
+  lastScanAt: number | null;
+  ageMs: number | null;
+  ttlMs: number;
+  nextRecommendedAt: number | null;
+  /** Silme/ayar sonrasi disk degisti mi? */
+  dirty: boolean;
+  scanning: boolean;
+  clusters: number | null;
+}
+
+export interface SettingsResponse {
+  scanCacheHours: number;
+  minCacheHours: number;
+  maxCacheHours: number;
+}
+
+export interface SettingsUpdateRequest {
+  scanCacheHours: number;
+}
+
 // ---------------------------------------------------------------------------
 // Plan ve silme
 // ---------------------------------------------------------------------------

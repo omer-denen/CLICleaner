@@ -7,6 +7,7 @@ import type { Env, SensitiveAllow } from '../core/types.ts';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { longPath, prettyPath } from '../util/longpath.ts';
+import { markScanDirty } from '../web/scan-store.ts';
 
 const C = {
   reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m',
@@ -180,6 +181,9 @@ export async function runClean(args: CleanArgs): Promise<void> {
   } catch {
     /* gunluk yazilamadi */
   }
+
+  // Web arayuzu sonra acilirsa "son tarama eski" gorunsun: disk degisti.
+  if (removed > 0) await markScanDirty();
 
   // --- Ozet ---
   console.log(`\n${C.bold}  ${'─'.repeat(58)}${C.reset}`);
