@@ -11,7 +11,7 @@ import {
   shortPath,
   VERDICT_LABEL,
 } from '../labels.ts';
-import { evidenceReading } from '../util/evidence-text.ts';
+import { EvidenceReader } from '../../../src/core/evidence-text.ts';
 
 /**
  * Sag sutun — baglam / "rontgen" paneli (T42 / D3 P2).
@@ -51,7 +51,7 @@ export function ContextPanel({ cluster, pinned, onTogglePin }: Props) {
   const v = cluster.verdict;
   const evidence = cluster.evidence;
   const targets = cluster.deleteTargets ?? [];
-  const reading = evidenceReading(cluster);
+  const reading = new EvidenceReader(cluster).reading();
   const key = shortKey(cluster.key);
 
   const copy = async (text: string, tag: string) => {

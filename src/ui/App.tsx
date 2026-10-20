@@ -5,7 +5,7 @@ import { Row } from './Row.tsx';
 import { formatBytes, padStart, truncatePath } from '../util/format.ts';
 import { prettyPath } from '../util/longpath.ts';
 import { groupByVerdict } from '../core/merge.ts';
-import { defaultSelected } from '../core/selection.ts';
+import { DefaultSelection } from '../core/selection.ts';
 import { deleteTarget, Journal, type DeleteMode } from '../actions/delete.ts';
 import type { Cluster, ScanResult } from '../core/types.ts';
 
@@ -107,7 +107,7 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
       // kanitlanmis kumeler (T34). Kullanici verisi/belirsiz varsayilan secilmez.
       const def = new Set<string>();
       for (const c of r.clusters) {
-        if (defaultSelected(c)) def.add(c.key);
+        if (DefaultSelection.selected(c)) def.add(c.key);
       }
       setSelected(def);
       setScreen('review');

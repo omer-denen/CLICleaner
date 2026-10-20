@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FindingView, FindingsResponse } from '../../../src/web/contract.ts';
 import { CATEGORY_LABEL } from '../../../src/core/categories.ts';
+import { FindingsQuery } from '../../../src/core/findings-query.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 import { getFindings } from '../api.ts';
@@ -39,14 +40,12 @@ export function FindingsView({ onFocus, focusedId }: Props) {
     };
   }, []);
 
-  const rows = useMemo(() => {
-    const all = data?.findings ?? [];
-    if (only === 'all') return all;
-    return all.filter((f) => f.source === only);
-  }, [data, only]);
+  /** Sorgu MOTORDA yapilir (`src/core/findings-query.ts`). */
+  const query = useMemo(() => new FindingsQuery(data?.findings ?? []), [data]);
+  const rows = useMemo(() => query.filter(only), [query, only]);
 
-  const diskBytes = rows.filter((f) => f.source === 'disk').reduce((a, f) => a + f.bytes, 0);
-  const cliBytes = rows.filter((f) => f.source === 'cli').reduce((a, f) => a + f.bytes, 0);
+  // Ozet, AKTIF kaynak filtresine gore gosterilen listeden alinir.
+  const { diskBytes, cliBytes, diskCount, cliCount } = query.totals(rows);
 
   return (
     <section className="findings" aria-label={t('Birleşik')}>
@@ -55,14 +54,14 @@ export function FindingsView({ onFocus, focusedId }: Props) {
           <span className="strip-label">{t('Disk')}</span>
           <span className="strip-value mono">{formatBytes(diskBytes)}</span>
           <span className="strip-sub dim">
-            {t('{n} küme', { n: rows.filter((f) => f.source === 'disk').length })}
+            {t('{n} küme', { n: diskCount })}
           </span>
         </div>
         <div className="strip-item">
           <span className="strip-label">{t("CLI'lar")}</span>
           <span className="strip-value mono">{formatBytes(cliBytes)}</span>
           <span className="strip-sub dim">
-            {t('{n} araç', { n: rows.filter((f) => f.source === 'cli').length })}
+            {t('{n} araç', { n: cliCount })}
           </span>
         </div>
         <div className="triage" role="group" aria-label={t('Kaynak')}>

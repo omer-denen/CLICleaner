@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CliInventory, CliStatus, CliTool } from '../../../src/core/cli-inventory-types.ts';
+import { CliInventoryQuery } from '../../../src/core/cli-inventory-query.ts';
 import type {
   CliExecuteResponse,
   CliInventoryStreamEvent,
@@ -191,34 +192,23 @@ export function CliView({ onError, onNotice }: Props) {
     [loading, liveTools, inventory],
   );
 
-  const tools = useMemo(() => {
-    const sorted = [...allTools].sort(
-      (a, b) => statusOrder(a.status) - statusOrder(b.status) || b.totalBytes - a.totalBytes,
-    );
-    return filter === 'all' ? sorted : sorted.filter((x) => x.status === filter);
-  }, [allTools, filter]);
+  /** Envanter sorgusu MOTORDA yapilir (`src/core/cli-inventory-query.ts`). */
+  const cliQuery = useMemo(() => new CliInventoryQuery(allTools), [allTools]);
+  const tools = useMemo(() => cliQuery.filter(filter), [cliQuery, filter]);
 
-  const unused = inventory?.tools.filter((x) => x.status === 'unused') ?? [];
-  const unusedBytes = unused.reduce((a, x) => a + x.totalBytes, 0);
+  const invQuery = useMemo(() => new CliInventoryQuery(inventory?.tools ?? []), [inventory]);
+  const invCounts = invQuery.counts();
+
+  const unused = invQuery.unused();
+  const unusedBytes = invQuery.unusedBytes();
 
   // Bozuk kurulumlar: ayni paketin birden fazla komutu varsa tek kart.
-  const brokenTools = useMemo(() => {
-    const map = new Map<string, CliTool>();
-    for (const tool of inventory?.tools ?? []) {
-      if (tool.health !== 'broken') continue;
-      const key = `${tool.source}:${tool.packageName}@${tool.version}`;
-      if (!map.has(key)) map.set(key, tool);
-    }
-    return [...map.values()];
-  }, [inventory]);
+  const brokenTools = useMemo(() => cliQuery.broken(), [cliQuery]);
 
   // Karantina yalnizca paket yoneticisi olmayan (standalone) araclar icin.
-  const standaloneTools = useMemo(
-    () => (inventory?.tools ?? []).filter((x) => x.source === 'standalone' && x.shims.length > 0),
-    [inventory],
-  );
+  const standaloneTools = useMemo(() => cliQuery.standalone(), [cliQuery]);
 
-  const selectable = (x: CliTool) => x.status !== 'protected' && x.uninstall !== null;
+  const selectable = CliInventoryQuery.isRemovable;
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -427,15 +417,14 @@ export function CliView({ onError, onNotice }: Props) {
           </div>
           <div className="card">
             <span className="card-label">{t('Bilinmiyor')}</span>
-            <strong>{inventory.tools.filter((x) => x.status === 'unknown').length}</strong>
+            <strong>{invCounts.unknown}</strong>
             <span className="dim">{t('Son sinyal')}</span>
           </div>
           <div className="card">
             <span className="card-label">{t('Korunan')}</span>
-            <strong>{inventory.tools.filter((x) => x.status === 'protected').length}</strong>
-            <span className="dim">{t('Yedek')}: {inventory.tools.filter((x) => x.stateDirs.length > 0).length}</span>
-          </div>
-        </div>
+            <strong>{invCounts.protected}</strong>
+            <span className="dim">{t('Yedek')}: {invCounts.withStateDirs}</span>
+          </div>        </div>
       )}
 
       {brokenTools.length > 0 && (
@@ -989,18 +978,6 @@ const STATUS_LABEL: Record<CliStatus, string> = {
 };
 
 /** Sunucudaki siralama ile ayni: once atil, sonra bilinmiyor, yakinda, korunan. */
-function statusOrder(status: CliStatus): number {
-  switch (status) {
-    case 'unused':
-      return 0;
-    case 'unknown':
-      return 1;
-    case 'recent':
-      return 2;
-    case 'protected':
-      return 3;
-  }
-}
 
 function idleDaysLabel(days: number, lang: 'tr' | 'en'): string {
   if (!Number.isFinite(days)) return '?';

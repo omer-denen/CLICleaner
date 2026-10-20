@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { PlanResponse, RiskLevel } from '../../../src/web/contract.ts';
+import type { PlanResponse } from '../../../src/web/contract.ts';
+import { ScanSummary } from '../../../src/core/scan-summary.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 import { RISK_LABEL, shortPath } from '../labels.ts';
@@ -34,8 +35,6 @@ interface Props {
   onDeselect: (key: string) => void;
 }
 
-const RISK_ORDER: RiskLevel[] = ['high', 'medium', 'low', 'safe'];
-
 export function PlanWorkspace({
   plan,
   protectedCount,
@@ -57,14 +56,7 @@ export function PlanWorkspace({
     return () => clearInterval(id);
   }, []);
 
-  const groups = useMemo(
-    () =>
-      RISK_ORDER.map((risk) => ({
-        risk,
-        clusters: view.clusters.filter((c) => c.risk === risk),
-      })).filter((g) => g.clusters.length > 0),
-    [view.clusters],
-  );
+  const groups = useMemo(() => ScanSummary.groupByRisk(view.clusters, (c) => c.risk), [view.clusters]);
 
   const flatRows = useMemo(() => groups.flatMap((g) => g.clusters), [groups]);
 

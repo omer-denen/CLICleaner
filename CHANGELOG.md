@@ -1,7 +1,14 @@
 # Değişiklik Günlüğü
 
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
-Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
+Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
+
+## [Unreleased]
+
+### İyileştirildi
+
+- Liste filtreleri, sıralama ve "tümünü planla" kapsamı artık tek bir merkezden
+  hesaplanır; sonuçlar tüm ekranlarda ve her iki arayüzde aynı çıkar.
 
 ## [1.0.0] - 2026-10-21
 

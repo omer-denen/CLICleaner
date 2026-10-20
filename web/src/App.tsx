@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { groupByVerdict } from '../../src/core/merge.ts';
-import { defaultSelected } from '../../src/core/selection.ts';
-import { formatBytes, formatCount, daysSince } from '../../src/util/format.ts';
-import type { Cluster, ScanResult } from '../../src/core/types.ts';
+import { DefaultSelection } from '../../src/core/selection.ts';
+import { formatBytes } from '../../src/util/format.ts';
+import type { ScanResult } from '../../src/core/types.ts';
 import type {
   DeleteMode,
   DesktopShortcutView,
   ExecuteEvent,
   FindingView,
   PlanResponse,
-  RiskLevel,
   ScanStatusResponse,
   ScanStreamEvent,
   SettingsResponse,
@@ -48,10 +47,16 @@ import { useI18n } from './i18n.tsx';
 import { VERDICT_HINT } from './labels.ts';
 import {
   agentClutter,
-  categoryOf,
   categoryStats,
   type CategoryKey,
 } from '../../src/core/categories.ts';
+import {
+  ClusterQuery,
+  type KindFilter,
+  type SortMode,
+} from '../../src/core/cluster-query.ts';
+import { SelectionScope } from '../../src/core/selection-scope.ts';
+import { ScanSummary } from '../../src/core/scan-summary.ts';
 import {
   EMPTY_LIVE_SCAN,
   EMPTY_SCAN_PROGRESS,
@@ -61,15 +66,6 @@ import {
 import { createSseBatcher, type SseBatcher } from './util/sse-batch.ts';
 
 type Phase = 'idle' | 'scanning' | 'review' | 'planning' | 'confirm' | 'deleting' | 'done';
-type KindFilter = 'all' | 'recommend' | 'ask' | 'report-only' | 'keep' | 'git';
-type SortMode = 'size' | 'risk' | 'recent' | 'name';
-
-/** Risk siralama: once yuksek risk, en sonda guvenli. */
-const RISK_ORDER: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2, safe: 3 };
-
-/** Triyaj esikleri (P1): "buyuk", "riskli" ve "zombi" filtreleri. */
-const TRIAGE_BIG_BYTES = 1024 * 1024 * 1024;
-const TRIAGE_ZOMBIE_DAYS = 30;
 
 interface DeletingState {
   index: number;
@@ -295,7 +291,7 @@ export default function App() {
       if (!latest.scan) return;
       setScan(latest.scan);
       setScanId(null);
-      setSelected(defaultSelection(latest.scan));
+      setSelected(DefaultSelection.keys(latest.scan.clusters));
       setLastScanAt(latest.at ?? latest.scan.finishedAt);
       setPhase('review');
     } catch (e) {
@@ -384,7 +380,7 @@ export default function App() {
           closeStream();
           setScanBatch({ live: EMPTY_LIVE_SCAN, progress: EMPTY_SCAN_PROGRESS });
           setScan(data.result);
-          setSelected(defaultSelection(data.result));
+          setSelected(DefaultSelection.keys(data.result.clusters));
           setLastScanAt(Date.now());
           void refreshScanStatus();
           setPhase('review');
@@ -393,8 +389,8 @@ export default function App() {
           // Kalici bir isaret degil: "Tamam" denince liste gorunur.
           setScanDone({
             clusters: data.result.clusters.length,
-            totalBytes: data.result.clusters.reduce((a, c) => a + c.totalBytes, 0),
-            reclaimableBytes: data.result.clusters.reduce((a, c) => a + c.reclaimableBytes, 0),
+            totalBytes: (new ScanSummary(data.result.clusters).totals().totalBytes),
+            reclaimableBytes: (new ScanSummary(data.result.clusters).totals().reclaimableBytes),
             durationMs: data.result.finishedAt - data.result.startedAt,
           });
         } else if (data.type === 'cancelled') {
@@ -466,7 +462,7 @@ export default function App() {
         if (latest.scan) {
           setScan(latest.scan);
           setScanId(null);
-          setSelected(defaultSelection(latest.scan));
+          setSelected(DefaultSelection.keys(latest.scan.clusters));
           setLastScanAt(latest.at ?? latest.scan.finishedAt);
           setPhase('review');
         }
@@ -482,54 +478,39 @@ export default function App() {
 
   const groups = useMemo(() => (scan ? groupByVerdict(scan.clusters) : null), [scan]);
 
+  /**
+   * Gorunen liste: filtre + arama + siralama MOTORDA yapilir
+   * (`src/core/cluster-query.ts`). Arayuz yalnizca sonucu gosterir.
+   */
   const activeItems = useMemo(() => {
     if (!scan) return [];
-    const f = filter.trim().toLowerCase();
-    const match = (c: Cluster) =>
-      !f ||
-      c.title.toLowerCase().includes(f) ||
-      c.key.toLowerCase().includes(f) ||
-      c.verdict.what.toLowerCase().includes(f) ||
-      c.parts.some((p) => p.path.toLowerCase().includes(f));
-
-    let base: Cluster[];
-    if (kindFilter === 'all') base = scan.clusters;
-    else if (kindFilter === 'git') base = scan.clusters.filter((c) => (c.evidence.markers ?? []).includes('git-tracked'));
-    else base = (groups?.[kindFilter] ?? []);
-    // Sol sutun kategorisi AYRICA bir filtre: ustune birlikte uygulanir.
-    if (category !== 'all') base = base.filter((c) => categoryOf(c) === category);
-    // Triyaj cipleri: kucuk/guvenli/yeni kumeleri hizla eler.
-    if (triage.big) base = base.filter((c) => c.reclaimableBytes >= TRIAGE_BIG_BYTES);
-    if (triage.risky)
-      base = base.filter((c) => c.verdict.risk === 'medium' || c.verdict.risk === 'high');
-    if (triage.zombie) base = base.filter((c) => daysSince(c.lastTouched) >= TRIAGE_ZOMBIE_DAYS);
-    return [...base].filter(match).sort((a, b) => compareClusters(a, b, sortMode));
-  }, [scan, groups, filter, kindFilter, sortMode, category, triage]);
+    return new ClusterQuery(scan.clusters).filter({
+      text: filter,
+      kind: kindFilter,
+      category,
+      triage,
+      sort: sortMode,
+    });
+  }, [scan, filter, kindFilter, sortMode, category, triage]);
 
   /** Sol sutun: kategori ozeti + saglik olcumleri (yalniz tarama sonucundan). */
   const cats = useMemo(() => categoryStats(scan?.clusters ?? []), [scan]);
   const aiRatio = useMemo(() => agentClutter(scan?.clusters ?? []), [scan]);
   const scannedBytes = useMemo(
-    () => (scan?.clusters ?? []).reduce((a, c) => a + c.totalBytes, 0),
+    () => new ScanSummary(scan?.clusters ?? []).totals().totalBytes,
     [scan],
   );
   const scannedReclaimable = useMemo(
-    () => (scan?.clusters ?? []).reduce((a, c) => a + c.reclaimableBytes, 0),
+    () => new ScanSummary(scan?.clusters ?? []).totals().reclaimableBytes,
     [scan],
   );
 
-  const selectedClusters = useMemo(
-    () => (scan?.clusters ?? []).filter((c) => selected.has(c.key)),
+  const selectedTotals = useMemo(
+    () => new SelectionScope(scan?.clusters ?? []).totals(selected),
     [scan, selected],
   );
-  const selectedBytes = useMemo(
-    () => selectedClusters.reduce((a, c) => a + c.reclaimableBytes, 0),
-    [selectedClusters],
-  );
-  const targetCount = useMemo(
-    () => selectedClusters.reduce((a, c) => a + (c.deleteTargets?.length ?? 0), 0),
-    [selectedClusters],
-  );
+  const selectedBytes = selectedTotals.bytes;
+  const targetCount = selectedTotals.targetCount;
 
   const toggleSelect = useCallback((key: string) => {
     setSelected((prev) => {
@@ -635,8 +616,7 @@ export default function App() {
       setSelected((prev) => {
         const next = new Set(prev);
         for (const c of activeItems) {
-          const selectable = c.verdict.kind !== 'report-only' && (c.deleteTargets?.length ?? 0) > 0;
-          if (!selectable) continue;
+          if (!SelectionScope.isSelectable(c)) continue;
           if (on) next.add(c.key);
           else next.delete(c.key);
         }
@@ -656,8 +636,7 @@ export default function App() {
     setSelected((prev) => {
       const next = new Set(prev);
       for (const c of scan.clusters) {
-        if (c.verdict.kind === 'report-only' || c.verdict.kind === 'keep') continue;
-        if ((c.deleteTargets?.length ?? 0) === 0) continue;
+        if (!SelectionScope.isPlannable(c)) continue;
         next.add(c.key);
       }
       return next;
@@ -665,13 +644,7 @@ export default function App() {
   }, [scan]);
 
   const reclaimableSelectable = useMemo(
-    () =>
-      (scan?.clusters ?? []).filter(
-        (c) =>
-          c.verdict.kind !== 'report-only' &&
-          c.verdict.kind !== 'keep' &&
-          (c.deleteTargets?.length ?? 0) > 0,
-      ).length,
+    () => new SelectionScope(scan?.clusters ?? []).plannableCount(),
     [scan],
   );
 
@@ -709,18 +682,7 @@ export default function App() {
    * silme hedefi OLAN kumeler. "Nuke All" YOKTUR: buton yalnizca PLAN
    * uretir; uygulama icin ayrica yazili onay gerekir.
    */
-  const scopeKeys = useMemo(
-    () =>
-      activeItems
-        .filter(
-          (c) =>
-            c.verdict.kind !== 'report-only' &&
-            c.verdict.kind !== 'keep' &&
-            (c.deleteTargets?.length ?? 0) > 0,
-        )
-        .map((c) => c.key),
-    [activeItems],
-  );
+  const scopeKeys = useMemo(() => new SelectionScope(activeItems).planScopeKeys(), [activeItems]);
 
   const planAll = useCallback(async () => {
     if (scopeKeys.length === 0) return;
@@ -1158,7 +1120,7 @@ export default function App() {
           <StatusStrip
             scan={scan}
             selectedBytes={selectedBytes}
-            selectedCount={selectedClusters.length}
+            selectedCount={selectedTotals.clusterCount}
             targetCount={targetCount}
             reclaimableSelectable={reclaimableSelectable}
             onSelectReclaimable={selectReclaimable}
@@ -1240,7 +1202,7 @@ export default function App() {
                   {s.key === 'all'
                     ? scan.clusters.length
                     : s.key === 'git'
-                      ? scan.clusters.filter((c) => (c.evidence.markers ?? []).includes('git-tracked')).length
+                      ? new ScanSummary(scan.clusters).gitTrackedCount()
                       : (groups?.[s.key]?.length ?? 0)}
                 </span>
               </button>
@@ -1295,7 +1257,7 @@ export default function App() {
               <span className="dim">
                 {' '}
                 {t('seçili · {clusters} küme · {targets} hedef', {
-                  clusters: selectedClusters.length,
+                  clusters: selectedTotals.clusterCount,
                   targets: targetCount,
                 })}
               </span>
@@ -1683,30 +1645,6 @@ export default function App() {
 }
 
 /** Liste siralamasi: boyut, risk, son hareket veya ad. */
-function compareClusters(a: Cluster, b: Cluster, mode: SortMode): number {
-  switch (mode) {
-    case 'risk': {
-      const d = RISK_ORDER[a.verdict.risk] - RISK_ORDER[b.verdict.risk];
-      return d !== 0 ? d : b.reclaimableBytes - a.reclaimableBytes;
-    }
-    case 'recent':
-      return b.lastTouched - a.lastTouched;
-    case 'name':
-      return a.title.localeCompare(b.title);
-    case 'size':
-    default:
-      return b.reclaimableBytes - a.reclaimableBytes;
-  }
-}
-
-function defaultSelection(result: ScanResult): Set<string> {
-  const out = new Set<string>();
-  for (const c of result.clusters) {
-    if (defaultSelected(c)) out.add(c.key);
-  }
-  return out;
-}
-
 function errText(e: unknown): string {
   if (e instanceof ApiError) return e.message;
   return e instanceof Error ? e.message : String(e);

@@ -253,6 +253,18 @@ Marka adı yalnızca kullanıcı yolunda görünür; motor yapıyı okur.
 
 > **Durum: SIRA SONRASI.** Klavye/a11y taraması, boş durumlar, odak halkaları,
 > hata mesajları, tekrar eden metinlerin temizlenmesi.
+>
+> **Ön adım TAMAMLANDI (20.10.2026): motor/ayrım ayrımı.** Filtre, arama,
+> sıralama, plan kapsamı, seçim özeti ve kanıt yorumu artık `src/core/`
+> içindedir; `web/src` yalnızca **gösterir**. Motor, her biri tek
+> sorumluluğu taşıyan ayrı sınıflar halinde yazıldı:
+> `ClusterQuery` (liste) · `SelectionScope` (seçim/plan kapsamı) ·
+> `ScanSummary` (özetler) · `CliInventoryQuery` (envanter) ·
+> `FindingsQuery` (birleşik bulgular) · `EvidenceReader` (kanıt yorumu).
+> Bu, "liste bazlı seçim işlemleri" için arayüzün tek doğru yeri olduğu
+> fikrini kod seviyesinde garanti eder: CLI ile web aynı soruya aynı cevabı
+> verir. Test: `scratch/test-cluster-query.ts` (52/52) ·
+> `scratch/test-cli-query.ts` (31/31) · CDP 24/24.
 
 - Odak/hover takibi, `Enter` ile sabitleme.
 - Kanıt, bağımlılık ağacı, deterministik yorum, komut kopyalama.

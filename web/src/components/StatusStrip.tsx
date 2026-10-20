@@ -1,4 +1,5 @@
 import type { ScanResult } from '../../../src/core/types.ts';
+import { ScanSummary } from '../../../src/core/scan-summary.ts';
 import { formatBytes, formatCount } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 
@@ -30,12 +31,13 @@ export function StatusStrip({
 }: Props) {
   const { t } = useI18n();
 
-  const total = scan.clusters.reduce((a, c) => a + c.totalBytes, 0);
-  const reclaim = scan.clusters.reduce((a, c) => a + c.reclaimableBytes, 0);
-  const rec = scan.clusters.filter((c) => c.verdict.kind === 'recommend').length;
-  const ask = scan.clusters.filter((c) => c.verdict.kind === 'ask').length;
-  const ro = scan.clusters.filter((c) => c.verdict.kind === 'report-only').length;
-  const files = scan.clusters.reduce((a, c) => a + c.parts.reduce((b, p) => b + p.files, 0), 0);
+  const summary = new ScanSummary(scan.clusters);
+  const { totalBytes: total, reclaimableBytes: reclaim } = summary.totals();
+  const counts = summary.verdictCounts();
+  const rec = counts.recommend;
+  const ask = counts.ask;
+  const ro = counts['report-only'];
+  const files = summary.fileCount();
 
   return (
     <section className="strip" aria-label={t('Özet')}>
