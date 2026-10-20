@@ -1,4 +1,5 @@
 import { stat, readdir, readFile } from 'node:fs/promises';
+import { readdirSync, statSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { longPath } from '../util/longpath.ts';
 import { debug, warn } from '../util/log.ts';
@@ -16,6 +17,7 @@ import type {
   Part,
   Regenerability,
   Risk,
+  SensitiveAllow,
   Verdict,
 } from './types.ts';
 import { daysSince, formatAge } from '../util/format.ts';
@@ -34,6 +36,8 @@ export interface ClassifyOptions {
   minAgeDays?: number;
   /** Iptal sinyali: yurume durur, yarim sonuc kumeye cevrilmez. */
   signal?: AbortSignal;
+  /** T28: hassas siniflarin (gecmis/model/kural) acik izni. */
+  allow?: SensitiveAllow;
 }
 
 /** Ortam tespiti: makinede GPU var mi? */
@@ -88,6 +92,8 @@ export async function classifyPath(
 
   const archetype = detectArchetype(ev, root, w.extensionCounts, probe);
   let reclaimable = estimateReclaimable(archetype, w.bytes, w.extensionCounts);
+  // T28: --nuke-models verildiyse tum model deposu hedeflenir.
+  if (archetype === 'model-store' && opts.allow?.models) reclaimable = w.bytes;
 
   // T32: pnpm/bun ana klasorleri uygulamayi da icerir. Depo kokü
   // taranan klasorden farkliysa YALNIZCA depo olculur ve hedeflenir.
@@ -129,6 +135,7 @@ export async function classifyPath(
     totalBytes: w.bytes,
     now,
     minAgeDays: opts.minAgeDays ?? 0,
+    allow: opts.allow,
   });
 
   // Her kararin gerekcesi kaydedilir: "bu klasor neden guvenli sayildi"
@@ -177,7 +184,27 @@ export async function classifyPath(
   // --- Gercek silme hedefleri ---
   // Kume seviyesindeki "silinebilir" bayt tek basina yeterli degildir;
   // hangi YOLUN ne kadarinin silineceği burada belirlenir.
-  const rawTargets = buildDeleteTargets(root, archetype, sub, w.bytes, now, ev);
+  // T28: hassas siniflar (sohbet gecmisi / kural dosyalari) yalnizca
+  // ilgili bayrak verildiyse hedef uretir. Proje ici taramalar bu kapiya
+  // dahil DEGILDIR (AGENTS kural 9 korunur).
+  const projectLike = archetype === 'project-workspace' || archetype === 'project-artifact';
+  const sensitive = projectLike ? [] : buildSensitiveTargets(root, ev, opts.allow);
+  if (sensitive.length > 0) {
+    verdict.kind = 'ask';
+    verdict.risk = 'high';
+    verdict.preconditions.push(
+      'Hassas veri: geri gelmez; once yedekle, iki asamali onay korunur',
+    );
+    verdict.consequence += ` Yalnizca acik bayrakla acildi (${sensitive
+      .map((t) => t.label.split(' (')[1]?.replace(')', '') ?? '')
+      .filter(Boolean)
+      .join(', ')}).`;
+    verdict.because.push('Hassas sinif: kullanici acikca istedi');
+  }
+  const rawTargets = [
+    ...buildDeleteTargets(root, archetype, sub, w.bytes, now, ev, opts.allow),
+    ...sensitive,
+  ];
   // T32: depo alt klasoru hedefleniyorsa boyutu olculmus degerden al.
   if (ev.cacheRoot) {
     for (const t of rawTargets) {
@@ -207,32 +234,31 @@ export async function classifyPath(
   // arac bozuk gorunur. Hedef yoksa karar en kotu "dogrulama"ya iner.
   if (targets.length === 0) enforceTargetConsistency(verdict, root, archetype);
 
-  // Electron onbellegi hedeflerinin gercek boyutunu olc
-  if (archetype === 'electron-app-data' && targets.length > 0) {
+  // Boyutu 0 olan hedefleri (Electron onbellegi, hassas klasorler) GERCEK
+  // yoldan olc. Tek yerde yapilir; olcum sonucu bos kalan hedef dusurulur.
+  let finalTargets = targets;
+  if (targets.some((t) => t.bytes === 0)) {
     const measured = await Promise.all(
       targets.map(async (t) => {
-        const cw = await walk({ root: t.path, largeThreshold: Infinity, maxLarge: 0 });
+        if (t.bytes > 0) return t;
+        const cw = await walk({
+          root: t.path,
+          largeThreshold: Infinity,
+          maxLarge: 0,
+          signal: opts.signal,
+        });
         return { ...t, bytes: cw.bytes };
       }),
     );
-    const alive = measured.filter((t) => t.bytes > 0);
-    // Olcum sonucu hedef kalmadiysa karar da "onerilen" kalamaz:
-    // aksi halde kullaniciya silinecek yol yokken "onerilen" denirdi.
-    if (alive.length === 0) enforceTargetConsistency(verdict, root, archetype);
-    return {
-      key,
-      title: verdict.title,
-      archetype,
-      parts: [part],
-      subparts: sub,
-      deleteTargets: alive,
-      totalBytes: w.bytes,
-      reclaimableBytes: alive.reduce((a, b) => a + b.bytes, 0),
-      lastTouched: w.lastTouched,
-      evidence: ev,
-      verdict,
-    };
+    finalTargets = measured.filter((t) => t.bytes > 0);
+    // Olcum sonucu hedef kalmadiysa karar "onerilen" kalamaz.
+    if (finalTargets.length === 0) enforceTargetConsistency(verdict, root, archetype);
   }
+
+  const targetBytes = finalTargets.reduce((a, t) => a + t.bytes, 0);
+  const measuredArchetype =
+    archetype === 'electron-app-data' || sensitive.length > 0 || (archetype === 'model-store' && opts.allow?.models);
+  if (measuredArchetype) reclaimable = Math.max(reclaimable, targetBytes);
 
   return {
     key,
@@ -240,7 +266,7 @@ export async function classifyPath(
     archetype,
     parts: [part],
     subparts: sub,
-    deleteTargets: targets,
+    deleteTargets: finalTargets,
     totalBytes: w.bytes,
     reclaimableBytes: reclaimable,
     lastTouched: w.lastTouched,
@@ -283,6 +309,7 @@ function buildDeleteTargets(
   totalBytes: number,
   now: number,
   ev?: Evidence,
+  allow?: SensitiveAllow,
 ): DeleteTarget[] {
   switch (archetype) {
     case 'virtual-disk':
@@ -303,7 +330,19 @@ function buildDeleteTargets(
       ];
 
     case 'model-store': {
-      // Yalnizca bilesik parcalar (kullanilamayan GPU runtime/varyant)
+      // T28: --nuke-models verilmedikce YALNIZCA bilesik parcalar
+      // (kullanilamayan GPU runtime/varyant) hedeflenir. Bayrakla tum
+      // model deposu hedef olur; risk yuksektir.
+      if (allow?.models) {
+        return [
+          {
+            path: root,
+            kind: 'whole',
+            label: `${baseName(root)} — TUM model deposu (--nuke-models)`,
+            bytes: totalBytes,
+          },
+        ];
+      }
       return sub.map((s) => ({
         path: s.path,
         kind: 'whole' as const,
@@ -383,6 +422,61 @@ function buildDeleteTargets(
     default:
       return [];
   }
+}
+
+/**
+ * T28: yalnizca acik bayrakla uretilen hassas hedefler.
+ *
+ * - `--clear-history`: koke dogrudan bagli sessions/history/chats klasorleri.
+ * - `--reset-rules`:   `rules/` klasoru veya kokteki `*.rules` dosyalari.
+ *
+ * Klasorun TAMAMI hedeflenmez; yalnizca kanitla bulunan alt yollar.
+ * Proje taramalari bu fonksiyonu cagirmaz (AGENTS kural 9).
+ */
+function buildSensitiveTargets(
+  root: string,
+  ev: Evidence,
+  allow?: SensitiveAllow,
+): DeleteTarget[] {
+  if (!allow || (!allow.history && !allow.rules)) return [];
+  const markers = new Set((ev.markers ?? []).map((m) => m.toLowerCase()));
+  const out: DeleteTarget[] = [];
+  const seen = new Set<string>();
+  const push = (path: string, label: string) => {
+    const k = path.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ path, kind: 'whole', label, bytes: 0 });
+  };
+  const addDir = (name: string, flag: string) => {
+    const p = `${root}\\${name}`;
+    try {
+      if (statSync(longPath(p)).isDirectory()) push(p, `${name} — ${flag}`);
+    } catch {
+      /* yok */
+    }
+  };
+
+  if (allow.history && markers.has('chat-history')) {
+    for (const n of ['sessions', 'history', 'conversations', 'chats']) {
+      addDir(n, 'sohbet gecmisi (--clear-history)');
+    }
+  }
+
+  if (allow.rules && markers.has('rules-files')) {
+    addDir('rules', 'kural dosyalari (--reset-rules)');
+    try {
+      for (const e of readdirSync(longPath(root), { withFileTypes: true }).slice(0, 300)) {
+        if (e.isFile() && /\.rules$/i.test(e.name)) {
+          push(`${root}\\${e.name}`, `${e.name} — kural dosyasi (--reset-rules)`);
+        }
+      }
+    } catch {
+      /* okunamadi */
+    }
+  }
+
+  return out;
 }
 
 function baseName(p: string): string {
@@ -1102,6 +1196,7 @@ function decide(ctx: {
   totalBytes: number;
   now: number;
   minAgeDays: number;
+  allow?: SensitiveAllow;
 }): Verdict {
   const base = decideBase(ctx);
   let regenerability: Regenerability = REGENERABILITY[ctx.archetype] ?? 'unknown';
@@ -1143,8 +1238,9 @@ function decideBase(ctx: {
   totalBytes: number;
   now: number;
   minAgeDays: number;
+  allow?: SensitiveAllow;
 }): Omit<Verdict, 'regenerability' | 'confidence'> {
-  const { archetype, ev, root, reclaimable, totalBytes, now, minAgeDays } = ctx;
+  const { archetype, ev, root, reclaimable, totalBytes, now, minAgeDays, allow } = ctx;
   const name = displayName(ev, root);
   const age = daysSince(ev.lastTouched ?? 0, now);
   const because: string[] = [];
@@ -1197,6 +1293,19 @@ function decideBase(ctx: {
 
   // ---- MODEL DEPOSU ----
   if (archetype === 'model-store') {
+    // T28: --nuke-models acikca verilmedikce TUM depo hedeflenmez.
+    if (allow?.models) {
+      return {
+        risk: 'high',
+        kind: 'ask',
+        title: `${name} — TUM model deposu (--nuke-models)`,
+        what: 'Indirilmis tum model agirliklari, tokenizer dosyalari ve calistirma kutuphaneleri.',
+        consequence:
+          'TUM model deposu silinecek. Modeller yeniden indirilir; bu saatler/gunler surebilir ve internet gerektirir. CPU modelleri de dahildir.',
+        because: [...because, 'Kullanici --nuke-models bayragiyla acikca istedi'],
+        preconditions: ['Uygulama kapali olmali', 'Yeniden indirme maliyetini goze al'],
+      };
+    }
     const cpuOnly = /Device: CPU|CPUExecutionProvider/i.test(logs.map((l) => l.line).join(' '));
     const gpuVariants = (ev.largeFiles ?? []).filter((f) => /gpu|cuda|trt/i.test(f.relPath));
     const gpuAbsent = GPU_STATE ? !GPU_STATE.hasNvidia : false;
@@ -1301,16 +1410,25 @@ function decideBase(ctx: {
   // ---- AGENT CALISMA ALANI: oturum gecmisi var ----
   if (archetype === 'agent-workspace') {
     const hasSessions = (ev.markers ?? []).some((m) => /session|memory|skill/i.test(m));
+    const history = (ev.markers ?? []).includes('chat-history');
     return {
-      risk: 'medium',
+      risk: allow?.history && history ? 'high' : 'medium',
       kind: 'ask',
       title: `${name} — AI ajan calisma alani`,
       what: 'Ajanin oturum gecmisi, becerileri, hafizasi ve onbellegi.',
       consequence: hasSessions
         ? 'SILMEZ: eski oturumlar ve ogrenilmis beceriler kaybolur.'
         : 'Onbellek ve gunlukler silinir; ajan yeniden indirme yapar.',
-      because,
-      preconditions: ['Ajanin kapali oldugundan emin ol'],
+      because: [
+        ...because,
+        ...(allow?.history && history
+          ? ['--clear-history: yalnizca sohbet/oturum klasorleri hedeflenir']
+          : []),
+      ],
+      preconditions: [
+        'Ajanin kapali oldugundan emin ol',
+        ...(allow?.history && history ? ['Sohbet gecmisi geri gelmez; once yedekle'] : []),
+      ],
     };
   }
 

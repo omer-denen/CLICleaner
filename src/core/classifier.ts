@@ -214,6 +214,15 @@ export async function probeDir(path: string): Promise<Probe> {
       }
       // Ajan calisma alani isaretleri: beceri, oturum, hafiza.
       if (AGENT_DIR_MARKERS.has(n)) p.markers.push(e.name);
+      // T28: sohbet gecmisi klasorleri (ad tek basina KAPI DEGIL; yalnizca
+      // --clear-history ile hedef uretilir).
+      if (n === 'sessions' || n === 'history' || n === 'conversations' || n === 'chats') {
+        p.markers.push('chat-history');
+      }
+      // T28: kural klasoru (icinde .rules / rules.json olmali).
+      if (n === 'rules' && (await probeRulesDir(`${path}\\${e.name}`))) {
+        p.markers.push('rules-files');
+      }
       // Vektor/embedding alt klasoru (or. "<ad>.lance" veri kumesi).
       if (EMBEDDING_EXT_RE.test(e.name)) {
         p.vectorStore = true;
@@ -249,6 +258,10 @@ export async function probeDir(path: string): Promise<Probe> {
       if (CUDA_DLL_RE.test(e.name) || ORT_DLL_RE.test(e.name)) {
         p.fileKinds.push('cuda-runtime');
       }
+      // T28: kural dosyalari ve sohbet gecmisi. Bunlar yalnizca ilgili
+      // bayrak verilirse silme hedefine donusur.
+      if (/\.rules$/i.test(e.name)) p.markers.push('rules-files');
+      if (/chat.*\.json$|[-_.]chat\.json$/i.test(e.name)) p.markers.push('chat-history');
       // Ajan beceri kilidi (kurulu becerilerin kaynagi ve hash'i).
       if (e.name.toLowerCase() === '.skill-lock.json') p.markers.push('skill-lock');
       // Squirrel tarzi guncelleyici ikilisi: surum klasorlerini yonetir.
@@ -691,6 +704,19 @@ async function probeProjectArtifact(path: string, p: Probe): Promise<void> {
     if (localDeps) p.markers.push('local-path-deps');
     return;
   }
+}
+
+/**
+ * `rules/` klasoru gercekten kural dosyalari mi iceriyor? (T28)
+ * Genel "rules" adi tek basina kanit degildir; icerikte .rules veya
+ * rules.json olmalidir. Yalnizca ilk 40 girdiye bakilir.
+ */
+async function probeRulesDir(dir: string): Promise<boolean> {
+  const ents = await readdirSafe(dir);
+  if (!ents) return false;
+  return ents.slice(0, 40).some(
+    (e) => e.isFile() && (/\.rules$/i.test(e.name) || e.name.toLowerCase() === 'rules.json'),
+  );
 }
 
 /** Kucuk JSON dosyasini guvenli okur (manifest disi veri sayilmaz). */

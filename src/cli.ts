@@ -64,6 +64,12 @@ ${C.bold}Sadece clean icin${C.reset}
   --dry-run          Sadece plani goster, hicbir sey silme
   -y, --yes          Onay sormadan calistir
 
+${C.bold}Hassas siniflar (yalnizca acikca istenirse)${C.reset}
+  --clear-history    Sohbet/oturum gecmisi klasorlerini plana dahil et
+  --nuke-models      TUM model depolarini plana dahil et (DANGER)
+  --reset-rules      Kural dosyalarini plana dahil et (rules/*.rules)
+  ${C.gray}Not: bu bayraklar risk sinifini DEGISTIRMEZ; iki asamali onay korunur.${C.reset}
+
 ${C.bold}Web arayuzu icin${C.reset}
   --port <n>         Sabit port (varsayilan: bos port otomatik secilir)
   --browser <ad>     Acilacak tarayici: edge (varsayilan) | default
@@ -148,6 +154,7 @@ async function main(): Promise<void> {
     let purge = false;
     let yes = false;
     let dryRun = false;
+    const allow: { history?: boolean; models?: boolean; rules?: boolean } = {};
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
@@ -158,9 +165,12 @@ async function main(): Promise<void> {
       else if (a === '--purge') purge = true;
       else if (a === '--yes' || a === '-y') yes = true;
       else if (a === '--dry-run') dryRun = true;
+      else if (a === '--clear-history') allow.history = true;
+      else if (a === '--nuke-models') allow.models = true;
+      else if (a === '--reset-rules') allow.rules = true;
     }
 
-    await runClean({ envs, profile, purge, yes, only, exclude, dryRun });
+    await runClean({ envs, profile, purge, yes, only, exclude, dryRun, allow });
     return;
   }
 

@@ -3,7 +3,7 @@ import { deleteTarget, Journal, buildPlan, closeRecycle, type DeleteMode } from 
 import { renderPlan, confirmPlan } from '../actions/confirm.ts';
 import { formatBytes } from '../util/format.ts';
 import { info, warn, debug } from '../util/log.ts';
-import type { Env } from '../core/types.ts';
+import type { Env, SensitiveAllow } from '../core/types.ts';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { longPath, prettyPath } from '../util/longpath.ts';
@@ -23,6 +23,12 @@ export interface CleanArgs {
   exclude: string[];
   /** Sadece plani goster; hicbir sey silme (guvenli mod) */
   dryRun?: boolean;
+  /**
+   * T28: hassas siniflar (sohbet gecmisi / modeller / kurallar) varsayilan
+   * olarak plana GIRMEZ; yalnizca acik bayrakla acilir. Iki asamali onay
+   * her durumda korunur.
+   */
+  allow?: SensitiveAllow;
 }
 
 /**
@@ -55,10 +61,22 @@ export async function runClean(args: CleanArgs): Promise<void> {
     includeBytes: true,
     exclude: args.exclude,
     quiet: true,
+    allow: args.allow,
   });
 
   // --- ASAMA 1: listeleme ---
-  const plan = buildPlan(result.clusters, mode, args.only);
+  const plan = buildPlan(result.clusters, mode, args.only, args.allow);
+
+  const flags = [
+    args.allow?.history ? '--clear-history' : '',
+    args.allow?.models ? '--nuke-models' : '',
+    args.allow?.rules ? '--reset-rules' : '',
+  ].filter(Boolean);
+  if (flags.length > 0) {
+    console.log(
+      `${C.red}${C.bold}  Hassas temizlik acik: ${flags.join(' ')}${C.reset} ${C.gray}(iki asamali onay yine gecerli)${C.reset}`,
+    );
+  }
 
   if (plan.targets.length === 0) {
     console.log(`${C.yellow}Silinecek uygun hedef bulunamadi.${C.reset}`);

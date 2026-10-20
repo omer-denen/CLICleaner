@@ -8,7 +8,7 @@ import { walk } from '../core/walker.ts';
 import { longPath } from '../util/longpath.ts';
 import { formatBytes, formatAge, padEnd, padStart } from '../util/format.ts';
 import { info, warn, debug } from '../util/log.ts';
-import type { Cluster, Env, Part, ScanResult, SkippedEntry } from '../core/types.ts';
+import type { Cluster, Env, Part, ScanResult, SensitiveAllow, SkippedEntry } from '../core/types.ts';
 
 export interface ScanArgs {
   envs: Env[];
@@ -30,6 +30,8 @@ export interface ScanArgs {
   onTargetDone?: (path: string, done: number, total: number, cluster: Cluster | null) => void;
   /** Iptal sinyali: yeni kok alinmaz, aktif yurume durur. */
   signal?: AbortSignal;
+  /** T28: hassas siniflarin (gecmis/model/kural) acik izni. */
+  allow?: SensitiveAllow;
 }
 
 /** Tarama: kesif -> olcum -> kanit -> kumelestirme. */
@@ -130,6 +132,7 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
         found = await classifyPath(t.path, t.origin, {
           minAgeDays: args.minAgeDays,
           signal: args.signal,
+          allow: args.allow,
         });
         if (args.signal?.aborted) return;
         if (found) {

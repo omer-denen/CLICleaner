@@ -24,6 +24,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   (nvm / fnm / volta) barındırdığı sürümleri yapıdan tanır; hangi sürümün
   aktif olduğunu gösterir ve eski sürümlerin global paketlerini inceleme
   notuyla listeler. Otomatik seçim veya silme yoktur.
+- **Hassas temizlik bayrakları:** sohbet geçmişi (`--clear-history`),
+  tüm model depoları (`--nuke-models`) ve kural dosyaları (`--reset-rules`)
+  varsayılan olarak plana girmez. Yalnızca açık bayrakla ve iki aşamalı
+  onayla temizlenir.
 - **Daha güvenli inceleme:** sürüm bilgisi ve bozuk kurulum kontrolü,
   bilinmeyen programlar çalıştırılmadan yapılır.
 

@@ -172,6 +172,20 @@ export interface Cluster {
   verdict: Verdict;
 }
 
+/**
+ * T28: hassas siniflarin plana dahil edilmesi icin ACIK kullanici izni.
+ *
+ * Bunlar risk seviyesi DEGIL, "plana dahil edilme kapisi"dir:
+ * varsayilan olarak report-only kalan sohbet gecmisi, model depolar ve
+ * kural dosyalari yalnizca ilgili bayrak verilirse hedeflenir. Iki
+ * asamali onay her durumda korunur.
+ */
+export interface SensitiveAllow {
+  history?: boolean;
+  models?: boolean;
+  rules?: boolean;
+}
+
 export type Risk = 'safe' | 'low' | 'medium' | 'high';
 export type VerdictKind = 'recommend' | 'ask' | 'report-only' | 'keep';
 

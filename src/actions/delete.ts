@@ -2,7 +2,7 @@ import { lstat, rename, rm, stat, readdir } from 'node:fs/promises';
 import type { ChildProcess } from 'node:child_process';
 import { longPath, isDenied, isLongPathError } from '../util/longpath.ts';
 import { debug, error as logError, info, warn } from '../util/log.ts';
-import type { DeleteTarget, Cluster } from '../core/types.ts';
+import type { DeleteTarget, Cluster, SensitiveAllow } from '../core/types.ts';
 import { assertSafeTarget } from './guard.ts';
 import { gitTrackerFor } from '../core/git.ts';
 
@@ -44,11 +44,24 @@ export interface DeletePlan {
   totalBytes: number;
 }
 
+/**
+ * T28: bir kume hangi hassas sinifa ait? Hedefleri varsa bile ilgili
+ * bayrak verilmedikce plana ALINMAZ.
+ */
+function requiredFlag(c: Cluster): keyof SensitiveAllow | null {
+  const m = new Set((c.evidence.markers ?? []).map((x) => x.toLowerCase()));
+  if (m.has('vector-index')) return 'models';
+  if (m.has('chat-history')) return 'history';
+  if (m.has('rules-files')) return 'rules';
+  return null;
+}
+
 /** Kume risk seviyesine gore onay planina cevrilir. */
 export function buildPlan(
   clusters: Cluster[],
   mode: DeleteMode,
   only?: string[],
+  allow?: SensitiveAllow,
 ): DeletePlan {
   const f = only?.map((o) => o.toLowerCase());
 
@@ -57,6 +70,9 @@ export function buildPlan(
 
   for (const c of clusters) {
     if (c.verdict.kind === 'report-only' || c.verdict.kind === 'keep') continue;
+    // T28: hassas siniflar yalnizca acik bayrakla plana girer.
+    const need = requiredFlag(c);
+    if (need && !allow?.[need]) continue;
     if (f && f.length > 0) {
       const hit = f.some(
         (o) => c.key.toLowerCase().includes(o) || c.title.toLowerCase().includes(o),
