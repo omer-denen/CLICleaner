@@ -210,6 +210,50 @@ Marka adı yalnızca kullanıcı yolunda görünür; motor yapıyı okur.
   sayısı/boyutu doğru.
 
 ### P2 — Sağ bağlam paneli
+
+> **Durum: TAMAMLANDI (20.10.2026).** `ContextPanel.tsx` (yeni),
+> `util/evidence-text.ts` (yeni, deterministik kanıt yorumu).
+> Odaklanan/klavye imleci (veya Enter ile sabitlenen) öğenin tüm kanıtı:
+> Ne? / Silersem ne olur? / Neden bu karar? / Kanıt yorumu / Kanıtlar /
+> Bağımlılık ağacı / Güvenli komut + manuel PowerShell komutu.
+> **Hover önizleme kaldırıldı** (kullanıcı kararı: hover sağlıklı çalışmıyor);
+> panel **seçim/imleç** tabanlıdır.
+> Metinler bir dil modeli değil, kanıttan üretilen deterministik cümlelerdir.
+
+### P3 — Planlama çalışma alanı (önerinin çekirdeği)
+
+> **Durum: TAMAMLANDI (20.10.2026).** `PlanWorkspace.tsx` + `ApprovalWall.tsx`
+> (yeni). Plan artık **modal değil, kalıcı çalışma alanı**dır.
+> Tasarım, bu tür uygulamaların onay adımındaki düzenini izler:
+> yapışkan özet şeridi (`KALDIRILACAK 8.92 GB · 7 küme · 8 hedef` + mod +
+> geri sayım), **adım şeridi** (Bul › Plan › Onay › Uygula), tarama ızgarasıyla
+> **aynı dilde yoğun tablo** (32px), satır içi **"plandan çıkar"** (sunucuda
+> yeniden plan üretilir → uygulanan plan ile görünen plan aynıdır), yollar
+> satır altında açılır. Sağda **onay duvarı**: "ne kaybedeceğim" + `SIL` +
+> yüksek risk onayı + Uygula/Vazgeç. İki aşamalı onay korunur.
+> *Sözleşme:* plana `key` alanı eklendi (`PlannedCluster.key`) — plandan
+> çıkarma başlığa göre eşleştirme yapmaz, anahtarla yapar.
+
+### P4 — Kategoriler ve sağlık
+
+> **Durum: TAMAMLANDI (20.10.2026).** Kategori mantığı **çekirdeğe** taşındı
+> (`src/core/categories.ts`) — arayüz ayrı liste tutmaz. Sağlık göstergesi
+> artık `DISK C:\ %62` (107 GB boş · 281 GB toplam) + Taranan + Geri kazanılır
+> + Ajan kirliliği. Disk ölçümü **sunucu tarafında** `statfs` ile
+> (`src/core/disk-usage.ts`, salt okunur, tek sistem çağrısı).
+
+### P5 — Birleşik kaynaklar ve plan önizleme
+
+> **Durum: TAMAMLANDI (20.10.2026).** `src/core/findings.ts` +
+> `GET /api/findings` + "Birleşik" sekmesi. Disk kümeleri ve CLI araçları tek
+> listede (kaynak sütunu ile). **Salt okunur:** planlar kaynak başına ayrıdır,
+> birleşik uygulama yoktur (kullanıcı kararı: iki ayrı yazılı onay).
+
+### P6 — Cila ve doğrulama
+
+> **Durum: SIRA SONRASI.** Klavye/a11y taraması, boş durumlar, odak halkaları,
+> hata mesajları, tekrar eden metinlerin temizlenmesi.
+
 - Odak/hover takibi, `Enter` ile sabitleme.
 - Kanıt, bağımlılık ağacı, deterministik yorum, komut kopyalama.
 - **Kabul:** her satır için panel dolar; kopyalanan komut yolu doğru;
