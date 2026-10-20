@@ -71,7 +71,7 @@ export function StatusStrip({
 
       <div className="strip-item">
         <span className="strip-label">{t('Kararlar')}</span>
-        <span className="strip-value mono">{rec + ask}</span>
+        <span className="strip-value mono">{summary.actionableCount()}</span>
         <span className="strip-sub dim">
           {t('{rec} önerilen · {ask} doğrulama · {ro} rapor', { rec, ask, ro })}
         </span>

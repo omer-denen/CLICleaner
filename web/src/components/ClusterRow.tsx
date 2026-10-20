@@ -14,6 +14,7 @@ import {
   VERDICT_SHORT,
 } from '../labels.ts';
 import { categoryOf } from '../../../src/core/categories.ts';
+import { EvidenceReader } from '../../../src/core/evidence-text.ts';
 
 /**
  * Yoğun ızgara satırı (T42 / D3 P1).
@@ -55,7 +56,7 @@ export function ClusterRow({
     t(ARCHETYPE_LABEL[cluster.archetype] ?? cluster.archetype),
     v.regenerability ? t(REGEN_LABEL[v.regenerability] ?? v.regenerability) : null,
     v.confidence ? t(CONFIDENCE_LABEL[v.confidence] ?? '') : null,
-    evidence.markers?.includes('git-tracked') ? 'git' : null,
+    EvidenceReader.isGitTracked(cluster) ? 'git' : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -107,7 +108,7 @@ export function ClusterRow({
           <span className="cluster-title">{cluster.title}</span>
           <span className="row-key">{shortKey(cluster.key)}</span>
           {!selectable && <span className="tag tag-locked">{t('kilitli')}</span>}
-          {evidence.markers?.includes('git-tracked') && (
+          {EvidenceReader.isGitTracked(cluster) && (
             <span className="tag tag-git" title={t('Git tarafından takip edilen yollar atlandı')}>
               git
             </span>
@@ -186,7 +187,7 @@ export function ClusterRow({
                 ))}
                 {evidence.owner && (
                   <span className="chip chip-owner">
-                    {t('sahip:')} {ownerLabel(evidence.owner)}
+                    {t('sahip:')} {EvidenceReader.ownerLabel(evidence.owner)}
                   </span>
                 )}
               </div>
@@ -259,19 +260,4 @@ export function ClusterRow({
       )}
     </div>
   );
-}
-
-function ownerLabel(owner: NonNullable<Cluster['evidence']['owner']>): string {
-  switch (owner.kind) {
-    case 'packageJson':
-      return owner.version ? `${owner.name}@${owner.version}` : owner.name;
-    case 'manifest':
-      return owner.app;
-    case 'logFile':
-      return owner.product;
-    case 'binaryProduct':
-      return owner.product;
-    case 'directoryName':
-      return owner.name;
-  }
 }

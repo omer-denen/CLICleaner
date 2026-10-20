@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CliInventory, CliStatus, CliTool } from '../../../src/core/cli-inventory-types.ts';
-import { CliInventoryQuery } from '../../../src/core/cli-inventory-query.ts';
+import {
+  CliInventoryQuery,
+  type CliFilter,
+} from '../../../src/core/cli-inventory-query.ts';
+import { ApprovalRules } from '../../../src/core/approval.ts';
+import { CliCommandText } from '../../../src/core/cli-command-text.ts';
 import type {
   CliExecuteResponse,
   CliInventoryStreamEvent,
@@ -23,8 +28,6 @@ import {
 import { useI18n } from '../i18n.tsx';
 import { shortPath } from '../labels.ts';
 
-type Filter = 'all' | CliStatus;
-
 interface Props {
   onError: (message: string) => void;
   onNotice?: (message: string) => void;
@@ -43,7 +46,7 @@ export function CliView({ onError, onNotice }: Props) {
   const [inventory, setInventory] = useState<CliInventory | null>(null);
   const [loading, setLoading] = useState(false);
   const [unusedDays, setUnusedDays] = useState(21);
-  const [filter, setFilter] = useState<Filter>('unused');
+  const [filter, setFilter] = useState<CliFilter>('unused');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [backup, setBackup] = useState(true);
@@ -140,7 +143,7 @@ export function CliView({ onError, onNotice }: Props) {
               onNotice?.(
                 t('Envanter güncellendi: {tools} araç · {unused} atıl.', {
                   tools: data.inventory.tools.length,
-                  unused: data.inventory.tools.filter((x) => x.status === 'unused').length,
+                  unused: new CliInventoryQuery(data.inventory.tools).unused().length,
                 }),
               );
               finish();
@@ -196,11 +199,17 @@ export function CliView({ onError, onNotice }: Props) {
   const cliQuery = useMemo(() => new CliInventoryQuery(allTools), [allTools]);
   const tools = useMemo(() => cliQuery.filter(filter), [cliQuery, filter]);
 
-  const invQuery = useMemo(() => new CliInventoryQuery(inventory?.tools ?? []), [inventory]);
+  const invQuery = useMemo(
+    () => new CliInventoryQuery(inventory?.tools ?? [], inventory?.duplicates ?? []),
+    [inventory],
+  );
   const invCounts = invQuery.counts();
 
   const unused = invQuery.unused();
   const unusedBytes = invQuery.unusedBytes();
+
+  /** Ayni komutun coklu kurulumlari: karar envanterde, cozum motorda. */
+  const duplicates = useMemo(() => invQuery.duplicateDetails(), [invQuery]);
 
   // Bozuk kurulumlar: ayni paketin birden fazla komutu varsa tek kart.
   const brokenTools = useMemo(() => cliQuery.broken(), [cliQuery]);
@@ -220,7 +229,7 @@ export function CliView({ onError, onNotice }: Props) {
   };
 
   const selectAll = () => {
-    setSelected(new Set(tools.filter(selectable).map((x) => x.id)));
+    setSelected(new Set(cliQuery.selectableIds(filter)));
   };
 
   // `ids` verilmezse mevcut secim kullanilir. Cakisma kartindan yalnizca
@@ -244,7 +253,7 @@ export function CliView({ onError, onNotice }: Props) {
   };
 
   const applyPlan = async () => {
-    if (!plan || phrase.trim() !== 'SIL') return;
+    if (!plan || !ApprovalRules.matches('delete', phrase)) return;
     setBusy(true);
     try {
       const r = await cliExecute({ planId: plan.planId, phrase: phrase.trim() });
@@ -273,10 +282,13 @@ export function CliView({ onError, onNotice }: Props) {
   };
 
   const applyRepair = async () => {
-    if (!repairPlan || repairPhrase.trim() !== 'ONAR') return;
+    if (!repairPlan || !ApprovalRules.matches('repair', repairPhrase)) return;
     setBusy(true);
     try {
-      const r = await cliRepairExecute({ planId: repairPlan.planId, phrase: 'ONAR' });
+      const r = await cliRepairExecute({
+        planId: repairPlan.planId,
+        phrase: repairPhrase.trim(),
+      });
       setRepairPlan(null);
       const failed = r.results.filter((x) => !x.ok);
       if (failed.length > 0) {
@@ -307,12 +319,12 @@ export function CliView({ onError, onNotice }: Props) {
   };
 
   const applyQuarantine = async () => {
-    if (!quarantinePlan || quarantinePhrase.trim() !== 'KARANTINA') return;
+    if (!quarantinePlan || !ApprovalRules.matches('quarantine', quarantinePhrase)) return;
     setBusy(true);
     try {
       const r = await cliQuarantineExecute({
         planId: quarantinePlan.planId,
-        phrase: 'KARANTINA',
+        phrase: quarantinePhrase.trim(),
       });
       setQuarantinePlan(null);
       const failed = r.results.filter((x) => !x.ok);
@@ -464,7 +476,7 @@ export function CliView({ onError, onNotice }: Props) {
         </section>
       )}
 
-      {inventory && inventory.duplicates.length > 0 && (
+      {duplicates.length > 0 && (
         <section className="conflicts">
           <h3>{t('Aynı komutun birden fazla kurulumu')}</h3>
           <p className="dim small">
@@ -472,12 +484,8 @@ export function CliView({ onError, onNotice }: Props) {
               "Aynı komutu iki paket sağlıyor. Shim'in gösterdiği aktif kurulum korunur; gölgede kalan eski paket kaldırılabilir.",
             )}
           </p>
-          {inventory.duplicates.map((d) => {
-            const keep = inventory.tools.find((x) => x.id === d.keepId);
-            const remove = d.removeIds
-              .map((id) => inventory.tools.find((x) => x.id === id))
-              .filter((x): x is CliTool => !!x);
-            const bytes = remove.reduce((a, x) => a + x.totalBytes, 0);
+          {duplicates.map((d) => {
+            const { keep, remove, bytes } = d;
             return (
               <div className="conflict" key={d.command}>
                 <div className="conflict-main">
@@ -603,7 +611,7 @@ export function CliView({ onError, onNotice }: Props) {
               ['recent', 'Yakında'],
               ['protected', 'Korunan'],
               ['all', 'Tümü'],
-            ] as Array<[Filter, string]>
+            ] as Array<[CliFilter, string]>
           ).map(([key, label]) => (
             <button
               key={key}
@@ -689,7 +697,7 @@ export function CliView({ onError, onNotice }: Props) {
                       <h4>{t('Kaldırma komutu')}</h4>
                       <code>{tool.uninstall?.display ?? t('Bilinmiyor')}</code>
                       <h4>{t('Geri kurulum komutu')}</h4>
-                      <code>{reinstallText(tool)}</code>
+                      <code>{CliCommandText.reinstall(tool) ?? '-'}</code>
                       <h4>{t('Yedek')}</h4>
                       {tool.stateDirs.length === 0 ? (
                         <p className="dim">{t('Yedek yok')}</p>
@@ -811,12 +819,14 @@ export function CliView({ onError, onNotice }: Props) {
               {t('Kaldırma paket yöneticisinin kendisiyle yapılır; kurulum klasörü elle silinmez.')}
             </div>
             <label className="phrase">
-              <span>{t('Onaylamak için SIL yaz:')}</span>
+              <span>
+                {t('Onaylamak için {phrase} yaz:', { phrase: ApprovalRules.phrase('delete') })}
+              </span>
               <input
                 type="text"
                 value={phrase}
                 onChange={(e) => setPhrase(e.target.value)}
-                placeholder="SIL"
+                placeholder={ApprovalRules.phrase('delete')}
                 disabled={busy}
                 autoFocus
               />
@@ -827,7 +837,7 @@ export function CliView({ onError, onNotice }: Props) {
               </button>
               <button
                 className="btn btn-danger"
-                disabled={busy || phrase.trim() !== 'SIL'}
+                disabled={busy || !ApprovalRules.matches('delete', phrase)}
                 onClick={() => void applyPlan()}
               >
                 {busy ? t('Başlatılıyor…') : t('Planı uygula')}
@@ -872,12 +882,14 @@ export function CliView({ onError, onNotice }: Props) {
               ))}
             </div>
             <label className="phrase">
-              <span>{t('Onaylamak için ONAR yaz:')}</span>
+              <span>
+                {t('Onaylamak için {phrase} yaz:', { phrase: ApprovalRules.phrase('repair') })}
+              </span>
               <input
                 type="text"
                 value={repairPhrase}
                 onChange={(e) => setRepairPhrase(e.target.value)}
-                placeholder="ONAR"
+                placeholder={ApprovalRules.phrase('repair')}
                 disabled={busy}
                 autoFocus
               />
@@ -888,7 +900,7 @@ export function CliView({ onError, onNotice }: Props) {
               </button>
               <button
                 className="btn btn-primary"
-                disabled={busy || repairPhrase.trim() !== 'ONAR'}
+                disabled={busy || !ApprovalRules.matches('repair', repairPhrase)}
                 onClick={() => void applyRepair()}
               >
                 {busy ? t('Başlatılıyor…') : t('Onarımı uygula')}
@@ -941,12 +953,16 @@ export function CliView({ onError, onNotice }: Props) {
               ))}
             </div>
             <label className="phrase">
-              <span>{t('Onaylamak için KARANTINA yaz:')}</span>
+              <span>
+                {t('Onaylamak için {phrase} yaz:', {
+                  phrase: ApprovalRules.phrase('quarantine'),
+                })}
+              </span>
               <input
                 type="text"
                 value={quarantinePhrase}
                 onChange={(e) => setQuarantinePhrase(e.target.value)}
-                placeholder="KARANTINA"
+                placeholder={ApprovalRules.phrase('quarantine')}
                 disabled={busy}
                 autoFocus
               />
@@ -957,7 +973,7 @@ export function CliView({ onError, onNotice }: Props) {
               </button>
               <button
                 className="btn btn-primary"
-                disabled={busy || quarantinePhrase.trim() !== 'KARANTINA'}
+                disabled={busy || !ApprovalRules.matches('quarantine', quarantinePhrase)}
                 onClick={() => void applyQuarantine()}
               >
                 {busy ? t('Başlatılıyor…') : t('Karantinayı uygula')}
@@ -983,21 +999,6 @@ function idleDaysLabel(days: number, lang: 'tr' | 'en'): string {
   if (!Number.isFinite(days)) return '?';
   const n = Math.max(0, Math.floor(days));
   return lang === 'tr' ? `${n} gün` : `${n} days`;
-}
-
-function reinstallText(tool: CliTool): string {
-  switch (tool.source) {
-    case 'npm-global':
-      return `npm install -g ${tool.packageName}${tool.version ? `@${tool.version}` : ''}`;
-    case 'uv-tool':
-      return `uv tool install ${tool.packageName}${tool.version ? `==${tool.version}` : ''}`;
-    case 'dotnet-tool':
-      return `dotnet tool install --global ${tool.packageName}${tool.version ? ` --version ${tool.version}` : ''}`;
-    case 'pip-user':
-      return `python -m pip install ${tool.packageName}${tool.version ? `==${tool.version}` : ''}`;
-    case 'standalone':
-      return '-';
-  }
 }
 
 function errText(e: unknown): string {

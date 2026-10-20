@@ -245,7 +245,6 @@ const EN: Record<string, string> = {
   'Kaldırma komutu': 'Uninstall command',
   'Geri kurulum komutu': 'Reinstall command',
   'Kaldırma sonrası onarım': 'Post-removal repair',
-  'Onaylamak için SIL yaz:': 'Type SIL to confirm:',
   'Planı uygula': 'Apply plan',
   'Envanter taranıyor…': 'Scanning inventory…',
   'Kurulu CLI envanterini incele': 'Review installed CLI inventory',
@@ -293,7 +292,6 @@ const EN: Record<string, string> = {
   ONARIM: 'REPAIR',
   'Paket yöneticisi paketi yeniden kuracak ve kurulum betiklerini çalıştıracak.':
     'The package manager will reinstall the package and run its install scripts.',
-  'Onaylamak için ONAR yaz:': 'Type ONAR to confirm:',
   'Onarımı uygula': 'Apply repair',
   'Onarım tamamlandı.': 'Repair completed.',
 
@@ -308,7 +306,6 @@ const EN: Record<string, string> = {
     'Shim files are moved to the vault (the command leaves PATH); state folders are copied to the vault and your data stays in place. Restore steps are written to RESTORE.md.',
   'Taşınacak shim': 'Shim to move',
   'Kopyalanacak durum klasörü': 'State folder to copy',
-  'Onaylamak için KARANTINA yaz:': 'Type KARANTINA to confirm:',
   'Karantinayı uygula': 'Apply quarantine',
   'Karantina tamamlandı.': 'Quarantine completed.',
 

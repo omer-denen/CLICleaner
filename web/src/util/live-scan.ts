@@ -108,11 +108,3 @@ export function reduceScanBatch(state: ScanBatchState, events: ScanStreamEvent[]
 
   return changed ? { live, progress } : state;
 }
-
-/** Oge listesini boyuta gore sirala (buyuk once); esitlikte kimlik. */
-export function sortLiveItems(items: LiveItem[]): LiveItem[] {
-  return [...items].sort((a, b) => {
-    const d = b.cluster.reclaimableBytes - a.cluster.reclaimableBytes;
-    return d !== 0 ? d : a.id.localeCompare(b.id);
-  });
-}

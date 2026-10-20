@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { VaultListResponse } from '../../../src/core/contract.ts';
+import { ApprovalRules } from '../../../src/core/approval.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { getVault, purgeVault, restoreAllVault, restoreVault } from '../api.ts';
 import { useI18n } from '../i18n.tsx';
@@ -74,6 +75,7 @@ export function VaultView({ active, onError, onNotice }: Props) {
   }, [load, onError, onNotice, t]);
 
   const purge = useCallback(async () => {
+    if (!ApprovalRules.matches('vaultPurge', purgePhrase)) return;
     setBulkBusy(true);
     try {
       const r = await purgeVault(purgePhrase);
@@ -263,12 +265,16 @@ export function VaultView({ active, onError, onNotice }: Props) {
               )}
             </div>
             <label className="phrase">
-              <span>{t('Onaylamak için {phrase} yaz:', { phrase: 'BOŞALT' })}</span>
+              <span>
+                {t('Onaylamak için {phrase} yaz:', {
+                  phrase: ApprovalRules.phrase('vaultPurge'),
+                })}
+              </span>
               <input
                 type="text"
                 value={purgePhrase}
                 onChange={(e) => setPurgePhrase(e.target.value)}
-                placeholder="BOŞALT"
+                placeholder={ApprovalRules.phrase('vaultPurge')}
                 disabled={bulkBusy}
                 autoFocus
               />
@@ -284,7 +290,7 @@ export function VaultView({ active, onError, onNotice }: Props) {
               <button
                 className="btn btn-danger"
                 onClick={() => void purge()}
-                disabled={bulkBusy || purgePhrase.trim() !== 'BOŞALT'}
+                disabled={bulkBusy || !ApprovalRules.matches('vaultPurge', purgePhrase)}
               >
                 {bulkBusy ? t('Boşaltılıyor…') : t('Kalıcı olarak boşalt')}
               </button>

@@ -3,7 +3,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 import { ARCHETYPE_LABEL, VERDICT_LABEL, shortPath } from '../labels.ts';
-import { sortLiveItems, type LiveItem } from '../util/live-scan.ts';
+import { sortScanItemsBySize } from '../../../src/core/scan-items.ts';
+import type { LiveItem } from '../util/live-scan.ts';
 
 interface ScanProgressProps {
   kind: 'scan';
@@ -183,7 +184,7 @@ export function ProgressPanel(props: Props) {
 function ScanFoundList({ items }: { items: LiveItem[] }) {
   const { t } = useI18n();
   const parentRef = useRef<HTMLDivElement | null>(null);
-  const sorted = useMemo(() => sortLiveItems(items), [items]);
+  const sorted = useMemo(() => sortScanItemsBySize(items), [items]);
   const [pending, setPending] = useState(0);
   const prevCount = useRef(0);
   const atTop = useRef(true);

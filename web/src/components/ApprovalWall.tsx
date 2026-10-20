@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlanResponse } from '../../../src/core/contract.ts';
+import { ApprovalRules } from '../../../src/core/approval.ts';
 import { PlanSummary } from '../../../src/core/plan-summary.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
@@ -33,7 +34,7 @@ export function ApprovalWall({ plan, busy, onCancel, onConfirm, focusSignal }: P
   const view = plan.plan;
   const summary = new PlanSummary(view.clusters);
   const { mediumOrHigh, high } = summary.riskCounts();
-  const phraseOk = !plan.requiresPhrase || phrase.trim() === 'SIL';
+  const phraseOk = !plan.requiresPhrase || ApprovalRules.matches('delete', phrase);
   const ackOk = !plan.requiresHighAck || ack;
   const canConfirm = phraseOk && ackOk && !busy;
 
@@ -112,14 +113,16 @@ export function ApprovalWall({ plan, busy, onCancel, onConfirm, focusSignal }: P
 
       {plan.requiresPhrase && (
         <section className="ctx-block">
-          <h3>{t('Onaylamak için {phrase} yaz:', { phrase: 'SIL' })}</h3>
+          <h3>
+            {t('Onaylamak için {phrase} yaz:', { phrase: ApprovalRules.phrase('delete') })}
+          </h3>
           <label className="phrase">
             <input
               ref={phraseRef}
               type="text"
               value={phrase}
               onChange={(e) => setPhrase(e.target.value)}
-              placeholder="SIL"
+              placeholder={ApprovalRules.phrase('delete')}
               disabled={busy}
             />
           </label>

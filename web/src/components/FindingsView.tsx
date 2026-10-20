@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FindingView, FindingsResponse } from '../../../src/core/contract.ts';
 import { CATEGORY_LABEL } from '../../../src/core/categories.ts';
-import { FindingsQuery } from '../../../src/core/findings-query.ts';
+import { FindingsQuery, type FindingFilter } from '../../../src/core/findings-query.ts';
 import { formatBytes } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
 import { getFindings } from '../api.ts';
@@ -24,7 +24,7 @@ export function FindingsView({ onFocus, focusedId }: Props) {
   const { t } = useI18n();
   const [data, setData] = useState<FindingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [only, setOnly] = useState<'all' | 'disk' | 'cli'>('all');
+  const [only, setOnly] = useState<FindingFilter>('all');
 
   useEffect(() => {
     let alive = true;

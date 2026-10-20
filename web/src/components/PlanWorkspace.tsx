@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PlanResponse } from '../../../src/core/contract.ts';
+import { PlanClock } from '../../../src/core/plan-clock.ts';
 import { ScanSummary } from '../../../src/core/scan-summary.ts';
 import { PlanSummary } from '../../../src/core/plan-summary.ts';
 import { formatBytes } from '../../../src/util/format.ts';
@@ -118,8 +119,8 @@ export function PlanWorkspace({
     return () => window.removeEventListener('keydown', onKey);
   }, [flatRows, rowIndex, onApprove, onCancel, onDeselect]);
 
-  const expired = plan.expiresAt > 0 && now > plan.expiresAt;
-  const remain = Math.max(0, Math.floor((plan.expiresAt - now) / 1000));
+  const clock = useMemo(() => new PlanClock(plan.expiresAt), [plan.expiresAt]);
+  const { expired, mm, ss } = clock.state(now);
 
   const togglePaths = (key: string) => {
     setOpenPaths((prev) => {
@@ -149,10 +150,7 @@ export function PlanWorkspace({
           <span className={`tag ${expired ? 'tag-danger' : ''}`}>
             {expired
               ? t('Plan süresi doldu')
-              : t('Süre: {mm}:{ss}', {
-                  mm: String(Math.floor(remain / 60)).padStart(2, '0'),
-                  ss: String(remain % 60).padStart(2, '0'),
-                })}
+              : t('Süre: {mm}:{ss}', { mm, ss })}
           </span>
         </div>
 

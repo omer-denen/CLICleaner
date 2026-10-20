@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { groupByVerdict } from '../../src/core/merge.ts';
 import { DefaultSelection } from '../../src/core/selection.ts';
 import { formatBytes } from '../../src/util/format.ts';
 import type { ScanResult } from '../../src/core/types.ts';
@@ -57,6 +56,8 @@ import {
 } from '../../src/core/cluster-query.ts';
 import { SelectionScope } from '../../src/core/selection-scope.ts';
 import { ScanSummary } from '../../src/core/scan-summary.ts';
+import { PlanSummary } from '../../src/core/plan-summary.ts';
+import { findingClusterKey } from '../../src/core/findings.ts';
 import {
   EMPTY_LIVE_SCAN,
   EMPTY_SCAN_PROGRESS,
@@ -334,10 +335,8 @@ export default function App() {
     try {
       let id: string;
       try {
-        const r = await startScan({
-          envs: ['dotfolders', 'localappdata', 'roamingappdata'],
-          root: root || undefined,
-        });
+        // envs GONDERILMEZ: varsayilanlar cekirdekte (runScan) tanimlidir.
+        const r = await startScan({ root: root || undefined });
         id = r.scanId;
       } catch (e) {
         // Ayni anda calisan tarama varsa ona baglan.
@@ -387,10 +386,11 @@ export default function App() {
           // Proje taramasi rapor-only'dir; bunu sessizce yapmayalim.
           if (root) notify(t('Proje taraması salt rapordur; silme hedefi üretilmez.'));
           // Kalici bir isaret degil: "Tamam" denince liste gorunur.
+          const totals = new ScanSummary(data.result.clusters).totals();
           setScanDone({
             clusters: data.result.clusters.length,
-            totalBytes: (new ScanSummary(data.result.clusters).totals().totalBytes),
-            reclaimableBytes: (new ScanSummary(data.result.clusters).totals().reclaimableBytes),
+            totalBytes: totals.totalBytes,
+            reclaimableBytes: totals.reclaimableBytes,
             durationMs: data.result.finishedAt - data.result.startedAt,
           });
         } else if (data.type === 'cancelled') {
@@ -476,8 +476,6 @@ export default function App() {
     };
   }, [tokenReady, closeStream, refreshScanStatus]);
 
-  const groups = useMemo(() => (scan ? groupByVerdict(scan.clusters) : null), [scan]);
-
   /**
    * Gorunen liste: filtre + arama + siralama MOTORDA yapilir
    * (`src/core/cluster-query.ts`). Arayuz yalnizca sonucu gosterir.
@@ -493,17 +491,17 @@ export default function App() {
     });
   }, [scan, filter, kindFilter, sortMode, category, triage]);
 
+  /** Tarama ozeti: sayimlar tek yerden (`src/core/scan-summary.ts`). */
+  const scanSummary = useMemo(() => new ScanSummary(scan?.clusters ?? []), [scan]);
+  const scanTotals = useMemo(() => scanSummary.totals(), [scanSummary]);
+  /** Plan ozeti: korunan kumeler ve risk sayimlari tek yerden. */
+  const planSummary = useMemo(() => new PlanSummary(plan?.plan.clusters ?? []), [plan]);
+
   /** Sol sutun: kategori ozeti + saglik olcumleri (yalniz tarama sonucundan). */
   const cats = useMemo(() => categoryStats(scan?.clusters ?? []), [scan]);
   const aiRatio = useMemo(() => agentClutter(scan?.clusters ?? []), [scan]);
-  const scannedBytes = useMemo(
-    () => new ScanSummary(scan?.clusters ?? []).totals().totalBytes,
-    [scan],
-  );
-  const scannedReclaimable = useMemo(
-    () => new ScanSummary(scan?.clusters ?? []).totals().reclaimableBytes,
-    [scan],
-  );
+  const scannedBytes = scanTotals.totalBytes;
+  const scannedReclaimable = scanTotals.reclaimableBytes;
 
   const selectedTotals = useMemo(
     () => new SelectionScope(scan?.clusters ?? []).totals(selected),
@@ -597,10 +595,10 @@ export default function App() {
   }, []);
 
   /** Sag panelin gosterdigi oge: odaklanan (secili) kume. */
-  const contextCluster = useMemo(() => {
-    if (!focusedKey || !scan) return null;
-    return scan.clusters.find((c) => c.key === focusedKey) ?? null;
-  }, [focusedKey, scan]);
+  const contextCluster = useMemo(
+    () => new ClusterQuery(scan?.clusters ?? []).byKey(focusedKey),
+    [focusedKey, scan],
+  );
 
   const toggleExpand = useCallback((key: string) => {
     setExpanded((prev) => {
@@ -613,12 +611,12 @@ export default function App() {
 
   const selectVisible = useCallback(
     (on: boolean) => {
+      const keys = new SelectionScope(activeItems).selectableKeys();
       setSelected((prev) => {
         const next = new Set(prev);
-        for (const c of activeItems) {
-          if (!SelectionScope.isSelectable(c)) continue;
-          if (on) next.add(c.key);
-          else next.delete(c.key);
+        for (const k of keys) {
+          if (on) next.add(k);
+          else next.delete(k);
         }
         return next;
       });
@@ -633,12 +631,10 @@ export default function App() {
    */
   const selectReclaimable = useCallback(() => {
     if (!scan) return;
+    const keys = new SelectionScope(scan.clusters).planScopeKeys();
     setSelected((prev) => {
       const next = new Set(prev);
-      for (const c of scan.clusters) {
-        if (!SelectionScope.isPlannable(c)) continue;
-        next.add(c.key);
-      }
+      for (const k of keys) next.add(k);
       return next;
     });
   }, [scan]);
@@ -1198,13 +1194,7 @@ export default function App() {
                 onClick={() => setKindFilter(s.key)}
               >
                 {t(s.title)}
-                <span className="tab-count">
-                  {s.key === 'all'
-                    ? scan.clusters.length
-                    : s.key === 'git'
-                      ? new ScanSummary(scan.clusters).gitTrackedCount()
-                      : (groups?.[s.key]?.length ?? 0)}
-                </span>
+                <span className="tab-count">{scanSummary.countFor(s.key)}</span>
               </button>
             ))}
           </div>
@@ -1276,7 +1266,7 @@ export default function App() {
       {plan && phase === 'confirm' && (
         <PlanWorkspace
           plan={plan}
-          protectedCount={Math.max(0, selected.size - plan.plan.clusters.length)}
+          protectedCount={planSummary.protectedCount(selected)}
           busy={false}
           onCancel={() => {
             setPlan(null);
@@ -1329,7 +1319,8 @@ export default function App() {
           focusedId={unifiedFocus?.id ?? null}
           onFocus={(f) => {
             setUnifiedFocus(f);
-            if (f?.source === 'disk') setFocusedKey(f.id.replace(/^disk:/, ''));
+            const key = f ? findingClusterKey(f) : null;
+            if (key) setFocusedKey(key);
           }}
         />
       )}
@@ -1644,7 +1635,6 @@ export default function App() {
   );
 }
 
-/** Liste siralamasi: boyut, risk, son hareket veya ad. */
 function errText(e: unknown): string {
   if (e instanceof ApiError) return e.message;
   return e instanceof Error ? e.message : String(e);

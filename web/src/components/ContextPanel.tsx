@@ -13,6 +13,7 @@ import {
 } from '../labels.ts';
 import { EvidenceReader } from '../../../src/core/evidence-text.ts';
 import { TargetMap } from '../../../src/core/target-map.ts';
+import { TargetCommands, type SafeCommandId } from '../../../src/core/target-commands.ts';
 
 /**
  * Sag sutun — baglam / "rontgen" paneli (T42 / D3 P2).
@@ -65,19 +66,21 @@ export function ContextPanel({ cluster, pinned, onTogglePin }: Props) {
     }
   };
 
-  const safeCommands = [
-    { text: `clicleaner explain ${key}`, label: t('Karar gerekçesini aç') },
-    { text: `clicleaner clean --only ${key} --dry-run`, label: t('Yalnız bu kümeyi kuru (plan)') },
-  ];
-
-  const manualCommands = targets.slice(0, 3).map((target) => ({
-    text:
-      target.kind === 'whole'
-        ? `Remove-Item -LiteralPath "${target.path}" -Recurse -Force`
-        : `Get-ChildItem -LiteralPath "${target.path}" -Recurse -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-${target.minAgeDays ?? 0}) } | Remove-Item -Force`,
-    bytes: target.bytes,
-    kind: target.kind,
+  /**
+   * Komut metinleri MOTORDAN gelir (`src/core/target-commands.ts`);
+   * panel yalnizca gosterir ve kopyalar. Kisaltilmis anahtar kullanilir
+   * cunku kullanici onu terminale yazar.
+   */
+  const safeLabels: Record<SafeCommandId, string> = {
+    explain: t('Karar gerekçesini aç'),
+    'dry-run': t('Yalnız bu kümeyi kuru (plan)'),
+  };
+  const safeCommands = TargetCommands.safe(key).map((c) => ({
+    ...c,
+    label: safeLabels[c.id],
   }));
+
+  const manualCommands = TargetCommands.manualList(targets);
 
   const targetMap = new TargetMap(targets);
   const targetsByPart = (partPath: string) => targetMap.underPart(partPath);
@@ -98,7 +101,7 @@ export function ContextPanel({ cluster, pinned, onTogglePin }: Props) {
               {t(REGEN_LABEL[v.regenerability] ?? v.regenerability)}
             </span>
           )}
-          {evidence.markers?.includes('git-tracked') && (
+          {EvidenceReader.isGitTracked(cluster) && (
             <span className="tag tag-git" title={t('Git tarafından takip edilen yollar atlandı')}>
               git
             </span>
@@ -169,15 +172,7 @@ export function ContextPanel({ cluster, pinned, onTogglePin }: Props) {
           ))}
           {evidence.owner && (
             <span className="chip chip-owner">
-              {t('sahip:')} {evidence.owner.kind === 'packageJson'
-                ? `${evidence.owner.name}${evidence.owner.version ? `@${evidence.owner.version}` : ''}`
-                : evidence.owner.kind === 'manifest'
-                  ? evidence.owner.app
-                  : evidence.owner.kind === 'logFile'
-                    ? evidence.owner.product
-                    : evidence.owner.kind === 'binaryProduct'
-                      ? evidence.owner.product
-                      : evidence.owner.name}
+              {t('sahip:')} {EvidenceReader.ownerLabel(evidence.owner)}
             </span>
           )}
           {v.confidence && (
