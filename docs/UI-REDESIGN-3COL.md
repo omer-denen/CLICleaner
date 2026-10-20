@@ -191,6 +191,18 @@ Marka adı yalnızca kullanıcı yolunda görünür; motor yapıyı okur.
 - **Kabul:** 1440/1024/768 genişliklerde taşma yok; klavye odağı görünür.
 
 ### P1 — Yoğun ızgara
+
+> **Durum: TAMAMLANDI (20.10.2026).** Tek satır durum şeridi + 32px
+> yoğun ızgara + yapışkan başlık + klavye + triyaj çipleri.
+> `StatusStrip.tsx` (yeni), `ClusterRow.tsx` (yeniden yazıldı),
+> `VirtualClusterList.tsx` (klavye + başlık), `labels.ts` (kısa etiketler).
+> Satır 32px (Rahat 40px); sütunlar `--grid-cols` ile hizalı.
+> Klavye: `↑/↓`/`J/K` imleç · `Shift+↑/↓` aralık · `Space` seç ·
+> `Enter` odak+detay · `/` arama · `Esc` seçimi bırak.
+> Terminal × dashboard dili: mono değerler, büyük harfli mono başlıklar,
+> ince ayraçlar, odak satırında `>` prompt imleci.
+> **Sapma:** `DISK %` göstergesi sunucu `statfs` gerektiriyor → P4'te.
+>
 - 32px satır, sticky başlık, sanal liste, kolonlar.
 - Klavye gezinme/seçim, `Shift` aralık, filtreli tümünü seç.
 - Triyaj çipleri ve yoğunluk anahtarı.

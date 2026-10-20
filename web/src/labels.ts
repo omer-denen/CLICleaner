@@ -59,6 +59,40 @@ export const VERDICT_HINT: Record<string, string> = {
   git: 'Git tarafından takip edilen yollar atlandı (tracked dosyalar silinmez).',
 };
 
+/** Yoğun ızgarda tek satıra sığan kısa etiketler (T42 / D3 P1). */
+export const RISK_SHORT: Record<RiskLevel, string> = {
+  safe: 'GÜV',
+  low: 'DÜŞ',
+  medium: 'ORTA',
+  high: 'YÜK',
+};
+
+export const VERDICT_SHORT: Record<string, string> = {
+  recommend: 'ÖN',
+  ask: 'DOĞR',
+  'report-only': 'RAP',
+  keep: 'KOR',
+};
+
+/** Sol rail kategorilerinin kısa adları (P1'de ızgara sütununda da kullanılır). */
+export const CATEGORY_LABEL: Record<string, string> = {
+  'ai-debris': 'AI Debris',
+  'orphaned-cli': 'Orphaned CLI',
+  'ghost-envs': 'Ghost Envs',
+  other: 'Diğer',
+};
+
+/**
+ * Kume anahtarini kisaltir.
+ *
+ * Anahtar "kapsam:tur:ad" bicimindedir (ornek "local:dir\npm-cache");
+ * arayuzde yalniz son bolum gosterilir.
+ */
+export function shortKey(key: string): string {
+  const i = Math.max(key.lastIndexOf(':'), key.lastIndexOf('\\'));
+  return i >= 0 ? key.slice(i + 1) : key;
+}
+
 /** Yolu kısalt: ev dizini ve AppData önekleri tanıdık hale gelir. */
 export function shortPath(p: string): string {
   return p

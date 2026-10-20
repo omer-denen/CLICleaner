@@ -4,44 +4,87 @@ import { useI18n } from '../i18n.tsx';
 import {
   ageLabel,
   ARCHETYPE_LABEL,
+  CATEGORY_LABEL,
   CONFIDENCE_LABEL,
   REGEN_LABEL,
   RISK_LABEL,
+  RISK_SHORT,
+  shortKey,
   shortPath,
+  VERDICT_SHORT,
 } from '../labels.ts';
+import { categoryOf } from '../util/categories.ts';
+
+/**
+ * Yoğun ızgara satırı (T42 / D3 P1).
+ *
+ * Satır 32px (rahat mod 40px): yol/başlık, kategori, son hareket, boyut,
+ * risk ve karar TEK satırda. Etiketler (mimari tip, yeniden üretilebilirlik,
+ * güven, git) satırın ipucunda (title) ve genişletilmiş detayda yaşar.
+ */
 
 interface Props {
   cluster: Cluster;
   selected: boolean;
   expanded: boolean;
+  focused: boolean;
   selectable: boolean;
   onToggle: () => void;
   onExpand: () => void;
+  onFocus: () => void;
 }
 
-export function ClusterRow({ cluster, selected, expanded, selectable, onToggle, onExpand }: Props) {
+export function ClusterRow({
+  cluster,
+  selected,
+  expanded,
+  focused,
+  selectable,
+  onToggle,
+  onExpand,
+  onFocus,
+}: Props) {
   const { t, lang } = useI18n();
   const v = cluster.verdict;
   const targets = cluster.deleteTargets ?? [];
   const evidence = cluster.evidence;
   const dateLocale = lang === 'tr' ? 'tr-TR' : 'en-US';
+  const category = categoryOf(cluster);
+
+  const hint = [
+    t(ARCHETYPE_LABEL[cluster.archetype] ?? cluster.archetype),
+    v.regenerability ? t(REGEN_LABEL[v.regenerability] ?? v.regenerability) : null,
+    v.confidence ? t(CONFIDENCE_LABEL[v.confidence] ?? '') : null,
+    evidence.markers?.includes('git-tracked') ? 'git' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <div className={`cluster ${expanded ? 'is-expanded' : ''} ${selectable ? '' : 'is-locked'}`}>
+    <div
+      className={`cluster ${expanded ? 'is-expanded' : ''} ${selectable ? '' : 'is-locked'} ${
+        focused ? 'is-focused' : ''
+      } ${selected ? 'is-selected' : ''}`}
+    >
       <div
         className="cluster-row"
         role="button"
-        tabIndex={0}
+        tabIndex={-1}
         aria-expanded={expanded}
-        onClick={onExpand}
+        title={hint}
+        onClick={() => {
+          onFocus();
+          onExpand();
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
+            onFocus();
             onExpand();
           }
         }}
       >
-        <label className="cell check" onClick={(e) => e.stopPropagation()}>
+        <div className="cell check" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={selected}
@@ -53,43 +96,28 @@ export function ClusterRow({ cluster, selected, expanded, selectable, onToggle, 
                 : `${t('seçilemez')}: ${cluster.title}`
             }
           />
-        </label>
+        </div>
 
         <div className="cell title">
-          <div className="title-line">
-            <span className="cluster-title">{cluster.title}</span>
-            {!selectable && <span className="tag tag-locked">{t('kilitli')}</span>}
-          </div>
-          <div className="subtitle">
-            <span className={`tag tag-risk-${v.risk}`}>{t(RISK_LABEL[v.risk])}</span>
-            <span className="tag">{t(ARCHETYPE_LABEL[cluster.archetype] ?? cluster.archetype)}</span>
-            {v.regenerability && (
-              <span
-                className={`tag tag-regen-${v.regenerability}`}
-                title={t(CONFIDENCE_LABEL[v.confidence] ?? '')}
-              >
-                {t(REGEN_LABEL[v.regenerability] ?? v.regenerability)}
-              </span>
-            )}
-            {evidence.markers?.includes('git-tracked') && (
-              <span className="tag tag-git" title={t('Git tarafından takip edilen yollar atlandı')}>
-                git
-              </span>
-            )}
-            <span className="dim">{cluster.key}</span>
-          </div>
+          {focused && (
+            <span className="row-prompt" aria-hidden="true">
+              &gt;
+            </span>
+          )}
+          <span className="cluster-title">{cluster.title}</span>
+          <span className="row-key">{shortKey(cluster.key)}</span>
+          {!selectable && <span className="tag tag-locked">{t('kilitli')}</span>}
+          {evidence.markers?.includes('git-tracked') && (
+            <span className="tag tag-git" title={t('Git tarafından takip edilen yollar atlandı')}>
+              git
+            </span>
+          )}
         </div>
 
-        <div
-          className="cell num"
-          title={t('silinebilir: {bytes}', { bytes: formatBytes(cluster.reclaimableBytes) })}
-        >
-          <span className="num-main">{formatBytes(cluster.reclaimableBytes)}</span>
-          <span className="num-sub">/ {formatBytes(cluster.totalBytes)}</span>
-        </div>
+        <div className="cell cat">{t(CATEGORY_LABEL[category] ?? category)}</div>
 
         <div
-          className="cell num single"
+          className="cell num age"
           title={t('son hareket: {date}', {
             date: new Date(cluster.lastTouched).toLocaleString(dateLocale),
           })}
@@ -97,22 +125,19 @@ export function ClusterRow({ cluster, selected, expanded, selectable, onToggle, 
           {ageLabel(cluster.lastTouched, lang)}
         </div>
 
-        <div className="cell verdict">
-          <span className={`tag tag-verdict-${v.kind}`}>
-            {t(
-              v.kind === 'recommend'
-                ? 'Önerilen'
-                : v.kind === 'ask'
-                  ? 'Doğrulama'
-                  : v.kind === 'report-only'
-                    ? 'Rapor'
-                    : 'Korunuyor',
-            )}
-          </span>
+        <div
+          className="cell num size"
+          title={t('silinebilir: {bytes}', { bytes: formatBytes(cluster.reclaimableBytes) })}
+        >
+          <span className="num-main">{formatBytes(cluster.reclaimableBytes)}</span>
         </div>
 
-        <div className="cell caret" aria-hidden="true">
-          {expanded ? '▾' : '▸'}
+        <div className="cell risk" title={t(RISK_LABEL[v.risk])}>
+          <span className={`tag tag-risk-${v.risk}`}>{t(RISK_SHORT[v.risk])}</span>
+        </div>
+
+        <div className="cell verdict">
+          <span className={`tag tag-verdict-${v.kind}`}>{t(VERDICT_SHORT[v.kind] ?? v.kind)}</span>
         </div>
       </div>
 

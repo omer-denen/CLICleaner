@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { groupByVerdict } from '../../src/core/merge.ts';
 import { defaultSelected } from '../../src/core/selection.ts';
-import { formatBytes, formatCount } from '../../src/util/format.ts';
+import { formatBytes, formatCount, daysSince } from '../../src/util/format.ts';
 import type { Cluster, ScanResult } from '../../src/core/types.ts';
 import type {
   DeleteMode,
@@ -32,6 +32,7 @@ import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Rail, type PlanState } from './components/Rail.tsx';
 import { ScanStatusBar } from './components/ScanStatusBar.tsx';
+import { StatusStrip } from './components/StatusStrip.tsx';
 import { VaultView } from './components/VaultView.tsx';
 import { VirtualClusterList } from './components/VirtualClusterList.tsx';
 import { useI18n } from './i18n.tsx';
@@ -56,6 +57,10 @@ type SortMode = 'size' | 'risk' | 'recent' | 'name';
 
 /** Risk siralama: once yuksek risk, en sonda guvenli. */
 const RISK_ORDER: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2, safe: 3 };
+
+/** Triyaj esikleri (P1): "buyuk", "riskli" ve "zombi" filtreleri. */
+const TRIAGE_BIG_BYTES = 1024 * 1024 * 1024;
+const TRIAGE_ZOMBIE_DAYS = 30;
 
 interface DeletingState {
   index: number;
@@ -170,6 +175,13 @@ export default function App() {
   const [mode, setMode] = useState<DeleteMode>('recycle');
   /** Sol sutun kategorisi (kanittan turetilir; ayrica filtre degildir). */
   const [category, setCategory] = useState<CategoryKey | 'all'>('all');
+  /** Klavye imleci (odaklanan satir). P2'de sag panel bunu okur. */
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  /** Satir yogunlugu: yogun (32px) / rahat (40px). */
+  const [density, setDensity] = useState<'dense' | 'comfortable'>('dense');
+  /** Triyaj cipleri: hizli eleme (boyut / risk / zombi). */
+  const [triage, setTriage] = useState({ big: false, risky: false, zombie: false });
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [deleting, setDeleting] = useState<DeletingState | null>(null);
@@ -466,8 +478,13 @@ export default function App() {
     else base = (groups?.[kindFilter] ?? []);
     // Sol sutun kategorisi AYRICA bir filtre: ustune birlikte uygulanir.
     if (category !== 'all') base = base.filter((c) => categoryOf(c) === category);
+    // Triyaj cipleri: kucuk/guvenli/yeni kumeleri hizla eler.
+    if (triage.big) base = base.filter((c) => c.reclaimableBytes >= TRIAGE_BIG_BYTES);
+    if (triage.risky)
+      base = base.filter((c) => c.verdict.risk === 'medium' || c.verdict.risk === 'high');
+    if (triage.zombie) base = base.filter((c) => daysSince(c.lastTouched) >= TRIAGE_ZOMBIE_DAYS);
     return [...base].filter(match).sort((a, b) => compareClusters(a, b, sortMode));
-  }, [scan, groups, filter, kindFilter, sortMode, category]);
+  }, [scan, groups, filter, kindFilter, sortMode, category, triage]);
 
   /** Sol sutun: kategori ozeti + saglik olcumleri (yalniz tarama sonucundan). */
   const cats = useMemo(() => categoryStats(scan?.clusters ?? []), [scan]);
@@ -501,6 +518,27 @@ export default function App() {
       else next.add(key);
       return next;
     });
+  }, []);
+
+  /** Aralık secimi (Shift+ok): verilen anahtarlari acık/kapatik yapar. */
+  const setSelectionFor = useCallback((keys: string[], on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const k of keys) {
+        if (on) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
+  }, []);
+
+  /** Secimi birak (durum seridindeki "Secilenleri temizle"). */
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  /** "/" ile arama kutusuna odaklanma. */
+  const focusSearch = useCallback(() => {
+    searchRef.current?.focus();
+    searchRef.current?.select();
   }, []);
 
   const toggleExpand = useCallback((key: string) => {
@@ -981,17 +1019,19 @@ export default function App() {
               })}
             </div>
           )}
-          <Summary
+          <StatusStrip
             scan={scan}
             selectedBytes={selectedBytes}
+            selectedCount={selectedClusters.length}
             targetCount={targetCount}
-            clusterCount={selectedClusters.length}
             reclaimableSelectable={reclaimableSelectable}
             onSelectReclaimable={selectReclaimable}
+            onClearSelection={clearSelection}
           />
 
           <div className="toolbar">
             <input
+              ref={searchRef}
               className="search"
               type="search"
               placeholder={t('Ara: başlık, anahtar, yol…')}
@@ -1010,11 +1050,41 @@ export default function App() {
                 <option value="name">{t('Ad (A → Z)')}</option>
               </select>
             </label>
+            <div className="triage" role="group" aria-label={t('Triyaj')}>
+              <button
+                className={`chip chip-toggle${triage.big ? ' active' : ''}`}
+                onClick={() => setTriage((p) => ({ ...p, big: !p.big }))}
+                title={t('Silinebilir boyutu 1 GB üzeri olanlar')}
+              >
+                {t('Boyut ≥ 1 GB')}
+              </button>
+              <button
+                className={`chip chip-toggle${triage.risky ? ' active' : ''}`}
+                onClick={() => setTriage((p) => ({ ...p, risky: !p.risky }))}
+                title={t('Risk seviyesi orta veya yüksek olanlar')}
+              >
+                {t('Risk: orta+')}
+              </button>
+              <button
+                className={`chip chip-toggle${triage.zombie ? ' active' : ''}`}
+                onClick={() => setTriage((p) => ({ ...p, zombie: !p.zombie }))}
+                title={t('30 günden uzun süredir dokunulmamış')}
+              >
+                {t('Zombi ≥ 30 gün')}
+              </button>
+              <button
+                className="chip chip-toggle density-toggle"
+                onClick={() => setDensity((d) => (d === 'dense' ? 'comfortable' : 'dense'))}
+                title={t('Satır yoğunluğu')}
+              >
+                {density === 'dense' ? t('Yoğun') : t('Rahat')}
+              </button>
+            </div>
             <div className="select-actions">
               <button className="btn small" onClick={() => selectVisible(true)} disabled={phase === 'deleting'}>
                 {t('Görünenleri seç')}
               </button>
-              <button className="btn small" onClick={() => selectVisible(false)} disabled={phase === 'deleting'}>
+              <button className="btn small" onClick={clearSelection} disabled={phase === 'deleting'}>
                 {t('Seçimi temizle')}
               </button>
             </div>
@@ -1068,9 +1138,15 @@ export default function App() {
                   items={activeItems}
                   selected={selected}
                   expanded={expanded}
-                  resetKey={`${kindFilter}|${sortMode}|${filter}|${scan.finishedAt}`}
+                  focusedKey={focusedKey}
+                  density={density}
+                  resetKey={`${kindFilter}|${sortMode}|${filter}|${category}|${scan.finishedAt}`}
                   onToggle={toggleSelect}
                   onExpand={toggleExpand}
+                  onFocus={setFocusedKey}
+                  onSelectMany={setSelectionFor}
+                  onSearchFocus={focusSearch}
+                  onEscape={clearSelection}
                 />
               </section>
             )}
@@ -1427,76 +1503,6 @@ function defaultSelection(result: ScanResult): Set<string> {
 function errText(e: unknown): string {
   if (e instanceof ApiError) return e.message;
   return e instanceof Error ? e.message : String(e);
-}
-
-function Summary({
-  scan,
-  selectedBytes,
-  targetCount,
-  clusterCount,
-  reclaimableSelectable,
-  onSelectReclaimable,
-}: {
-  scan: ScanResult;
-  selectedBytes: number;
-  targetCount: number;
-  clusterCount: number;
-  reclaimableSelectable: number;
-  onSelectReclaimable: () => void;
-}) {
-  const { t } = useI18n();
-  const total = scan.clusters.reduce((a, c) => a + c.totalBytes, 0);
-  const reclaim = scan.clusters.reduce((a, c) => a + c.reclaimableBytes, 0);
-  const rec = scan.clusters.filter((c) => c.verdict.kind === 'recommend').length;
-  const ask = scan.clusters.filter((c) => c.verdict.kind === 'ask').length;
-  const ro = scan.clusters.filter((c) => c.verdict.kind === 'report-only').length;
-  const files = scan.clusters.reduce((a, c) => a + c.parts.reduce((b, p) => b + p.files, 0), 0);
-
-  return (
-    <section className="summary">
-      <div className="card">
-        <span className="card-label">{t('Taranan')}</span>
-        <strong>{formatBytes(total)}</strong>
-        <span className="dim">
-          {t('{files} dosya · {clusters} küme', {
-            files: formatCount(files),
-            clusters: scan.clusters.length,
-          })}
-        </span>
-      </div>
-      <div className="card">
-        <span className="card-label">{t('Silinebilir')}</span>
-        <strong className="green">{formatBytes(reclaim)}</strong>
-        <span className="dim">{t('yeniden üretilebilir veya kullanılamaz')}</span>
-        <button
-          type="button"
-          className="btn small card-action"
-          onClick={onSelectReclaimable}
-          disabled={reclaimableSelectable === 0}
-          title={t('Silinebilir kümelerin tümünü seç')}
-        >
-          {t('Seç ({n})', { n: reclaimableSelectable })}
-        </button>
-      </div>
-      <div className="card">
-        <span className="card-label">{t('Seçili')}</span>
-        <strong>{formatBytes(selectedBytes)}</strong>
-        <span className="dim">
-          {t('{clusters} küme · {targets} hedef', {
-            clusters: clusterCount,
-            targets: targetCount,
-          })}
-        </span>
-      </div>
-      <div className="card">
-        <span className="card-label">{t('Kararlar')}</span>
-        <strong>{rec + ask}</strong>
-        <span className="dim">
-          {t('{rec} önerilen · {ask} doğrulama · {ro} rapor', { rec, ask, ro })}
-        </span>
-      </div>
-    </section>
-  );
 }
 
 function DoneView({

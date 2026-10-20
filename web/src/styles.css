@@ -2365,6 +2365,278 @@ input {
   color: var(--muted);
 }
 
+/* =====================================================================
+   T42 / D3 — P1: yoğun ızgara + durum şeridi
+   "Modern terminal emülatörü × temiz dashboard" hibriti:
+   mono değerler, hizalı sütunlar, ince ayraçlar, `>` prompt imleci.
+   ===================================================================== */
+
+:root {
+  /* Ortak sütun şablonu: başlık ve satırlar aynı hizada olmalı. */
+  --grid-cols: 26px minmax(180px, 1fr) 108px 100px 92px 58px 66px;
+}
+
+/* --- durum şeridi: tek satır --- */
+
+.strip {
+  display: flex;
+  align-items: stretch;
+  margin: 0 0 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.strip-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 18px;
+  border-right: 1px solid var(--border);
+  min-width: 0;
+}
+
+.strip-item:first-child {
+  padding-left: 2px;
+}
+
+.strip-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.strip-value {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.strip-sub {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strip-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 18px;
+}
+
+/* --- triyaj çipleri --- */
+
+.triage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-toggle {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+.chip-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.chip-toggle.active {
+  color: #06121a;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.density-toggle {
+  margin-left: 4px;
+}
+
+/* --- ızgara başlığı (yapışkan) --- */
+
+.vlist-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: var(--grid-cols);
+  gap: 10px;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border-strong);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vlist-head > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vlist-head .cell.num {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.vlist-head .cell.risk,
+.vlist-head .cell.verdict {
+  text-align: right;
+}
+
+/* --- yoğun satırlar --- */
+
+.vlist.density-dense {
+  --row-h: 32px;
+}
+
+.vlist.density-comfortable {
+  --row-h: 40px;
+}
+
+.vlist .cluster {
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  opacity: 1;
+}
+
+.vlist .cluster.is-locked {
+  opacity: 0.66;
+}
+
+.vlist .cluster.is-selected {
+  background: rgba(76, 194, 255, 0.05);
+}
+
+.vlist .cluster.is-focused {
+  background: rgba(76, 194, 255, 0.1);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.vlist-item {
+  padding-bottom: 0;
+}
+
+.cluster-row {
+  grid-template-columns: var(--grid-cols);
+  height: var(--row-h, 32px);
+  padding: 0 10px;
+  gap: 10px;
+}
+
+.cluster-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cell.title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cluster-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-key {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* terminal prompt imleci: odaktaki satır */
+.row-prompt {
+  position: absolute;
+  left: -15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.cell.cat {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell.num.age {
+  display: block;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cell.num.size {
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: baseline;
+  font-family: var(--mono);
+}
+
+.cell.risk,
+.cell.verdict {
+  text-align: right;
+}
+
+.vlist .tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+}
+
+/* genişletilmiş detay yoğun modda da okunur kalsın */
+.vlist .cluster-detail {
+  border-top: 1px dashed var(--border);
+}
+
+@media (max-width: 1240px) {
+  :root {
+    --grid-cols: 26px minmax(140px, 1fr) 92px 78px 84px 0 66px;
+  }
+
+  .cell.risk {
+    display: none;
+  }
+}
+
 /* dar ekran: rail üstte yatay bloğa düşer */
 
 @media (max-width: 1080px) {
