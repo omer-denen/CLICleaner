@@ -1,5 +1,6 @@
 import type { CliInventory, CliTool } from './cli-inventory-types.ts';
 import { categoryOf, type CategoryKey } from './categories.ts';
+import { SelectionScope } from './selection-scope.ts';
 import type { Cluster, Risk, ScanResult } from './types.ts';
 
 /**
@@ -47,8 +48,7 @@ export function diskFindings(clusters: Cluster[]): Finding[] {
   const out: Finding[] = [];
   for (const c of clusters) {
     const root = c.parts[0]?.path ?? '';
-    const selectable =
-      c.verdict.kind !== 'report-only' && c.verdict.kind !== 'keep' && (c.deleteTargets?.length ?? 0) > 0;
+    const selectable = SelectionScope.isPlannable(c);
     const evidence: string[] = [];
     for (const k of c.evidence.fileKinds ?? []) evidence.push(k);
     for (const m of (c.evidence.markers ?? []).slice(0, 3)) evidence.push(m);
@@ -130,6 +130,21 @@ function cliReason(t: CliTool): string {
 /** Iki kaynagi birlestirir: once disk, sonra CLI. */
 export function mergeFindings(disk: Finding[], cli: Finding[]): Finding[] {
   return [...disk, ...cli];
+}
+
+/** Disk bulgu kimliginin oneki. */
+const DISK_FINDING_PREFIX = 'disk:';
+
+/**
+ * Disk bulgusundan kume anahtari; CLI bulgusunda null.
+ *
+ * Arayuz kimligi ayristirmaz; odaklanan bulgunun kume karsiligini
+ * bu fonksiyonla bulur.
+ */
+export function findingClusterKey(finding: Pick<Finding, 'id'>): string | null {
+  if (!finding.id.startsWith(DISK_FINDING_PREFIX)) return null;
+  const key = finding.id.slice(DISK_FINDING_PREFIX.length);
+  return key.length > 0 ? key : null;
 }
 
 /** Son tarama sonucundan butun bulgular (disk + CLI). */

@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
+import { ApprovalRules } from '../core/approval.ts';
 import type { DeleteMode, DeletePlan } from './delete.ts';
 
 /**
@@ -24,13 +25,6 @@ export interface ConfirmOptions {
   /** Risk duzeyine gore zorunlu yazili onay */
   phrase?: string;
 }
-
-const RISK_PHRASE: Record<string, string> = {
-  safe: '',
-  low: '',
-  medium: 'SIL',
-  high: 'SIL',
-};
 
 export interface ApprovalResult {
   approved: boolean;
@@ -69,7 +63,9 @@ export async function confirmPlan(
   const hasHigh = plan.clusters.some((c) => c.risk === 'high');
   const hasMedium = plan.clusters.some((c) => c.risk === 'medium');
 
-  const phrase = hasHigh ? RISK_PHRASE.high! : hasMedium ? RISK_PHRASE.medium! : opts.phrase ?? '';
+  const phrase = ApprovalRules.requiresPhrase(plan.clusters.map((c) => c.risk))
+    ? ApprovalRules.phrase('delete')
+    : (opts.phrase ?? '');
   const label = hasHigh ? 'YUKSEK RISK' : hasMedium ? 'ORTA RISK' : 'dusuk risk';
 
   if (!opts.interactive) {

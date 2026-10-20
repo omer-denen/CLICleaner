@@ -55,6 +55,14 @@ export class SelectionScope {
   }
 
   /**
+   * Listeden secilebilen kumelerin anahtarlari. Varsayilan: bu nesnenin
+   * tum kumeleri. "Gorunenleri sec" bu listeyi kullanir.
+   */
+  selectableKeys(over: Cluster[] = this.clusters): string[] {
+    return over.filter(SelectionScope.isSelectable).map((c) => c.key);
+  }
+
+  /**
    * "Tumunu planla" KAPSAMI: verilen kumelerden plana alinabilenlerin
    * anahtarlari. Varsayilan: bu nesnenin tum kumeleri.
    *

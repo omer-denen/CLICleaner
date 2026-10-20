@@ -60,6 +60,33 @@ export class EvidenceReader {
     this.cluster = cluster;
   }
 
+  /** Kume Git tarafindan takip edilen yollar iceriyor mu? */
+  static isGitTracked(cluster: Cluster): boolean {
+    return (cluster.evidence.markers ?? []).includes('git-tracked');
+  }
+
+  /**
+   * Sahiplik kanitinin kisa etiketi.
+   *
+   * Ad, surum ve urun alanlari kanittan gelir; arayuz yalnizca gosterir.
+   */
+  static ownerLabel(owner: NonNullable<Cluster['evidence']['owner']>): string {
+    switch (owner.kind) {
+      case 'packageJson':
+        return owner.version ? `${owner.name}@${owner.version}` : owner.name;
+      case 'manifest':
+        return owner.app;
+      case 'logFile':
+        return owner.product;
+      case 'binaryProduct':
+        return owner.product;
+      case 'directoryName':
+        return owner.name;
+      default:
+        return '';
+    }
+  }
+
   /**
    * Kume icin kanit cumleleri.
    *
@@ -82,7 +109,7 @@ export class EvidenceReader {
     if (kinds.includes('node-modules')) out.push('Icinde bagimlilik klasoru var (node_modules).');
 
     const markers = c.evidence.markers ?? [];
-    if (markers.includes('git-tracked'))
+    if (EvidenceReader.isGitTracked(c))
       out.push('Sürüm kontrolü altındaki yollar atlandı; tracked dosyalar silinmez.');
     if (markers.includes('CACHEDIR.TAG'))
       out.push('Klasor kendini onbellek olarak isaretliyor (CACHEDIR.TAG).');

@@ -1,6 +1,7 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { scanCliInventory } from '../core/cli-inventory.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import {
   executeCliQuarantine,
   planCliQuarantine,
@@ -82,11 +83,12 @@ export async function runQuarantine(args: string[]): Promise<void> {
   }
 
   stdout.write('  Yazili onay gerekli. Geri alinabilir ama arac PATH\'ten duser.\n');
+  const required = ApprovalRules.phrase('quarantine');
   const rl = createInterface({ input: stdin, output: stdout });
-  const ans = await rl.question('  Onaylamak icin "KARANTINA" yaz: ');
+  const ans = await rl.question(`  Onaylamak icin "${required}" yaz: `);
   rl.close();
 
-  if (ans.trim() !== 'KARANTINA') {
+  if (!ApprovalRules.matches('quarantine', ans)) {
     console.log(`${C.yellow}Vazgecildi; hicbir sey tasinmadi.${C.reset}`);
     process.exitCode = 1;
     return;

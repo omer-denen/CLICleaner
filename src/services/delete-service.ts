@@ -9,6 +9,7 @@ import {
   type DeleteResult,
 } from '../actions/delete.ts';
 import { longPath } from '../util/longpath.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import { newId } from './ids.ts';
 import { ServiceError, describeError } from './errors.ts';
 import type { ScanResult } from '../core/types.ts';
@@ -74,8 +75,9 @@ export class DeleteService {
 
     const planId = newId();
     const expiresAt = Date.now() + PLAN_TTL_MS;
-    const requiresPhrase = plan.clusters.some((c) => c.risk === 'medium' || c.risk === 'high');
-    const requiresHighAck = plan.clusters.some((c) => c.risk === 'high');
+    const risks = plan.clusters.map((c) => c.risk);
+    const requiresPhrase = ApprovalRules.requiresPhrase(risks);
+    const requiresHighAck = ApprovalRules.requiresHighAck(risks);
     this.plans.set(planId, {
       planId,
       plan,
@@ -101,8 +103,11 @@ export class DeleteService {
       this.plans.delete(stored.planId);
       throw new ServiceError(410, 'Plan suresi doldu; yeniden planlayin');
     }
-    if (stored.requiresPhrase && phrase !== 'SIL') {
-      throw new ServiceError(400, 'Onay metni hatali ("SIL" bekleniyordu)');
+    if (stored.requiresPhrase && !ApprovalRules.matches('delete', phrase)) {
+      throw new ServiceError(
+        400,
+        `Onay metni hatali ("${ApprovalRules.phrase('delete')}" bekleniyordu)`,
+      );
     }
     if (stored.requiresHighAck && acknowledgeHigh !== true) {
       throw new ServiceError(400, 'Yuksek risk onayi eksik');

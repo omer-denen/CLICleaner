@@ -3,6 +3,7 @@ import {
   planCliQuarantine,
   type QuarantinePlan,
 } from '../actions/cli-quarantine.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import { info } from '../util/log.ts';
 import { ServiceError } from './errors.ts';
 import { newId } from './ids.ts';
@@ -77,7 +78,7 @@ export class CliQuarantineService {
       items,
       totalBytes: plan.totalBytes,
       requiresPhrase: true,
-      phrase: 'KARANTINA',
+      phrase: ApprovalRules.phrase('quarantine'),
       expiresAt,
     };
   }
@@ -89,8 +90,11 @@ export class CliQuarantineService {
       this.plans.delete(planId);
       throw new ServiceError(410, 'Karantina plani suresi doldu; yeniden planlayin');
     }
-    if (phrase !== 'KARANTINA') {
-      throw new ServiceError(400, 'Onay metni hatali ("KARANTINA" bekleniyordu)');
+    if (!ApprovalRules.matches('quarantine', phrase)) {
+      throw new ServiceError(
+        400,
+        `Onay metni hatali ("${ApprovalRules.phrase('quarantine')}" bekleniyordu)`,
+      );
     }
 
     this.plans.delete(planId);

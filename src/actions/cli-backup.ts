@@ -2,6 +2,7 @@ import { cp, mkdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
 import { walk } from '../core/walker.ts';
+import { CliCommandText } from '../core/cli-command-text.ts';
 import type { CliTool } from '../core/cli-inventory-types.ts';
 
 /**
@@ -130,19 +131,10 @@ export async function executeToolBackup(
 
 /** Aracin paket yoneticisiyle yeniden kurulum komutu. */
 export function reinstallCommand(tool: CliTool): string {
-  const v = tool.version;
-  switch (tool.source) {
-    case 'npm-global':
-      return `npm install -g ${tool.packageName}${v ? `@${v}` : ''}`;
-    case 'uv-tool':
-      return `uv tool install ${tool.packageName}${v ? `==${v}` : ''}`;
-    case 'dotnet-tool':
-      return `dotnet tool install --global ${tool.packageName}${v ? ` --version ${v}` : ''}`;
-    case 'pip-user':
-      return `python -m pip install ${tool.packageName}${v ? `==${v}` : ''}`;
-    case 'standalone':
-      return '(paket yoneticisi yok; dagitim sayfasindan yeniden kur)';
-  }
+  return (
+    CliCommandText.reinstall(tool) ??
+    '(paket yoneticisi yok; dagitim sayfasindan yeniden kur)'
+  );
 }
 
 function restoreDoc(m: {

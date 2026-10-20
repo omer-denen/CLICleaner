@@ -1,5 +1,6 @@
 import { categoryStats, type CategoryStat } from './categories.ts';
-import { RISK_SEQUENCE } from './cluster-query.ts';
+import { RISK_SEQUENCE, type KindFilter } from './cluster-query.ts';
+import { EvidenceReader } from './evidence-text.ts';
 import type { Cluster, Risk, VerdictKind } from './types.ts';
 
 /**
@@ -56,9 +57,27 @@ export class ScanSummary {
   gitTrackedCount(): number {
     let n = 0;
     for (const c of this.clusters) {
-      if ((c.evidence.markers ?? []).includes('git-tracked')) n++;
+      if (EvidenceReader.isGitTracked(c)) n++;
     }
     return n;
+  }
+
+  /**
+   * Liste sekmesi rozeti icin sayi.
+   *
+   * "all" = tum kumeler, "git" = tracked isaretli kumeler, aksi halde
+   * karar turu. Arayuz kendi sayimini yapmaz.
+   */
+  countFor(kind: KindFilter): number {
+    if (kind === 'all') return this.clusters.length;
+    if (kind === 'git') return this.gitTrackedCount();
+    return this.verdictCounts()[kind];
+  }
+
+  /** Karar bekleyen kume sayisi: "onerilen" + "dogrulama". */
+  actionableCount(): number {
+    const counts = this.verdictCounts();
+    return counts.recommend + counts.ask;
   }
 
   /** Kategori bazli ozet (sol sutun). */

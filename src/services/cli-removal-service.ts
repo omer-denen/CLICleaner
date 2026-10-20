@@ -4,6 +4,7 @@ import {
   reinstallSpec,
   type CliRemovalPlan,
 } from '../actions/cli-remove.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import { info } from '../util/log.ts';
 import { ServiceError } from './errors.ts';
 import type { CliInventoryService } from './cli-inventory-service.ts';
@@ -112,8 +113,11 @@ export class CliRemovalService {
       this.plans.delete(planId);
       throw new ServiceError(410, 'Plan suresi doldu; yeniden planlayin');
     }
-    if (phrase !== 'SIL') {
-      throw new ServiceError(400, 'Onay metni hatali ("SIL" bekleniyordu)');
+    if (!ApprovalRules.matches('delete', phrase)) {
+      throw new ServiceError(
+        400,
+        `Onay metni hatali ("${ApprovalRules.phrase('delete')}" bekleniyordu)`,
+      );
     }
 
     this.plans.delete(planId);

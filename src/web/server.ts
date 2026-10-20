@@ -27,7 +27,9 @@ import {
   shortcutPath,
 } from '../actions/desktop-shortcut.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import { buildFindings } from '../core/findings.ts';
+import { FindingsQuery } from '../core/findings-query.ts';
 import { checkForUpdate } from '../core/update-check.ts';
 import { currentVersion } from '../util/version.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
@@ -385,10 +387,11 @@ async function handleRequest(
     const last = ctx.scan.last();
     const inv = ctx.inventory.getLast();
     const findings = buildFindings(last?.scan ?? null, inv);
+    const totals = new FindingsQuery(findings).totals();
     const body: FindingsResponse = {
       findings,
-      disk: findings.filter((f) => f.source === 'disk').length,
-      cli: findings.filter((f) => f.source === 'cli').length,
+      disk: totals.diskCount,
+      cli: totals.cliCount,
       at: last?.at ?? null,
     };
     sendJson(res, 200, body);
@@ -588,8 +591,10 @@ async function handleRequest(
   if (route === 'POST /api/vault/purge') {
     const body = await readJson<VaultPurgeRequest>(req);
     // Kalici islem: yazili onay sunucuda da dogrulanir (istemciye guvenilmez).
-    if ((body.phrase ?? '').trim() !== 'BOŞALT') {
-      sendJson(res, 400, { error: 'Onay ifadesi hatali (BOŞALT)' });
+    if (!ApprovalRules.matches('vaultPurge', body.phrase)) {
+      sendJson(res, 400, {
+        error: `Onay ifadesi hatali (${ApprovalRules.phrase('vaultPurge')})`,
+      });
       return;
     }
     const r = await purgeVault();

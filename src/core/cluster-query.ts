@@ -65,6 +65,12 @@ export class ClusterQuery {
     return this.clusters;
   }
 
+  /** Anahtardan tek kume (yoksa null). Baglam paneli bunu kullanir. */
+  byKey(key: string | null | undefined): Cluster | null {
+    if (!key) return null;
+    return this.clusters.find((c) => c.key === key) ?? null;
+  }
+
   /** Arama metni: baslik, anahtar, karar metni veya parca yollarinda arar. */
   static matchesText(c: Cluster, needle: string): boolean {
     return (

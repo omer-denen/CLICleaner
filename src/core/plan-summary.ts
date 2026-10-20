@@ -4,7 +4,8 @@ import type { PlannedClusterView, PlannedTargetView } from './contract.ts';
  * PLAN OZETI.
  *
  * Plan ekraninda gosterilen sayimlar: risk dagilimi ("SIL" yazili onay
- * gerekip gerekmedigini belirler), hedef turu dagilimi ve toplam bayt.
+ * gerekip gerekmedigini belirler), hedef turu dagilimi, toplam bayt ve
+ * plana girmeyen (korunan) kumeler.
  *
  * Bu modul SAF TypeScript'tir: node builtin importu YOKTUR.
  */
@@ -73,6 +74,21 @@ export class PlanSummary {
   clusterBytes(clusters: PlannedClusterView[]): number {
     let n = 0;
     for (const c of clusters) for (const t of c.targets) n += t.bytes;
+    return n;
+  }
+
+  /**
+   * Secilen ama plana GIRMEYEN kume sayisi.
+   *
+   * Plana yalniz "plannable" kumeler girer; geri kalanlar (report-only,
+   * keep, hedefsiz) korunur. Arayuz bu sayiyi tahmin etmez.
+   */
+  protectedCount(selectedKeys: Iterable<string>): number {
+    const planned = new Set(this.clusters.map((c) => c.key));
+    let n = 0;
+    for (const key of selectedKeys) {
+      if (!planned.has(key)) n++;
+    }
     return n;
   }
 }

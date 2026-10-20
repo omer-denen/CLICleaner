@@ -1,4 +1,4 @@
-import type { CliStatus, CliTool } from './cli-inventory-types.ts';
+import type { CliDuplicates, CliStatus, CliTool } from './cli-inventory-types.ts';
 
 /**
  * CLI ENVANTER SORGUSU.
@@ -17,11 +17,26 @@ import type { CliStatus, CliTool } from './cli-inventory-types.ts';
 /** Envanter filtresi; 'all' = hepsi. */
 export type CliFilter = 'all' | CliStatus;
 
+/** Ayni komutun coklu kurulumu: tutulacak ve kaldirilacak araclar. */
+export interface DuplicateDetail {
+  command: string;
+  reason: string;
+  /** Aktif shim'in gosterdigi kurulum (yoksa null). */
+  keep: CliTool | null;
+  /** Golgede kalan, planlanabilir kurulumlar. */
+  remove: CliTool[];
+  removeIds: string[];
+  /** Kaldirilacak kurulumlarin toplam boyutu. */
+  bytes: number;
+}
+
 export class CliInventoryQuery {
   private readonly tools: CliTool[];
+  private readonly duplicates: CliDuplicates[];
 
-  constructor(tools: CliTool[]) {
+  constructor(tools: CliTool[], duplicates: CliDuplicates[] = []) {
     this.tools = tools;
+    this.duplicates = duplicates;
   }
 
   /** Envanterdeki tum araclar. */
@@ -59,6 +74,19 @@ export class CliInventoryQuery {
   filter(filter: CliFilter): CliTool[] {
     const sorted = this.sorted();
     return filter === 'all' ? sorted : sorted.filter((x) => x.status === filter);
+  }
+
+  /** Kimlikten arac (yoksa null). */
+  byId(id: string): CliTool | null {
+    return this.tools.find((x) => x.id === id) ?? null;
+  }
+
+  /**
+   * "Gorunenleri sec": filtre sonucundaki kaldirilabilir araclarin
+   * kimlikleri. Kural motorda; arayuz yalnizca sonucu uygular.
+   */
+  selectableIds(filter: CliFilter = 'all'): string[] {
+    return this.filter(filter).filter(CliInventoryQuery.isRemovable).map((x) => x.id);
   }
 
   /** Atil (kullanilmayan) araclar. */
@@ -107,6 +135,30 @@ export class CliInventoryQuery {
   /** Kaldirilabilir araclarin kimlikleri. */
   removableIds(): string[] {
     return this.tools.filter(CliInventoryQuery.isRemovable).map((x) => x.id);
+  }
+
+  /**
+   * Ayni komutun coklu kurulumlari: tutulacak arac, kaldirilacak araclar
+   * ve toplam boyut. "Hangi kurulum korunur" karari envanterde verilir;
+   * burada yalniz cozulur ve gosterime hazir hale getirilir.
+   */
+  duplicateDetails(): DuplicateDetail[] {
+    return this.duplicates.map((d) => {
+      const keep = this.byId(d.keepId);
+      const remove = d.removeIds
+        .map((id) => this.byId(id))
+        .filter((x): x is CliTool => x !== null);
+      let bytes = 0;
+      for (const tool of remove) bytes += tool.totalBytes;
+      return {
+        command: d.command,
+        reason: d.reason,
+        keep,
+        remove,
+        removeIds: d.removeIds,
+        bytes,
+      };
+    });
   }
 
   /** Envanter sayaclari (kartlar ve rozetler icin). */

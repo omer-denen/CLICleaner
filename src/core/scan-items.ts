@@ -30,3 +30,25 @@ export function primaryPath(cluster: Cluster): string {
 export function scanItemId(cluster: Cluster): string {
   return `${cluster.key}#${pathHash(primaryPath(cluster))}`;
 }
+
+/** Canli liste ogesi icin gereken minimum alanlar. */
+export interface ScanItemLike {
+  id: string;
+  cluster: Cluster;
+}
+
+/**
+ * Canli liste sirasi: kurtarilabilir boyut azalan, esitlikte kimlik.
+ *
+ * Ayni kural hem canli "Bulunanlar" listesinde hem testte kullanilir;
+ * arayuz kendi siralama kuralini yazmaz.
+ */
+export function compareScanItemsBySize(a: ScanItemLike, b: ScanItemLike): number {
+  const d = b.cluster.reclaimableBytes - a.cluster.reclaimableBytes;
+  return d !== 0 ? d : a.id.localeCompare(b.id);
+}
+
+/** Canli listeyi boyuta gore siralar (girdi degismez). */
+export function sortScanItemsBySize<T extends ScanItemLike>(items: T[]): T[] {
+  return [...items].sort(compareScanItemsBySize);
+}

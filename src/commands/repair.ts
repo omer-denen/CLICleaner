@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { scanCliInventory, type CliTool } from '../core/cli-inventory.ts';
+import { ApprovalRules } from '../core/approval.ts';
 
 /**
  * `clicleaner repair` — bozuk / yarim kurulumlari terminalde gosterir
@@ -65,8 +66,9 @@ export async function runRepair(args: string[]): Promise<void> {
 
   const rl = createInterface({ input: stdin, output: stdout });
   try {
-    const answer = (await rl.question('  Onaylamak için ONAR yaz: ')).trim();
-    if (answer !== 'ONAR') {
+    const required = ApprovalRules.phrase('repair');
+    const answer = (await rl.question(`  Onaylamak için ${required} yaz: `)).trim();
+    if (!ApprovalRules.matches('repair', answer)) {
       console.log('  İptal edildi.');
       return;
     }

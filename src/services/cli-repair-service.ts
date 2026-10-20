@@ -3,6 +3,7 @@ import {
   planCliRepairs,
   type CliRepairPlan,
 } from '../actions/cli-repair.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import { info } from '../util/log.ts';
 import { ServiceError } from './errors.ts';
 import type { CliInventoryService } from './cli-inventory-service.ts';
@@ -66,8 +67,11 @@ export class CliRepairService {
       this.plans.delete(planId);
       throw new ServiceError(410, 'Onarim plani suresi doldu; yeniden planlayin');
     }
-    if (phrase !== 'ONAR') {
-      throw new ServiceError(400, 'Onay metni hatali ("ONAR" bekleniyordu)');
+    if (!ApprovalRules.matches('repair', phrase)) {
+      throw new ServiceError(
+        400,
+        `Onay metni hatali ("${ApprovalRules.phrase('repair')}" bekleniyordu)`,
+      );
     }
 
     this.plans.delete(planId);
