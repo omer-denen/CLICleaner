@@ -100,7 +100,7 @@ export async function confirmPlan(
 
   stdout.write(`\n  ${format(plan.totalBytes)} silinecek (${label})\n`);
   if (plan.mode === 'recycle') {
-    stdout.write('  Geri donusum kutusuna tasinacak — geri alinabilir.\n');
+    stdout.write('  Aracin kendi kasasina tasinacak - geri alinabilir.\n');
   } else {
     stdout.write('  KALICI SILME — geri alinamaz.\n');
   }

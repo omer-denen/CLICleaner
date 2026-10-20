@@ -43,9 +43,16 @@ export function sseSetup(res: ServerResponse): void {
   res.write(': bagli\n\n');
 }
 
-export function sseSend(res: ServerResponse, data: unknown): void {
+/**
+ * SSE olayi yazar. `id` verilirse tarayici `Last-Event-ID` olarak
+ * saklar ve baglanti koptugunda sunucuya geri gonderir (MDN: SSE
+ * event stream format). Yeniden baglanmada olaylar bu kimlikten
+ * sonrasindan tekrar oynatilir.
+ */
+export function sseSend(res: ServerResponse, data: unknown, id?: number): void {
   if (res.writableEnded) return;
   try {
+    if (typeof id === 'number' && Number.isFinite(id)) res.write(`id: ${id}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   } catch {
     /* istemci koptu */

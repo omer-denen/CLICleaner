@@ -69,10 +69,11 @@
 
 ### Faz 7 — Geri dönüşüm / kalıcı silme
 
-- [ ] **Çelişki:** araca özel karantina alanı, mevcut Windows Geri Dönüşüm
-      Kutusu + `cli-backup` kasasıyla çakışır. Öneri: yeni bir silme deposu
-      açmak yerine mevcut kutuya meta veri indeksi eklemek.
-- [ ] Saklama süresi (30 gün) ve kalan gün sayısı.
+- [x] **Kasa:** Windows Geri Dönüşüm Kutusu iptal; `actions/vault.ts`
+      (manifest, atomik rename, çakışmada `.restored-<zaman>`).
+- [ ] Kasa ekranı: parti listesi, boyut, tek tık geri yükleme, kalan gün.
+- [ ] Saklama süresi yalnızca bilgi; otomatik temizlik yok (OS Storage Sense
+      zaten Recycle Bin'i yönetir; bizim kasamız kullanıcı onayıyla boşaltılır).
 - [ ] Kalıcı silme: iki aşamalı onay + metin (mevcut `SIL` akışı korunur).
 
 ### Faz 8 — Güvenlik / UX cilası
@@ -87,8 +88,12 @@
 
 1. **Zamanlanmış silme:** "Direkt silme hiçbir zaman olmaz" ilkesiyle çelişir.
    Otomatik çalışan silme yapılmayacak; plan hatırlatıcı + onay üretecek.
-2. **Özel karantina:** Windows Geri Dönüşüm Kutusu zaten kullanılıyor.
-   İkinci bir depo veri kaybı riski doğurur; meta veri indeksi önerilir.
+2. **Karantina kararı (kullanıcı):** Windows Geri Dönüşüm Kutusu **iptal**.
+   Silinen yollar aracın kendi kasasına taşınır
+   (`%LOCALAPPDATA%\clicleaner\vault\<batch>`), manifest + `.restored-*`
+   çakışma çözümü vardır. Araştırma notu: Windows Storage Sense zaten
+   Recycle Bin'i yaş/kota ile temizler; bu yüzden ayrı bir otomatik
+   temizlik YAPILMAZ, saklama yalnızca bilgi olarak gösterilir.
 3. **İstemciden yol:** Mevcut sözleşme bilinçli olarak yol kabul etmez.
    Yol doğrulama "sunucu tarama sonucundan gelen anahtarları çöz" şeklinde.
 4. **Dosya sistemi değişikliği:** Tüm diski izlemek pahalı. "Eski" işareti

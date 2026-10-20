@@ -36,10 +36,10 @@ export interface CleanArgs {
  * Temizleme akisi — iki asama:
  *
  *   1. LISTELE : tara, kume olustur, silme planini yazdir
- *   2. ONAYLA  : riske gore kademeli onay, sonra geri donusum kutusuna
+ *   2. ONAYLA  : riske gore kademeli onay, sonra ARACIN KENDI KASASINA
  *
- * Geri donusum kutusu varsayilandir. Kalici silme ancak --purge ile
- * ve yine de yazili onayla yapilir.
+ * Kasa varsayilandir (Windows Geri Donusum Kutusu kullanilmaz).
+ * Kalici silme ancak --purge ile ve yine de yazili onayla yapilir.
  */
 export async function runClean(args: CleanArgs): Promise<void> {
   const mode: DeleteMode = args.purge ? 'purge' : 'recycle';
@@ -195,7 +195,7 @@ export async function runClean(args: CleanArgs): Promise<void> {
     console.log(`${C.red}  Hata       : ${failedCount}${C.reset}`);
   }
   if (mode === 'recycle' && removed > 0) {
-    console.log(`${C.cyan}  Geri al    : Geri Donusum Kutusu'ndan veya "clicleaner undo" ile${C.reset}`);
+    console.log(`${C.cyan}  Geri al    : "clicleaner undo --restore" ile kasadan${C.reset}`);
   } else if (mode === 'purge' && removed > 0) {
     console.log(`${C.red}  Kalici silindi — geri alinamaz${C.reset}`);
   }

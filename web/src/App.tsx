@@ -746,9 +746,9 @@ export default function App() {
                 className={mode === 'recycle' ? 'active' : ''}
                 onClick={() => setMode('recycle')}
                 disabled={phase === 'deleting'}
-                title={t('Geri dönüşüm kutusuna taşınır; geri alınabilir')}
+                title={t('Aracın kendi kasasına taşınır; geri alınabilir')}
               >
-                {t('Geri dönüşüm')}
+                {t('Kasaya taşı')}
               </button>
               <button
                 className={mode === 'purge' ? 'active danger' : 'danger'}
@@ -1252,7 +1252,11 @@ function DoneView({
     <div className="done">
       <div className="done-card">
         <h2>{t('Tamamlandı')}</h2>
-        <p className="big green">{t('{bytes} boşaltıldı', { bytes: formatBytes(done.freed) })}</p>
+        <p className="big green">
+          {done.mode === 'purge'
+            ? t('{bytes} boşaltıldı', { bytes: formatBytes(done.freed) })
+            : t('{bytes} kasaya taşındı', { bytes: formatBytes(done.freed) })}
+        </p>
         <p className="dim">
           {t('{n} dosya/klasör işlendi', { n: done.removed })}
           {done.skipped > 0 ? ` ${t('· {n} atlandı', { n: done.skipped })}` : ''}
@@ -1262,7 +1266,7 @@ function DoneView({
           <div className="alert alert-danger">{t('Kalıcı silindi; geri alınamaz.')}</div>
         ) : (
           <div className="alert alert-info">
-            {t('Geri dönüşüm kutusunda. Geri almak için Geri Dönüşüm Kutusu’nu aç veya {cmd} kullan.', {
+            {t('Kasada. Geri almak için kasayı aç veya {cmd} kullan.', {
               cmd: 'clicleaner undo --restore',
             })}
           </div>
@@ -1290,7 +1294,7 @@ function DoneView({
           </button>
           {done.mode === 'recycle' && (
             <button className="btn btn-primary" onClick={onOpenRecycle}>
-              {t('Geri Dönüşüm Kutusu’nu aç')}
+              {t('Kasayı aç')}
             </button>
           )}
         </div>

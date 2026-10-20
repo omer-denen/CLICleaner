@@ -5,6 +5,7 @@ import { debug, error as logError, info, warn } from '../util/log.ts';
 import type { DeleteTarget, Cluster, SensitiveAllow } from '../core/types.ts';
 import { assertSafeTarget } from './guard.ts';
 import { gitTrackerFor } from '../core/git.ts';
+import { moveIntoVault, newVaultBatch } from './vault.ts';
 
 /**
  * Silme katmani.
@@ -211,76 +212,17 @@ export async function deleteTarget(
       return res;
     }
 
-    // Geri donusum kutusu: kota yetiyorsa klasorun tamami
-    const fits = await recycleBinHasRoom(w);
-    debug('geri donusum kutusu k kontrolu', { path: target.path, sizeMB: Math.round(w / 1048576), fits });
-
-    if (fits) {
-      try {
-        await recycleViaShell(target.path, true);
-        info('geri donusum kutusuna tasindi', { path: target.path, bytes: w });
-      } catch (err) {
-        const msg = describe(err);
-        logError('geri donusum kutusuna gonderilemedi', { path: target.path, err: msg });
-        // Kota dolu / cok buyuk: kalici silme YAPMA, kullaniciya bildir
-        res.failed.push({
-          path: target.path,
-          reason: `${msg} — geri donusum kutusuna sigmiyor; --purge ile kalici sil`,
-        });
-        res.bytesFreed = 0;
-        res.removed = 0;
-      }
-    } else {
-      // Kota yetmiyor: dosya dosya gondermeyi dene
-      // (TEK geri donusum sureci kullanilir)
-      const files = await collectFiles(target.path);
-      let moved = 0;
-      const bin = recycle();
-      let quotaChecked = false;
-      for (const f of files) {
-        try {
-          const st = await lstat(longPath(f));
-          if (st.isSymbolicLink()) {
-            res.skipped.push({ path: f, reason: 'sembolik bag/junction (hedef korunur)' });
-            continue;
-          }
-          if (!quotaChecked) {
-            quotaChecked = true;
-            if (!(await recycleBinHasRoom(0))) {
-              res.skipped.push({ path: f, reason: 'geri donusum kutusu dolu' });
-              continue;
-            }
-          }
-          const rr = await bin.send(f);
-          if (rr.ok) {
-            res.bytesFreed += st.size;
-            moved++;
-          } else if (/kilitli|being used|erişim/i.test(rr.reason)) {
-            res.skipped.push({ path: f, reason: 'dosya kilitli' });
-          } else if (rr.reason === 'dosya zaten yok') {
-            moved++;
-          } else {
-            warn('geri donusum kutusuna gonderilemedi', { path: f, reason: rr.reason });
-            res.skipped.push({ path: f, reason: rr.reason });
-          }
-        } catch (err) {
-          const code = (err as NodeJS.ErrnoException).code;
-          if (code === 'EPERM' || code === 'EBUSY' || code === 'EACCES') {
-            res.skipped.push({ path: f, reason: 'dosya kilitli' });
-          } else {
-            res.skipped.push({ path: f, reason: describe(err) });
-          }
-        }
-      }
-      res.removed = moved;
-      if (moved > 0) {
-        // Bosalan klasorleri temizle (artik icleri bos)
-        try {
-          await rm(longPath(target.path), { recursive: true, force: true, maxRetries: 1 });
-        } catch {
-          /* icinde dosya kalmis olabilir, sorun degil */
-        }
-      }
+    // Kendi kasamiz: klasorun tamami tek atomik rename ile tasinir.
+    try {
+      const batch = await newVaultBatch();
+      await moveIntoVault(batch, target.path, w, 1);
+      info('kasaya tasindi', { path: target.path, bytes: w, batch: batch.id });
+    } catch (err) {
+      const msg = describe(err);
+      logError('kasaya tasinamadi', { path: target.path, err: msg });
+      res.failed.push({ path: target.path, reason: `${msg} — kasa tasima basarisiz` });
+      res.bytesFreed = 0;
+      res.removed = 0;
     }
     return res;
   }
@@ -347,21 +289,25 @@ export async function deleteTarget(
     return res;
   }
 
-  // Geri donusum kutusu: TEK surec, N dosya
-  const bin = recycle();
-  const CONC = 1; // tek surec sirali beslenir
-  for (let i = 0; i < eligible.length; i += CONC) {
-    for (const e of eligible.slice(i, i + 64)) {
-      const r = await bin.send(e.path);
-      if (r.ok) {
-        res.bytesFreed += e.size;
-        res.removed++;
-      } else if (/permission|kilitli|being used|erişim/i.test(r.reason)) {
+  // Kendi kasamiz: her dosya tek tek tasinir (yas filtresi zaten uygulandi).
+  let batch: Awaited<ReturnType<typeof newVaultBatch>> | null = null;
+  try {
+    batch = await newVaultBatch();
+  } catch (err) {
+    res.failed.push({ path: target.path, reason: `kasa olusturulamadi: ${describe(err)}` });
+    return res;
+  }
+  for (const e of eligible) {
+    try {
+      await moveIntoVault(batch, e.path, e.size, 1);
+      res.bytesFreed += e.size;
+      res.removed++;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'EPERM' || code === 'EBUSY' || code === 'EACCES') {
         res.skipped.push({ path: e.path, reason: 'dosya kilitli (uygulama acik)' });
-      } else if (r.reason === 'dosya zaten yok') {
-        res.removed++;
       } else {
-        res.failed.push({ path: e.path, reason: r.reason });
+        res.failed.push({ path: e.path, reason: describe(err) });
       }
     }
   }

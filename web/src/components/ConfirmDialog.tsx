@@ -58,7 +58,7 @@ export function ConfirmDialog({ plan, busy, onCancel, onConfirm }: Props) {
         <header className="modal-head">
           <h2>{t('Planı gözden geçir')}</h2>
           <span className={`tag ${view.mode === 'purge' ? 'tag-danger' : 'tag-recycle'}`}>
-            {view.mode === 'purge' ? t('KALICI SİLME') : t('Geri dönüşüm kutusu')}
+            {view.mode === 'purge' ? t('KALICI SİLME') : t('Kasa (geri alınabilir)')}
           </span>
         </header>
 
@@ -77,11 +77,11 @@ export function ConfirmDialog({ plan, busy, onCancel, onConfirm }: Props) {
 
         {view.mode === 'purge' ? (
           <div className="alert alert-danger">
-            {t('Kalıcı silme geri alınamaz. Emin değilsen “Geri dönüşüm kutusu” modunu kullan.')}
+            {t('Kalıcı silme geri alınamaz. Emin değilsen “Kasa” modunu kullan.')}
           </div>
         ) : (
           <div className="alert alert-info">
-            {t('Dosyalar geri dönüşüm kutusuna taşınır; yanlış karar verirsen geri alabilirsin.')}
+            {t('Dosyalar aracın kendi kasasına taşınır; yanlış karar verirsen geri alabilirsin.')}
           </div>
         )}
 

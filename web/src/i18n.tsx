@@ -350,6 +350,20 @@ const EN: Record<string, string> = {
   Kaydet: 'Save',
   'Ayarlar kaydedildi.': 'Settings saved.',
 
+  // --- kasa (Recycle Bin yerine) ---
+  'Kasaya taşı': 'Move to vault',
+  'Kasa (geri alınabilir)': 'Vault (restorable)',
+  'Aracın kendi kasasına taşınır; geri alınabilir':
+    "Moved to the tool's own vault; restorable",
+  'Dosyalar aracın kendi kasasına taşınır; yanlış karar verirsen geri alabilirsin.':
+    "Files are moved to the tool's own vault; you can restore a wrong decision.",
+  'Kalıcı silme geri alınamaz. Emin değilsen “Kasa” modunu kullan.':
+    'Permanent deletion cannot be undone. Use “Vault” mode if unsure.',
+  '{bytes} kasaya taşındı': '{bytes} moved to vault',
+  'Kasada. Geri almak için kasayı aç veya {cmd} kullan.':
+    'In the vault. To restore, open the vault or use {cmd}.',
+  'Kasayı aç': 'Open vault',
+
   // --- plan görünümü (Faz 1) ---
   'Planı gözden geçir': 'Review the plan',
   toplam: 'total',

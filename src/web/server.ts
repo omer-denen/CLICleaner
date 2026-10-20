@@ -11,6 +11,8 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { closeRecycle } from '../actions/delete.ts';
+import { vaultRoot } from '../actions/vault.ts';
+import { mkdirSync } from 'node:fs';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { longPath } from '../util/longpath.ts';
 import { ScanService } from '../services/scan-service.ts';
@@ -120,10 +122,10 @@ export function createWebServer(opts: WebOptions = {}): { server: Server; token:
 
   // Servis olaylarini SSE istemcilerine yazan tek nokta. Terminal
   // olaydan sonra baglantilar kapatilir; servisler HTTP bilmez.
-  const emit = (jobId: string, event: unknown): void => {
+  const emit = (jobId: string, event: unknown, id?: number): void => {
     const clients = streams.get(jobId);
     if (!clients) return;
-    for (const c of clients) sseSend(c, event);
+    for (const c of clients) sseSend(c, event, id);
     const type = (event as { type?: string }).type;
     if (type === 'done' || type === 'cancelled' || type === 'error') {
       for (const c of clients) c.end();
@@ -505,6 +507,25 @@ function openScanStream(
   }
 
   sseSetup(res);
+
+  // SSE yeniden baglanma: tarayici `Last-Event-ID` gonderir. Son 2000
+  // olay tutuldugu icin istemci kacirdigi olaylari tekrar alir; tampon
+  // disina dustuyse asagidaki anlik gorunum (snapshot) kullanilir.
+  const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+  const headerId = req.headers['last-event-id'];
+  const rawId = Array.isArray(headerId) ? headerId[0] : headerId;
+  const lastId = Number(rawId ?? url.searchParams.get('lastEventId') ?? 0) || 0;
+  const firstId = job.events[0]?.id ?? 0;
+  const canReplay = lastId > 0 && (job.events.length === 0 || lastId >= firstId - 1);
+  if (canReplay) {
+    for (const e of job.events) {
+      if (e.id > lastId) sseSend(res, e.event, e.id);
+    }
+    // Biten tarama: son olay (done/cancelled/error) de gonderildi.
+    if (job.status !== 'running') res.end();
+    return;
+  }
+
   sseSend(res, { type: 'progress', ...job.progress });
 
   // Gec baglanan istemci, taranacak alanlari ve simdiye kadar
@@ -699,7 +720,10 @@ function metaResponse(ctx: WebContext): MetaResponse {
 
 function openRecycleBin(res: ServerResponse): void {
   try {
-    spawn('explorer.exe', ['shell:RecycleBinFolder'], {
+    // Windows Geri Donusum Kutusu degil, ARACIN KENDI kasasi acilir.
+    const dir = vaultRoot();
+    mkdirSync(longPath(dir), { recursive: true });
+    spawn('explorer.exe', [dir], {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,

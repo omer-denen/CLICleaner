@@ -39,6 +39,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   ayarlardan değiştirilebilir; silme sonrası sonuç "eski" işaretlenir.
 - **Plan görünümü:** silme planı risk gruplarına ayrıldı; özet üstte sabit,
   hedef yolları isteğe bağlı açılıyor.
+- **Kendi kasa:** Windows Geri Dönüşüm Kutusu yerine silinen öğeler aracın
+  kasasına taşınır. Manifest, atomik taşıma ve çakışmada `.restored-*`
+  olarak geri yükleme vardır (`clicleaner undo --restore`).
 - Varsayılan seçim yalnızca yeniden oluşturulabilirliği kanıtlanmış ve
   güven düzeyi düşük olmayan klasörleri işaretler.
 - Web arayüzünün hangi tarayıcıda açıldığı ve nasıl değiştirileceği

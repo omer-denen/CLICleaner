@@ -38,12 +38,15 @@ export interface ScanJob {
   targets: string[];
   /** Simdiye kadar siniflandirilan kumeler: gec baglanan istemciye replay. */
   found: Cluster[];
+  /** SSE yeniden baglanma: olay kimligi + son N olay (Last-Event-ID). */
+  events: Array<{ id: number; event: ScanStreamEvent }>;
+  nextEventId: number;
   result?: ScanResult;
   error?: string;
   startedAt: number;
 }
 
-export type ScanEmit = (jobId: string, event: ScanStreamEvent) => void;
+export type ScanEmit = (jobId: string, event: ScanStreamEvent, id?: number) => void;
 
 export interface ScanArgs {
   envs: Env[];
@@ -81,6 +84,8 @@ export class ScanService {
       progress: { done: 0, total: 0, bytes: 0 },
       targets: [],
       found: [],
+      events: [],
+      nextEventId: 0,
       startedAt: Date.now(),
     };
     const controller = new AbortController();
@@ -201,6 +206,17 @@ export class ScanService {
     });
   }
 
+  /**
+   * Olayi artan kimlikle yayinlar ve son 2000 olayi tutar. Yeniden
+   * baglanan istemci `Last-Event-ID` gonderirse buradan tekrar oynatilir.
+   */
+  private pushEvent(job: ScanJob, event: ScanStreamEvent): void {
+    const id = ++job.nextEventId;
+    job.events.push({ id, event });
+    if (job.events.length > 2000) job.events.splice(0, job.events.length - 2000);
+    this.emit(job.id, event, id);
+  }
+
   private async runJob(job: ScanJob, controller: AbortController, args: ScanArgs): Promise<void> {
     try {
       const result = await runScan({
@@ -215,18 +231,18 @@ export class ScanService {
         signal: controller.signal,
         onProgress: (done, total, bytes) => {
           job.progress = { done, total, bytes };
-          this.emit(job.id, { type: 'progress', done, total, bytes });
+          this.pushEvent(job, { type: 'progress', done, total, bytes });
         },
         onTargets: (paths) => {
           job.targets = paths;
-          this.emit(job.id, { type: 'targets', paths });
+          this.pushEvent(job, { type: 'targets', paths });
         },
         onTargetStart: (path, done, total) => {
-          this.emit(job.id, { type: 'target-start', path, done, total });
+          this.pushEvent(job, { type: 'target-start', path, done, total });
         },
         onTargetDone: (path, done, total, cluster) => {
           if (cluster) job.found.push(cluster);
-          this.emit(job.id, { type: 'target-done', path, done, total, cluster });
+          this.pushEvent(job, { type: 'target-done', path, done, total, cluster });
         },
       });
 
@@ -237,7 +253,7 @@ export class ScanService {
           ilerleme: `${job.progress.done}/${job.progress.total}`,
           kume: result.clusters.length,
         });
-        this.emit(job.id, { type: 'cancelled' });
+        this.pushEvent(job, { type: 'cancelled' });
         return;
       }
 
@@ -254,15 +270,15 @@ export class ScanService {
         // Testler kismi taramalari onbellege yazmasin (persistScan: false).
         if (this.persistScan) await saveScanCache(result);
       }
-      this.emit(job.id, { type: 'done', result });
+      this.pushEvent(job, { type: 'done', result });
     } catch (err) {
       if (controller.signal.aborted) {
         job.status = 'cancelled';
-        this.emit(job.id, { type: 'cancelled' });
+        this.pushEvent(job, { type: 'cancelled' });
       } else {
         job.status = 'error';
         job.error = describeError(err);
-        this.emit(job.id, { type: 'error', message: job.error });
+        this.pushEvent(job, { type: 'error', message: job.error });
       }
     } finally {
       this.active = null;
