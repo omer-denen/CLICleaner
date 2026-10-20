@@ -56,6 +56,19 @@ export interface PathSourceReport {
   note?: string;
 }
 
+/**
+ * T33: bir araci baska bir yerden kullanan kanit.
+ *
+ * Referans/surec varsa kaldirma guveni dusurulur; bu bir SILME karari
+ * degildir, yalnizca "once bunu kaldir/kapat" uyarisidir.
+ */
+export interface CliReference {
+  kind: 'process' | 'config' | 'shortcut' | 'scheduled-task';
+  /** Surec adi, dosya yolu veya gorev adi */
+  path: string;
+  detail: string;
+}
+
 export interface UninstallSpec {
   kind: 'npm' | 'uv' | 'dotnet' | 'pip' | 'manual';
   program: string;
@@ -104,6 +117,8 @@ export interface CliTool {
   repair?: UninstallSpec;
   /** T17: npm kurulum gunlugunden kurulum izi (varsa). */
   installTrace?: InstallTrace;
+  /** T33: araci kullanan surec/dosya/gorev referanslari (SALT OKUNUR). */
+  references?: CliReference[];
 }
 
 /**

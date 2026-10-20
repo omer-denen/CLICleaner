@@ -16,6 +16,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
   alt klasörü hedeflenir; uygulama klasörü korunur.
 - **PATH kaynakları:** CLI envanteri, kullanıcı ve makine PATH'ini
   karşılaştırır; yinelenen ve artık var olmayan dizinleri listeler.
+- **Kaldırma öncesi referans kontrolü:** CLI envanteri, aracı kullanan
+  çalışan süreçleri, yapılandırma dosyalarını, kısayolları ve zamanlanmış
+  görevleri salt okunur tarar. Referans varsa kaldırma güveni düşer ve
+  plan ekranında "önce kapat/kaldır" notu gösterilir.
 - **Node sürüm kopyaları:** CLI envanteri, Node sürüm yöneticilerinin
   (nvm / fnm / volta) barındırdığı sürümleri yapıdan tanır; hangi sürümün
   aktif olduğunu gösterir ve eski sürümlerin global paketlerini inceleme

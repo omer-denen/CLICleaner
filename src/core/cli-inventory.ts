@@ -8,6 +8,7 @@ import { walk } from './walker.ts';
 import { readExeInfo } from './exe-info.ts';
 import { readPathSources } from './path-sources.ts';
 import { scanNodeRuntimes } from './node-runtimes.ts';
+import { annotateReferences } from './cli-references.ts';
 import { daysSince } from '../util/format.ts';
 
 /**
@@ -143,6 +144,9 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
   // T17: kurulum izi (npm _logs), oksuz shim taramasi ve PATH golgeleme.
   // Hepsi SALT OKUNUR kanit uretir; hicbiri silme hedefi olmaz.
   await applyInstallTraces(uniqueTools);
+  // T33: kaldirma oncesi referans kontrolu (surec / yapilandirma / kisayol /
+  // zamanlanmis gorev). SALT OKUNUR; guveni dusurur, silme hedefi uretmez.
+  await annotateReferences(uniqueTools);
   const npmPrefix = process.env.APPDATA ? join(process.env.APPDATA, 'npm') : '';
   if (npmPrefix) shimIssues.push(...(await scanNpmShimOrphans(npmPrefix)));
   const pathShadows = await scanPathShadowing(uniqueTools);
