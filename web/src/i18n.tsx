@@ -434,6 +434,16 @@ const EN: Record<string, string> = {
   'Yolları göster ({n})': 'Show paths ({n})',
   'Yolları gizle': 'Hide paths',
 
+  // --- masaüstü kısayolu (T40) ---
+  'Masaüstü kısayolu': 'Desktop shortcut',
+  'Masaüstü kısayolu eklendi.': 'Desktop shortcut added.',
+  'Masaüstü kısayolu kaldırıldı.': 'Desktop shortcut removed.',
+  'Kısayol ekle': 'Add shortcut',
+  'Kısayolu kaldır': 'Remove shortcut',
+  'Kısayol hazır: {path}': 'Shortcut ready: {path}',
+  'Masaüstüne bir kısayol ekle; arayüzü tek tıkla aç.':
+    'Add a desktop shortcut and open the UI with one click.',
+
   // --- birleşik görünüm (P5) ---
   Birleşik: 'Unified',
   Boşta: 'Idle',

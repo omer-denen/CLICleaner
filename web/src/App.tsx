@@ -5,6 +5,7 @@ import { formatBytes, formatCount, daysSince } from '../../src/util/format.ts';
 import type { Cluster, ScanResult } from '../../src/core/types.ts';
 import type {
   DeleteMode,
+  DesktopShortcutView,
   ExecuteEvent,
   FindingView,
   PlanResponse,
@@ -16,9 +17,12 @@ import type {
 import {
   ApiError,
   cancelScan,
+  createDesktopShortcut,
   createPlan,
+  deleteDesktopShortcut,
   executePlan,
   executeStream,
+  getDesktopShortcut,
   getLatest,
   getScanStatus,
   getSettings,
@@ -190,6 +194,9 @@ export default function App() {
   const [approveSignal, setApproveSignal] = useState(0);
   /** Birlesik gorunumde odaklanan bulgu (P5). */
   const [unifiedFocus, setUnifiedFocus] = useState<FindingView | null>(null);
+  /** Masaustu kisayolu durumu (T40). */
+  const [shortcut, setShortcut] = useState<DesktopShortcutView | null>(null);
+  const [shortcutBusy, setShortcutBusy] = useState(false);
   /** Satir yogunlugu: yogun (32px) / rahat (40px). */
   const [density, setDensity] = useState<'dense' | 'comfortable'>('dense');
   /** Triyaj cipleri: hizli eleme (boyut / risk / zombi). */
@@ -548,11 +555,50 @@ export default function App() {
   /** Secimi birak (durum seridindeki "Secilenleri temizle"). */
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
-  /** "/" ile arama kutusuna odaklanma. */
+  /** Arama kutusuna odaklanma ("/"). */
   const focusSearch = useCallback(() => {
     searchRef.current?.focus();
     searchRef.current?.select();
   }, []);
+
+  /** Masaustu kisayolunu yukler (ayarlar modalini acinca). */
+  const loadShortcut = useCallback(async () => {
+    try {
+      setShortcut(await getDesktopShortcut());
+    } catch {
+      /* kisayol bilgisi alinamadi: dugmeler gizli kalir */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (settingsOpen) void loadShortcut();
+  }, [settingsOpen, loadShortcut]);
+
+  const addShortcut = useCallback(async () => {
+    setShortcutBusy(true);
+    try {
+      const s = await createDesktopShortcut();
+      setShortcut(s);
+      notify(s.error ? s.error : t('Masaüstü kısayolu eklendi.'));
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setShortcutBusy(false);
+    }
+  }, [notify, t]);
+
+  const removeShortcut = useCallback(async () => {
+    setShortcutBusy(true);
+    try {
+      const s = await deleteDesktopShortcut();
+      setShortcut(s);
+      notify(s.error ? s.error : t('Masaüstü kısayolu kaldırıldı.'));
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setShortcutBusy(false);
+    }
+  }, [notify, t]);
 
   /**
    * Odak (imleç) degisimi. Sag panel SECIM/IMLECE gore guncellenir;
@@ -1386,6 +1432,31 @@ export default function App() {
               <button className="btn small" onClick={() => setPolicyOpen(true)}>
                 {t('Politikayı aç')}
               </button>
+            </div>
+
+            {/*
+              Masaustu kisayolu (T40): kisayol sadece araci baslatir; her
+              baslatmada yeni guvenlik jetonu uretilir ve jeton .lnk icine
+              YAZILMAZ.
+            */}
+            <div className="settings-policy">
+              <div>
+                <strong>{t('Masaüstü kısayolu')}</strong>
+                <p className="dim small">
+                  {shortcut?.exists && shortcut.ours
+                    ? t('Kısayol hazır: {path}', { path: shortcut.path })
+                    : t('Masaüstüne bir kısayol ekle; arayüzü tek tıkla aç.')}
+                </p>
+              </div>
+              {shortcut?.exists && shortcut.ours ? (
+                <button className="btn small" onClick={() => void removeShortcut()} disabled={shortcutBusy}>
+                  {t('Kısayolu kaldır')}
+                </button>
+              ) : (
+                <button className="btn small" onClick={() => void addShortcut()} disabled={shortcutBusy}>
+                  {t('Kısayol ekle')}
+                </button>
+              )}
             </div>
             <footer className="modal-actions">
               <button className="btn" onClick={() => setSettingsOpen(false)}>

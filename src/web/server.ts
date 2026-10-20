@@ -19,6 +19,13 @@ import {
   restoreVaultEntry,
 } from '../actions/vault.ts';
 import { exists } from '../actions/restore.ts';
+import {
+  createShortcut,
+  removeShortcut,
+  resolveTarget,
+  shortcutInfo,
+  shortcutPath,
+} from '../actions/desktop-shortcut.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { buildFindings } from '../core/findings.ts';
 import { primaryPath, scanItemId } from '../core/scan-items.ts';
@@ -43,6 +50,7 @@ import type {
   CliRepairPlanRequest,
   CliQuarantineExecuteRequest,
   CliQuarantinePlanRequest,
+  DesktopShortcutView,
   ExecuteRequest,
   FindingsResponse,
   LatestResponse,
@@ -289,6 +297,58 @@ async function handleRequest(
     await ctx.scan.ensureCacheLoaded();
     const last = ctx.scan.last();
     const body: LatestResponse = { scan: last?.scan ?? null, at: last?.at ?? null };
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'GET /api/shortcut/desktop') {
+    const info = await shortcutInfo();
+    const body: DesktopShortcutView = {
+      path: info.path,
+      exists: info.exists,
+      ours: info.ours,
+    };
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (route === 'POST /api/shortcut/desktop') {
+    const target = resolveTarget();
+    if (!target) {
+      const body: DesktopShortcutView = {
+        path: shortcutPath(),
+        exists: false,
+        ours: false,
+        error: 'Giris betigi bulunamadi; kisayol olusturulamadi.',
+      };
+      sendJson(res, 400, body);
+      return;
+    }
+    try {
+      const info = await createShortcut(target);
+      const body: DesktopShortcutView = { path: info.path, exists: info.exists, ours: info.ours };
+      sendJson(res, 200, body);
+    } catch (e) {
+      const body: DesktopShortcutView = {
+        path: shortcutPath(),
+        exists: false,
+        ours: false,
+        error: describeError(e),
+      };
+      sendJson(res, 500, body);
+    }
+    return;
+  }
+
+  if (route === 'DELETE /api/shortcut/desktop') {
+    const result = await removeShortcut();
+    const info = await shortcutInfo();
+    const body: DesktopShortcutView = {
+      path: info.path,
+      exists: info.exists,
+      ours: info.ours,
+      error: result.removed ? undefined : 'Kisayol bulunamadi veya bize ait degil.',
+    };
     sendJson(res, 200, body);
     return;
   }

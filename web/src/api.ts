@@ -14,6 +14,7 @@ import type {
   CliQuarantineExecuteResponse,
   CliQuarantinePlanRequest,
   CliQuarantinePlanResponse,
+  DesktopShortcutView,
   ExecuteRequest,
   ExecuteStartResponse,
   FindingsResponse,
@@ -130,6 +131,19 @@ export function getLatest(): Promise<LatestResponse> {
 
 export function getScanStatus(): Promise<ScanStatusResponse> {
   return request<ScanStatusResponse>('/api/scan/status');
+}
+
+/** Masaustu kisayolu (T40). */
+export function getDesktopShortcut(): Promise<DesktopShortcutView> {
+  return request<DesktopShortcutView>('/api/shortcut/desktop');
+}
+
+export function createDesktopShortcut(): Promise<DesktopShortcutView> {
+  return request<DesktopShortcutView>('/api/shortcut/desktop', { method: 'POST' });
+}
+
+export function deleteDesktopShortcut(): Promise<DesktopShortcutView> {
+  return request<DesktopShortcutView>('/api/shortcut/desktop', { method: 'DELETE' });
 }
 
 /** Birlesik bulgular (disk + CLI). SALT OKUNUR. */
