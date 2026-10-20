@@ -170,6 +170,26 @@ export async function runInventory(args: string[]): Promise<void> {
     console.log('');
   }
 
+  const pc = inv.pathChannels;
+  if (pc && (pc.duplicates.length > 0 || pc.missing.length > 0)) {
+    console.log(`${C.magenta}${C.bold}PATH KAYNAKLARI (User / Machine)${C.reset}`);
+    console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
+    console.log(
+      `  ${C.gray}User ${pc.userDirs.length} dizin · Machine ${pc.machineDirs.length} dizin · birlesik ${pc.mergedDirs} tekil${C.reset}`,
+    );
+    for (const d of pc.duplicates) {
+      console.log(`  ${C.magenta}cakisma${C.reset}  ${d.path}`);
+      console.log(`            ${C.dim}${d.detail} (${d.sources.join(' + ')})${C.reset}`);
+    }
+    for (const m of pc.missing.slice(0, 10)) {
+      console.log(
+        `  ${C.yellow}diskte yok${C.reset} ${m.path} ${C.dim}(${m.source === 'user' ? 'User' : 'Machine'})${C.reset}`,
+      );
+    }
+    console.log(`${C.dim}  SALT OKUNUR: PATH degistirilmez, kayit defterine yazilmaz.${C.reset}`);
+    console.log('');
+  }
+
   if (inv.pathShadows.length > 0) {
     console.log(`${C.magenta}${C.bold}PATH GOLGELEME${C.reset}`);
     console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
@@ -185,7 +205,7 @@ export async function runInventory(args: string[]): Promise<void> {
 
   console.log(`${C.gray}${'─'.repeat(70)}${C.reset}`);
   console.log(
-    `${C.bold}  Atil: ${unused.length}${C.reset}${C.gray} · dogrulama: ${unknown.length} · yakin: ${recent.length} · korunan: ${protectedTools.length} · shim sorunu: ${inv.shimIssues.length}${C.reset}`,
+    `${C.bold}  Atil: ${unused.length}${C.reset}${C.gray} · dogrulama: ${unknown.length} · yakin: ${recent.length} · korunan: ${protectedTools.length} · shim sorunu: ${inv.shimIssues.length} · PATH cakismasi: ${inv.pathChannels?.duplicates.length ?? 0}${C.reset}`,
   );
   console.log(`${C.dim}  Bu komut SALT OKUNUR; hicbir sey silinmedi.${C.reset}`);
   console.log(`${C.dim}  Kaldirma icin: clicleaner cli-remove <ad> (gelecek surum)${C.reset}\n`);

@@ -57,6 +57,8 @@ export type FileKind =
   | 'lockfile'
   | 'vpn-config'
   | 'wsl-disk'
+  /** Vektor/embedding indeksi (chroma, lance, faiss, npy/parquet) */
+  | 'embedding-index'
   /** Herhangi bir native kutuphane — CUDA olmak ZORUNDA DEGIL */
   | 'native-lib';
 
@@ -80,6 +82,10 @@ export type Archetype =
   | 'updater-staging'
   | 'global-packages'
   | 'editor-workspace'
+  /** Kaynak projesi: manifest + bagimlilik klasoru. Kullanici emegi; asla silinmez. */
+  | 'project-workspace'
+  /** Proje ici bagimlilik klasoru (node_modules / .venv). Yeniden uretilebilir; yalniz raporlanir. */
+  | 'project-artifact'
   | 'os-user-data'
   | 'virtual-disk'
   | 'unknown';
@@ -163,6 +169,23 @@ export interface Cluster {
 export type Risk = 'safe' | 'low' | 'medium' | 'high';
 export type VerdictKind = 'recommend' | 'ask' | 'report-only' | 'keep';
 
+/**
+ * Yeniden uretilebilirlik ekseni (T34). Risk ekseninin YERINE gecmez;
+ * ona ikinci bir boyut ekler: "silinirse ne kadar kayip olur?"
+ *   - regenerable: yeniden indirilir/uretilir (onbellek, derlenmis ortam)
+ *   - user-data:   kullaniciya ait, geri gelmez (oturum, beceri, ayar)
+ *   - unknown:     kanit yetersiz; kullanici karar verir
+ */
+export type Regenerability = 'regenerable' | 'unknown' | 'user-data';
+
+/**
+ * Kanit guveni: kac bagimsiz sinyal ayni yone bakiyor.
+ *   - high:   yapisal kanit (CACHEDIR.TAG, manifest, imza)
+ *   - medium: tek guclu sinyal veya birden fazla zayif sinyal
+ *   - low:    yalnizca genel ad/isaret; elle dogrulama gerekir
+ */
+export type Confidence = 'low' | 'medium' | 'high';
+
 export interface Verdict {
   risk: Risk;
   kind: VerdictKind;
@@ -176,6 +199,10 @@ export interface Verdict {
   because: string[];
   /** Silmeden once yapilmasi gerekenler */
   preconditions: string[];
+  /** Yeniden uretilebilirlik ekseni (T34) */
+  regenerability: Regenerability;
+  /** Kanit guveni (T34) */
+  confidence: Confidence;
 }
 
 // ---------------------------------------------------------------------------

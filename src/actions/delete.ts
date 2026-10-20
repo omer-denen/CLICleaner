@@ -290,7 +290,12 @@ export async function deleteTarget(
         res.skipped.push({ path: f, reason: 'git tarafindan takip ediliyor (tracked)' });
         continue;
       }
-      if (now - st.mtimeMs < minMs) {
+      // minAgeDays: 0 "yas filtresi yok" demektir. Kosulu `minMs > 0` ile
+      // sinirlamak gerekir: Windows dosya zaman damgasi saat tikine
+      // yuvarlandigi icin yeni yazilan bir dosyanin mtime'i Date.now()'dan
+      // birkac ms ILERIDE kalabilir; bu durumda `now - mtime` negatif olur
+      // ve dosya yanlislikla "cok yeni" sayilirdi.
+      if (minMs > 0 && now - st.mtimeMs < minMs) {
         res.skipped.push({ path: f, reason: 'cok yeni' });
         continue;
       }

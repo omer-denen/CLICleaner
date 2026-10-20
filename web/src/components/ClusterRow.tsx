@@ -1,7 +1,14 @@
 import type { Cluster } from '../../../src/core/types.ts';
 import { formatBytes, formatCount } from '../../../src/util/format.ts';
 import { useI18n } from '../i18n.tsx';
-import { ageLabel, ARCHETYPE_LABEL, RISK_LABEL, shortPath } from '../labels.ts';
+import {
+  ageLabel,
+  ARCHETYPE_LABEL,
+  CONFIDENCE_LABEL,
+  REGEN_LABEL,
+  RISK_LABEL,
+  shortPath,
+} from '../labels.ts';
 
 interface Props {
   cluster: Cluster;
@@ -56,6 +63,14 @@ export function ClusterRow({ cluster, selected, expanded, selectable, onToggle, 
           <div className="subtitle">
             <span className={`tag tag-risk-${v.risk}`}>{t(RISK_LABEL[v.risk])}</span>
             <span className="tag">{t(ARCHETYPE_LABEL[cluster.archetype] ?? cluster.archetype)}</span>
+            {v.regenerability && (
+              <span
+                className={`tag tag-regen-${v.regenerability}`}
+                title={t(CONFIDENCE_LABEL[v.confidence] ?? '')}
+              >
+                {t(REGEN_LABEL[v.regenerability] ?? v.regenerability)}
+              </span>
+            )}
             {evidence.markers?.includes('git-tracked') && (
               <span className="tag tag-git" title={t('Git tarafından takip edilen yollar atlandı')}>
                 git

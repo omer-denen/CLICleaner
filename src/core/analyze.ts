@@ -2,17 +2,19 @@ import { stat, readdir, readFile } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { longPath } from '../util/longpath.ts';
 import { debug, warn } from '../util/log.ts';
-import { probeDir, ownerFromName } from './classifier.ts';
+import { probeDir, ownerFromName, type Probe } from './classifier.ts';
 import { isOwnDataPath } from './discover.ts';
 import { isGitTracked } from './git.ts';
 import { walk } from './walker.ts';
 import type {
   Archetype,
   Cluster,
+  Confidence,
   DeleteTarget,
   Evidence,
   FileKind,
   Part,
+  Regenerability,
   Risk,
   Verdict,
 } from './types.ts';
@@ -263,6 +265,7 @@ function buildDeleteTargets(
   switch (archetype) {
     case 'virtual-disk':
     case 'os-user-data':
+    case 'project-artifact':
       return []; // HICBIR ZAMAN otomatik hedeflenmez
 
     case 'temp-scratch':
@@ -746,13 +749,7 @@ export function detectArchetype(
   ev: Evidence,
   root: string,
   extCounts: Map<string, number>,
-  probe?: {
-    electronCache?: boolean;
-    sdkInstall?: boolean;
-    editorExtensions?: boolean;
-    appVersions?: boolean;
-    skillStore?: boolean;
-  },
+  probe?: Probe,
 ): Archetype {
   const kinds = new Set(ev.fileKinds);
   const markers = new Set((ev.markers ?? []).map((m) => m.toLowerCase()));
@@ -804,15 +801,52 @@ export function detectArchetype(
     return 'runtime-pool';
   }
 
+  // 4c. PROJE ICI BAGIMLILIK KLASORU (T31).
+  //
+  // node_modules / .venv tek basina "global paket kurulumu" gibi gorunur.
+  // Ust dizinde kaynak manifesti varsa bu, kullanicinin projesine ait bir
+  // bagimlilik klasorudur; yeniden uretilebilirligi (lockfile, yama,
+  // yerel yol bagimliligi) kanitla yazilir. Yine de silme hedefi URETILMEZ:
+  // proje ici tarama zorunlu olarak rapor modudur (AGENTS kural 9).
+  if (probe?.projectArtifact) return 'project-artifact';
+
+  // 4d. GLOBAL PAKET KURULUMU: komut shim'i + node_modules.
+  //
+  // npm prefix (or. %APPDATA%\\npm) node_modules + shim'ler icerir; bu
+  // bir KURULUMDUR, onbellek DEGIL. Paket onbelleginden ONCE gelir.
+  if (markers.has('node_modules') && (markers.has('shim-dir') || markers.has('.bin'))) {
+    return 'global-packages';
+  }
+
+  // 4e. PROJE CALISMA ALANI: kaynak manifesti + bagimlilik klasoru.
+  //
+  // Bu bir ARTIK DEGIL, kullanicinin kendi projesidir. Kaynak kod ve
+  // bagimliliklar kullanici emegidir; hicbir kosulda silme hedefi
+  // uretilmez (AGENTS kural 9). "package-lock.json var" tek basina
+  // "onbellek" DEMEK DEGILDIR; ondan once bu kontrol gelir.
+  if (
+    probe?.projectManifest &&
+    (markers.has('node_modules') || kinds.has('venv') || kinds.has('python-env') ||
+      markers.has('site-packages') || markers.has('.venv') || markers.has('venv') ||
+      markers.has('dist') || markers.has('build') || markers.has('target'))
+  ) {
+    return 'project-workspace';
+  }
+
+  // 4f. Yalnizca node_modules/.bin (manifest yok): kurulu paketler.
+  if (markers.has('.bin') || markers.has('node_modules')) return 'global-packages';
+
   // 5. Paket yoneticisi ONBELLEGI (yeniden indirilebilir, guvenli)
   //
   // CACHEDIR.TAG en guvenilir isaret: paket yoneticileri (npm, conda,
   // rattler, uv, pip) bu klasoru standart olarak "cache" olarak isaretler.
   if (
     markers.has('cachedir-tag') || markers.has('package-store') ||
-    kinds.has('npm-cache') || markers.has('_cacache') || /npm paket onbellegi/i.test(logs) ||
+    markers.has('_cacache') || /npm paket onbellegi/i.test(logs) ||
+    markers.has('store') ||
     kinds.has('nuget-package') || /NuGet paket onbellegi/i.test(logs) ||
     markers.has('conda') || markers.has('pixi') ||
+    probe?.vectorStore ||
     isPackageStoreDir(root, markers, extCounts)
   ) {
     return 'pkg-manager-cache';
@@ -846,8 +880,9 @@ export function detectArchetype(
   // Program Files / Programs altindaki exe'ler KURULUMDUR, artik degil
   if (/\\programs?\\|\\app-[^\\]+\\/i.test(root)) return 'os-user-data';
 
-  // 8. Global paket dizini (node_modules altinda paketler)
-  if (markers.has('.bin') || markers.has('node_modules')) return 'global-packages';
+  // 8. (Global paket dizini kontrolu 4e adimina tasindi: paket
+  //     onbelleginden ONCE gelmeli, aksi halde global prefix yanlis
+  //     siniflanir.)
 
   // 9. Gecici / cokme
   if (kinds.has('crash-dump')) return 'crash-artifacts';
@@ -949,6 +984,14 @@ export function estimateReclaimable(
       // Global paket kurulumu bir ONBELLEK DEGILDIR; silmek kurulu
       // araclari ve PATH baglantilarini bozar.
       return 0;
+    case 'project-workspace':
+      // Kaynak projesi: bagimliliklar yeniden kurulabilir olsa da bu
+      // kullanicinin emegidir ve varsayilan olarak hicbir sey hedeflenmez.
+      return 0;
+    case 'project-artifact':
+      // Proje ici bagimlilik klasoru: rapor modunda gosterilir, silme
+      // hedefi uretmez (AGENTS kural 9).
+      return 0;
     case 'agent-workspace':
       // Oturum gecmisi, beceriler ve hafiza kullanici degeridir;
       // "bosta kalan bayt" gibi raporlanmasi yaniltici olur.
@@ -965,7 +1008,57 @@ export function estimateReclaimable(
   }
 }
 
-/** Kanitlari karara cevirir. */
+/**
+ * Mimari tip -> yeniden uretilebilirlik ekseni (T34).
+ * Risk'ten BAGIMSIZDIR; onun yerine gecmez, ona ikinci boyut ekler.
+ */
+const REGENERABILITY: Record<Archetype, Regenerability> = {
+  'pkg-manager-cache': 'regenerable',
+  'temp-scratch': 'regenerable',
+  'crash-artifacts': 'regenerable',
+  'updater-staging': 'regenerable',
+  'accelerator-runtime': 'regenerable',
+  'runtime-pool': 'regenerable',
+  'global-packages': 'regenerable',
+  'model-store': 'regenerable',
+  'editor-extension-store': 'unknown',
+  'versioned-app-store': 'unknown',
+  'electron-app-data': 'unknown',
+  'editor-workspace': 'user-data',
+  'agent-workspace': 'user-data',
+  'project-workspace': 'user-data',
+  'project-artifact': 'regenerable',
+  'os-user-data': 'user-data',
+  'virtual-disk': 'user-data',
+  'unknown': 'unknown',
+};
+
+/** Mimari tip -> kanit guveni (T34). */
+const CONFIDENCE: Record<Archetype, Confidence> = {
+  'pkg-manager-cache': 'high',
+  'temp-scratch': 'high',
+  'crash-artifacts': 'high',
+  'updater-staging': 'medium',
+  'accelerator-runtime': 'medium',
+  'runtime-pool': 'high',
+  'global-packages': 'high',
+  'model-store': 'medium',
+  'editor-extension-store': 'high',
+  'versioned-app-store': 'high',
+  'electron-app-data': 'medium',
+  'editor-workspace': 'medium',
+  'agent-workspace': 'medium',
+  'project-workspace': 'high',
+  'project-artifact': 'medium',
+  'os-user-data': 'medium',
+  'virtual-disk': 'high',
+  'unknown': 'low',
+};
+
+/**
+ * Kanitlari karara cevirir ve iki ekseni (yeniden uretilebilirlik +
+ * guven) ekler. Icerideki karar mantigi decideBase'tedir.
+ */
 function decide(ctx: {
   archetype: Archetype;
   ev: Evidence;
@@ -975,6 +1068,47 @@ function decide(ctx: {
   now: number;
   minAgeDays: number;
 }): Verdict {
+  const base = decideBase(ctx);
+  let regenerability: Regenerability = REGENERABILITY[ctx.archetype] ?? 'unknown';
+  let confidence: Confidence = CONFIDENCE[ctx.archetype] ?? 'low';
+
+  if (ctx.archetype === 'pkg-manager-cache') {
+    const ms = new Set((ctx.ev.markers ?? []).map((m) => m.toLowerCase()));
+    const strongCache = ms.has('cachedir-tag') || ms.has('_cacache') || ms.has('store') || ms.has('package-store');
+    // Vektor deposu yeniden uretilir ama yeniden indeksleme pahali olabilir.
+    if (ms.has('vector-index')) confidence = 'medium';
+    else if (!strongCache) confidence = 'medium';
+  }
+
+  // Proje ici bagimlilik (T31): yeniden uretilebilirlik KANITLA belirlenir.
+  // Kilit dosyasi yoksa hangi surumlerin kurulacagi belirsizdir; bu yuzden
+  // "yeniden uretilebilir" demek yerine "belirsiz" denir.
+  if (ctx.archetype === 'project-artifact') {
+    const ms = new Set(ctx.ev.markers ?? []);
+    const hasLock = [...ms].some((m) => m.startsWith('lockfile:'));
+    const caveat = ms.has('patched-deps') || ms.has('local-path-deps');
+    if (hasLock) {
+      regenerability = 'regenerable';
+      confidence = caveat ? 'medium' : 'high';
+    } else {
+      regenerability = 'unknown';
+      confidence = 'low';
+    }
+  }
+
+  return { ...base, regenerability, confidence };
+}
+
+/** Karar mantigi (regenerability/confidence eklenmeden). */
+function decideBase(ctx: {
+  archetype: Archetype;
+  ev: Evidence;
+  root: string;
+  reclaimable: number;
+  totalBytes: number;
+  now: number;
+  minAgeDays: number;
+}): Omit<Verdict, 'regenerability' | 'confidence'> {
   const { archetype, ev, root, reclaimable, totalBytes, now, minAgeDays } = ctx;
   const name = displayName(ev, root);
   const age = daysSince(ev.lastTouched ?? 0, now);
@@ -1076,19 +1210,50 @@ function decide(ctx: {
     // kullanildi" bilgisiyle YUKSELMEZ. Oncelik her zaman mimari
     // turden gelir; yas sadece aciklama metnini zenginlestirir.
     const fresh = age < 7;
+    const mset = new Set((ev.markers ?? []).map((m) => m.toLowerCase()));
+    // npm cacache duzeni: "_cacache" / "_npx" isaretleri kanittir.
+    const npmManaged =
+      mset.has('_cacache') || mset.has('_npx') || /npm paket onbellegi/i.test(logs.map((l) => l.means).join(' '));
+    const isVector = mset.has('vector-index');
+
+    // Vektor/embedding depolar: yeniden uretilir ama YENIDEN INDEKSLEME
+    // (gomsu/embedding) pahali olabilir; bu yuzden "onerilen" degil,
+    // kullaniciya sorulan bir karardir.
+    if (isVector) {
+      return {
+        risk: 'medium',
+        kind: 'ask',
+        title: `${name} — vektor / embedding indeksi`,
+        what: 'Vektor veritabani veya embedding onbellegi (indeks + gomsu dosyalari). Uygulama bunlari yerel arama/RAG icin uretir.',
+        consequence:
+          'Silinirse uygulama yeniden indeksleme yapar; bu islem uzun surebilir veya dis servis/kota gerektirebilir. Kaynak belgeler silinmez.',
+        because: [
+          ...because,
+          'Vektor indeks dosyalari (faiss/lance/npy/parquet) veya sqlite + UUID klasor duzeni bulundu',
+          `${formatAge(ev.lastTouched ?? 0, now)} son kullanildi`,
+        ],
+        preconditions: ['Uygulama kapali olmali', 'Yeniden indeksleme maliyetini (sure/kota) goze al'],
+      };
+    }
+
     return {
       risk: 'safe',
       kind: fresh ? 'ask' : 'recommend',
       title: `${name} — paket indirme onbellegi`,
       what: 'Paket yoneticisinin indirdigi arsiv ve indeks dosyalari. Kaynak kod degil, sadece "hizli kurulum" kopyasi.',
-      consequence: 'Silmek hicbir kurulu paketi bozmaz. Bir sonraki kurulumda paket yeniden indirilir (biraz yavas).',
+      consequence: npmManaged
+        ? 'Silmek hicbir kurulu paketi bozmaz. Bir sonraki kurulumda paket yeniden indirilir (biraz yavas). Istenirse paket yoneticisinin kendi komutu da kullanilabilir.'
+        : 'Silmek hicbir kurulu paketi bozmaz. Bir sonraki kurulumda paket yeniden indirilir (biraz yavas).',
       because: [
         ...because,
         `${formatAge(ev.lastTouched ?? 0, now)} son kullanildi`,
         'Icerik yeniden uretilebilir',
+        ...(npmManaged ? ['npm onbellegi: butunluk icin "npm cache verify" de kullanilabilir'] : []),
         ...(fresh ? ['Cok guncel: bir sonraki kurulum biraz gecikebilir'] : []),
       ],
-      preconditions: [],
+      preconditions: npmManaged
+        ? ['npm/Node calismiyorken calistir', 'Guvenli alternatif: "npm cache verify" (butunluk + cop toplama)']
+        : [],
     };
   }
 
@@ -1105,6 +1270,65 @@ function decide(ctx: {
         : 'Onbellek ve gunlukler silinir; ajan yeniden indirme yapar.',
       because,
       preconditions: ['Ajanin kapali oldugundan emin ol'],
+    };
+  }
+
+  // ---- PROJE CALISMA ALANI: kullanici emegi, dokunma ----
+  //
+  // Icerisinde kaynak manifesti + bagimlilik klasoru var. Bu bir
+  // "artik" degil, kullanicinin projesidir. Proje ici artiklar
+  // (node_modules, .venv, dist) yalnizca `--root` + rapor modunda
+  // gosterilir; sistem taramasinda HICBIR silme hedefi uretilmez.
+  if (archetype === 'project-workspace') {
+    return {
+      risk: 'high',
+      kind: 'report-only',
+      title: `${name} — proje calisma alani`,
+      what: 'Kaynak manifesti (package.json / pyproject.toml ...) ve bagimlilik klasoru (node_modules / .venv / dist). Kullanici projesi.',
+      consequence:
+        'SILINMEZ. Bagimliliklar yeniden kurulabilir ama kaynak kod ve yerel degisiklikler geri gelmez. Proje ici artiklari gormek icin "Projeyi Tara" (--root) kullanin.',
+      because: [
+        ...because,
+        'Kaynak manifesti + bagimlilik klasoru birlikte bulundu',
+        'Proje ici tarama zorunlu olarak salt rapordur',
+      ],
+      preconditions: ['Bu siniftan hicbir sey otomatik silinmez'],
+    };
+  }
+
+  // ---- PROJE ICI BAGIMLILIK KLASORU (T31) ----
+  //
+  // node_modules / .venv, ust dizindeki manifest nedeniyle "projeye ait"
+  // kabul edilir. Yeniden uretilebilirlik lockfile ile kanitlanir; yine de
+  // silme hedefi URETILMEZ (proje ici tarama rapor modudur).
+  if (archetype === 'project-artifact') {
+    const ms = new Set(ev.markers ?? []);
+    const lock = [...ms].find((m) => m.startsWith('lockfile:'))?.slice('lockfile:'.length);
+    const patches = ms.has('patched-deps');
+    const local = ms.has('local-path-deps');
+    const py = ms.has('project-deps:python');
+    const kindName = py ? 'Python sanal ortami' : 'node_modules';
+    return {
+      risk: 'low',
+      kind: 'report-only',
+      title: `${name} — proje bagimlilik klasoru`,
+      what: `${kindName}. Kaynak kod DEGIL; proje manifesti ve kilit dosyasindan yeniden kurulabilen paketler.`,
+      consequence: lock
+        ? `SILINMEZ (proje taramasi rapor modu). Silinirse "${lock}" ile birebir yeniden kurulur; internet veya ozel paket kaynagi gerekebilir.`
+        : 'SILINMEZ (proje taramasi rapor modu). Kilit dosyasi yok: yeniden kurulumda paket surumleri degisebilir.',
+      because: [
+        ...because,
+        `Ust dizinde kaynak manifesti (${py ? 'pyproject.toml / requirements.txt' : 'package.json'}) bulundu`,
+        lock ? `Kilit dosyasi: ${lock} (birebir yeniden kurulum)` : 'Kilit dosyasi yok (surumler sabit degil)',
+        ...(patches ? ['Yamali bagimliliklar (patches/) tespit edildi'] : []),
+        ...(local ? ['Yerel yol bagimliligi (file:/link:/workspace:) tespit edildi'] : []),
+        `${formatAge(ev.lastTouched ?? 0, now)} son dokunuldu`,
+      ],
+      preconditions: [
+        'Proje ici tarama rapor modudur; silme hedefi uretilmez',
+        ...(patches ? ['Yamalarin yeniden uygulanmasi gerekir'] : []),
+        ...(local ? ['Yerel paket yollari proje disinda da mevcut olmali'] : []),
+      ],
     };
   }
 

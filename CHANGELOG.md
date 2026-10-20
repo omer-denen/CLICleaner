@@ -3,6 +3,27 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir.
 
+## [0.7.0] - 2026-10-20
+
+### Eklendi
+
+- **Proje bağımlılıkları:** proje taramasında `node_modules` / `.venv`
+  klasörleri, üst dizindeki proje dosyalarıyla birlikte değerlendirilir;
+  yeniden kurulabilirlik ve güven düzeyi gösterilir. Bu klasörler yalnızca
+  raporlanır, silme hedefi olmaz.
+- **PATH kaynakları:** CLI envanteri, kullanıcı ve makine PATH'ini
+  karşılaştırır; yinelenen ve artık var olmayan dizinleri listeler.
+- **Daha güvenli inceleme:** sürüm bilgisi ve bozuk kurulum kontrolü,
+  bilinmeyen programlar çalıştırılmadan yapılır.
+
+### İyileştirildi
+
+- Varsayılan seçim yalnızca yeniden oluşturulabilirliği kanıtlanmış ve
+  güven düzeyi düşük olmayan klasörleri işaretler.
+- Web arayüzünün hangi tarayıcıda açıldığı ve nasıl değiştirileceği
+  belgelendi.
+- Tarama ve listeleme işlemi düzeltildi ve iyileştirildi.
+
 ## [0.6.0] - 2026-10-19
 
 ### Eklendi

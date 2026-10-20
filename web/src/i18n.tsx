@@ -199,6 +199,8 @@ const EN: Record<string, string> = {
   'Güncelleyici artığı': 'Updater leftover',
   'Global paket kurulumu': 'Global package install',
   'Editör çalışma alanı': 'Editor workspace',
+  'Proje çalışma alanı': 'Project workspace',
+  'Proje bağımlılığı': 'Project dependency',
   'Kullanıcı verisi': 'User data',
   'Sanal disk': 'Virtual disk',
   Tanımlanamayan: 'Unidentified',
@@ -206,6 +208,11 @@ const EN: Record<string, string> = {
   Düşük: 'Low',
   Orta: 'Medium',
   Yüksek: 'High',
+  'Yeniden üretilebilir': 'Regenerable',
+  Belirsiz: 'Uncertain',
+  'Güven: yüksek': 'Confidence: high',
+  'Güven: orta': 'Confidence: medium',
+  'Güven: düşük': 'Confidence: low',
 
   // --- CLI view (yeni sekme) ---
   'Kurulu CLI envanteri': 'Installed CLI inventory',

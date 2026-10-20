@@ -5,6 +5,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { longPath } from '../util/longpath.ts';
 import { walk } from './walker.ts';
+import { readExeInfo } from './exe-info.ts';
+import { readPathSources } from './path-sources.ts';
 import { daysSince } from '../util/format.ts';
 
 /**
@@ -143,6 +145,9 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
   const npmPrefix = process.env.APPDATA ? join(process.env.APPDATA, 'npm') : '';
   if (npmPrefix) shimIssues.push(...(await scanNpmShimOrphans(npmPrefix)));
   const pathShadows = await scanPathShadowing(uniqueTools);
+  // T35: PATH'in User (HKCU) ve Machine (HKLM) kaynaklari. SALT OKUNUR;
+  // kayit defterine yazilmaz, PATH degistirilmez.
+  const pathChannels = await readPathSources();
 
   const tools = uniqueTools.sort((a, b) => {
     const rank = statusRank(a.status) - statusRank(b.status);
@@ -158,6 +163,7 @@ export async function scanCliInventory(opts: CliInventoryOptions = {}): Promise<
     notes,
     shimIssues,
     pathShadows,
+    pathChannels,
   };
 }
 
@@ -421,10 +427,16 @@ async function readShimTarget(shim: string, prefix: string): Promise<string | nu
  *
  * npm 12 gibi politikalarin kurulum betiklerini engellemesi, uv/dotnet/
  * pip kurulumlarinin yarim kalmasi veya standalone bir ikilinin
- * bozulmasi ayni belirtiyi verir: bin dosyasi stub kalir ve
- * calistirilamaz. Kanit: kucuk .exe + calistirma hatasi (+ varsa
- * kurulum betigi). Onarim kaynaga gore uretilir; standalone yalnizca
- * raporlanir (paket yoneticisi yok).
+ * bozulmasi ayni belirtiyi verir: bin dosyasi stub kalir.
+ *
+ * T38: stub kaniti artik CALISTIRMA ile degil, PE basligi ve kaynak
+ * dizini statik okunarak elde edilir. Bilinmeyen bir .exe'yi "denemek"
+ * icin calistirmak yan etki (kurulum betigi, ag erisimi) ve guvenlik
+ * riski tasir; bu yuzden surec ACILMAZ. Gecerli PE basligi olan kucuk
+ * dosyalar "bozuk" sayilmaz (yanlis pozitiften kacinilir).
+ *
+ * Onarim kaynaga gore uretilir; standalone yalnizca raporlanir
+ * (paket yoneticisi yok).
  */
 async function annotateHealth(tools: CliTool[]): Promise<void> {
   for (const tool of tools) {
@@ -436,15 +448,15 @@ async function annotateHealth(tools: CliTool[]): Promise<void> {
       const st = await stat(longPath(binPath)).catch(() => null);
       if (!st?.isFile() || st.size === 0 || st.size >= 4096) continue;
 
-      const probe = await probeExe(binPath);
-      if (probe.ok) continue;
+      const info = await readExeInfo(binPath);
+      if (info.valid) continue;
 
       const scriptEvidence = await installScriptEvidence(tool);
       tool.health = 'broken';
       tool.healthEvidence = [
         `bin dosyasi ${st.size} B (stub)`,
         ...(scriptEvidence ? [scriptEvidence] : []),
-        `calistirma hatasi: ${probe.detail}`,
+        `gecerli PE basligi yok: ${info.detail ?? 'bilinmiyor'}`,
       ];
       const spec = repairSpecFor(tool, Boolean(scriptEvidence));
       if (spec) tool.repair = spec;
@@ -494,27 +506,6 @@ function packageBinRel(pkg: Record<string, unknown>, cmd: string): string | null
     return typeof v === 'string' ? v : null;
   }
   return null;
-}
-
-/**
- * Stub bin'i kisaca calistirir. Yalnizca kucuk dosyalar icin cagrilir.
- * Onemli: surec calisti ama sifir olmayan kodla ciktysa bu "bozuk"
- * kaniti degildir; yalnizca spawn/OS hatasi bozuk sayilir.
- */
-async function probeExe(file: string): Promise<{ ok: boolean; detail: string }> {
-  try {
-    const run = promisify(execFile);
-    await run(file, ['--version'], { timeout: 8000, windowsHide: true });
-    return { ok: true, detail: '' };
-  } catch (err) {
-    const e = err as { killed?: boolean; code?: string | number; message?: string };
-    const spawnError = e.killed === true || typeof e.code === 'string';
-    const detail = e.killed ? 'zaman asimi' : (e.message?.split('\n')[0] ?? 'calistirilamadi');
-    return {
-      ok: !spawnError,
-      detail: detail.slice(0, 160),
-    };
-  }
 }
 
 /** Kaynaga gore onarim komutu; standalone icin null (elle onarim). */
@@ -1038,12 +1029,15 @@ async function scanStandaloneShims(
         atimeReliable,
       });
 
+      // T38: surum, ikiliyi CALISTIRMADAN VersionInfo'dan okunur.
+      const exe = await readExeInfo(p);
+
       const tool: CliTool = {
         id: `standalone:${cmd}`,
         command: cmd,
         source: 'standalone',
         packageName: cmd,
-        version: '',
+        version: exe.version ?? '',
         installPath: p,
         shims: [p],
         stalePaths: [],

@@ -5,6 +5,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +69,8 @@ const ROOT_DIR = resolve(HERE, '..', '..');
 const DIST_DIR = join(ROOT_DIR, 'dist', 'web');
 const WEB_INDEX = join(DIST_DIR, 'index.html');
 
+export type BrowserChoice = 'edge' | 'default';
+
 export interface WebOptions {
   envs?: Env[];
   profile?: string;
@@ -78,6 +81,16 @@ export interface WebOptions {
   host?: string;
   /** Tarayiciyi otomatik ac */
   open?: boolean;
+  /**
+   * Hangi tarayici acilsin. Varsayilan 'edge'.
+   *
+   * Neden tek tarayici: arayuz yerel ve Windows'a ozel bir aractir.
+   * Desteklenen tarayici Microsoft Edge'tir (Windows 10/11'de daima
+   * bulunur, Chromium tabanli; boylece tek bir ortam test edilir).
+   * Edge bulunamazsa sistem varsayilanina dusulur. 'default' daima
+   * sistem varsayilanini acar.
+   */
+  browser?: BrowserChoice;
   /**
    * Tarama sonucunu 24 saatlik disk onbellegine yaz (varsayilan true).
    * Testler false verir; kismi tarama kullanicinin onbellegini ezmesin.
@@ -186,7 +199,7 @@ export async function runWeb(opts: WebOptions = {}): Promise<void> {
   console.log('  Kapatmak icin Ctrl+C.');
   console.log('');
 
-  if (opts.open !== false) openBrowser(url);
+  if (opts.open !== false) openBrowser(url, opts.browser ?? 'edge');
 
   await new Promise<void>((ok) => {
     const stop = () => {
@@ -718,19 +731,56 @@ function isSafeName(name: string): boolean {
   return /^[a-z0-9._@-]+$/i.test(name) && name.length <= 64;
 }
 
-function openBrowser(url: string): void {
-  try {
-    if (process.platform === 'win32') {
-      spawn('cmd.exe', ['/c', 'start', '', url], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-      }).unref();
-    } else if (process.platform === 'darwin') {
-      spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    } else {
-      spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+/**
+ * Windows'ta Microsoft Edge ikilisinin bilinen konumlari. Edge tek
+ * desteklenen tarayicidir; boylece arayuz tek bir ortamda calisir.
+ */
+function edgeCandidates(): string[] {
+  const out: string[] = [];
+  const pf86 = process.env['ProgramFiles(x86)'];
+  const pf = process.env.ProgramFiles;
+  const lad = process.env.LOCALAPPDATA;
+  if (pf86) out.push(join(pf86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
+  if (pf) out.push(join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
+  if (lad) out.push(join(lad, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
+  return out;
+}
+
+/**
+ * Acilacak komutu cozer. Disa acik (test edilebilir): hangi tarayicinin
+ * nasil acilacagini yalnizca burada belirleriz.
+ *
+ * Oncelik: acik secim > CLICLEANER_BROWSER ortam degiskeni.
+ * Edge bulunamazsa sistem varsayilanina (cmd /c start) dusulur.
+ */
+export function resolveBrowserCommand(
+  url: string,
+  choice: BrowserChoice = 'edge',
+): { cmd: string; args: string[] } {
+  const envChoice = (process.env.CLICLEANER_BROWSER ?? '').toLowerCase();
+  const eff: BrowserChoice = envChoice === 'default' ? 'default' : envChoice === 'edge' ? 'edge' : choice;
+
+  if (process.platform === 'win32') {
+    if (eff === 'edge') {
+      const edge = edgeCandidates().find((p) => {
+        try {
+          return existsSync(p);
+        } catch {
+          return false;
+        }
+      });
+      if (edge) return { cmd: edge, args: [url] };
     }
+    return { cmd: 'cmd.exe', args: ['/c', 'start', '', url] };
+  }
+  if (process.platform === 'darwin') return { cmd: 'open', args: [url] };
+  return { cmd: 'xdg-open', args: [url] };
+}
+
+function openBrowser(url: string, choice: BrowserChoice = 'edge'): void {
+  try {
+    const { cmd, args } = resolveBrowserCommand(url, choice);
+    spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
   } catch {
     /* tarayici acilamadi; adres konsolda yazili */
   }

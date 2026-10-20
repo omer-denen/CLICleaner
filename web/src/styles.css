@@ -630,6 +630,19 @@ input {
   border-color: rgba(76, 194, 255, 0.45);
 }
 
+/* Yeniden uretilebilirlik ekseni (T34): risk'ten bagimsiz ikinci boyut. */
+.tag-regen-regenerable {
+  color: var(--green);
+  border-color: rgba(74, 222, 128, 0.4);
+}
+.tag-regen-user-data {
+  color: var(--red);
+  border-color: rgba(248, 113, 113, 0.45);
+}
+.tag-regen-unknown {
+  color: var(--muted);
+}
+
 /* ---------------------------------------------------------------- detail */
 
 .cluster-detail {

@@ -1,6 +1,6 @@
 {
   "name": "clicleaner",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Evidence-based Windows disk cleaner for developer caches, package stores and CLI leftovers",
   "type": "module",
   "license": "MIT",

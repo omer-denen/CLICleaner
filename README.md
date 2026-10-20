@@ -42,8 +42,11 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
    npx clicleaner
    ```
 
-4. Tarayıcı otomatik açılır. Açılmazsa terminalde yazan
-   `http://localhost:<port>` adresini tarayıcıya yapıştır.
+4. Tarayıcı otomatik açılır. Arayüz **Microsoft Edge**'te açılır; Edge
+   yüklü değilse sistem varsayılan tarayıcısı kullanılır. Açılmazsa terminalde
+   yazan `http://localhost:<port>` adresini tarayıcıya yapıştır. Farklı
+   davranış için `clicleaner ui --browser default` veya `CLICLEANER_BROWSER`
+   ortam değişkeni kullanılabilir.
 5. **İncele**'ye bas. Tarama sürerken solda taranan dizinleri, sağda bulunanları
    canlı görürsün.
 6. Tarama bitince **Tamam** → listeyi incele.

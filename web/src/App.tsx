@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { groupByVerdict } from '../../src/core/merge.ts';
+import { defaultSelected } from '../../src/core/selection.ts';
 import { formatBytes, formatCount } from '../../src/util/format.ts';
 import type { Cluster, ScanResult } from '../../src/core/types.ts';
 import type {
@@ -1037,7 +1038,7 @@ function compareClusters(a: Cluster, b: Cluster, mode: SortMode): number {
 function defaultSelection(result: ScanResult): Set<string> {
   const out = new Set<string>();
   for (const c of result.clusters) {
-    if (c.verdict.kind === 'recommend' && (c.deleteTargets?.length ?? 0) > 0) out.add(c.key);
+    if (defaultSelected(c)) out.add(c.key);
   }
   return out;
 }

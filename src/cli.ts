@@ -66,6 +66,7 @@ ${C.bold}Sadece clean icin${C.reset}
 
 ${C.bold}Web arayuzu icin${C.reset}
   --port <n>         Sabit port (varsayilan: bos port otomatik secilir)
+  --browser <ad>     Acilacak tarayici: edge (varsayilan) | default
   --no-open          Tarayiciyi otomatik acma, yalnizca adresi yaz
   --tui              Terminal arayuzunu kullan (varsayilan: tarayici)
 
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
     let tui = false;
     let port = 0;
     let open = true;
+    let browser: 'edge' | 'default' = 'edge';
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
@@ -184,12 +186,15 @@ async function main(): Promise<void> {
       else if (a === '--port') {
         const n = Number(rest[++i]);
         if (Number.isInteger(n) && n >= 0 && n <= 65535) port = n;
+      } else if (a === '--browser') {
+        const v = (rest[++i] ?? '').toLowerCase();
+        if (v === 'edge' || v === 'default') browser = v;
       } else if (a === '--no-open') open = false;
     }
 
     if (!tui) {
       const { runWeb } = await import('./web/server.ts');
-      await runWeb({ envs, profile, exclude, port, open });
+      await runWeb({ envs, profile, exclude, port, open, browser });
       return;
     }
 

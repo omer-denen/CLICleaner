@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
 import type { FileKind, LogSignal, OwnerSignal } from './types.ts';
 
@@ -33,7 +34,46 @@ export interface Probe {
   appVersions?: boolean;
   /** Ajan beceri deposu: skills/ + SKILL.md */
   skillStore?: boolean;
+  /** Kaynak projesi isareti: manifest (package.json, pyproject.toml...) goruldu */
+  projectManifest?: boolean;
+  /** Vektor/embedding deposu: index + embedding dosyalari (T29) */
+  vectorStore?: boolean;
+  /** Proje ici bagimlilik klasoru (T31): node_modules / .venv + manifest */
+  projectArtifact?: ProjectArtifactEvidence;
 }
+
+/**
+ * Proje ici bagimlilik klasoru kaniti (T31).
+ *
+ * node_modules TEK BASINA "global paket kurulumu" gibi gorunur; oysa
+ * ustunde bir kaynak manifesti varsa kullanicinin projesine aittir.
+ * Yeniden uretilebilirlik, kanitla belirlenir: lockfile, yamalar ve
+ * yerel yol bagimliliklari.
+ */
+export interface ProjectArtifactEvidence {
+  ecosystem: 'node' | 'python';
+  projectRoot: string;
+  manifest: string;
+  /** Birebir yeniden kurulumu saglayan kilit dosyasi (yoksa null) */
+  lockfile: string | null;
+  /** Yamanmis bagimliliklar: yeniden kurulumda ek adim gerekir */
+  patches: boolean;
+  /** file:/link:/workspace: bagimliliklari (proje disina bagli) */
+  localDeps: boolean;
+}
+
+/** Kaynak projesi manifestleri. Ad, tur bildirir; uretim kodu degildir. */
+const PROJECT_MANIFEST_RE =
+  /^(package\.json|pyproject\.toml|cargo\.toml|go\.mod|composer\.json|gemfile|pom\.xml|build\.gradle|build\.gradle\.kts|setup\.py|requirements\.txt|meson\.build|cmakelists\.txt)$/i;
+
+/** Proje kilidi: "bu bir proje" kaniti; ONBELLEK KANITI DEGILDIR. */
+const LOCKFILE_RE = /^(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|poetry\.lock|uv\.lock|cargo\.lock|composer\.lock|gemfile\.lock)$/i;
+
+/** Embedding/vektor indeks dosyalari (format adi; uygulama adi degil). */
+const EMBEDDING_EXT_RE = /\.(faiss|lance|npy|npz|parquet|ann|hnsw|ivf)$/i;
+
+/** Vektor DB klasor duzeni: rastgele UUID adli alt klasorler. */
+const UUID_DIR_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Uzantiya gore anlamli tur siniflandirmasi. */
 const EXT_KIND: Record<string, FileKind> = {
@@ -52,7 +92,14 @@ const EXT_KIND: Record<string, FileKind> = {
   jsonl: 'log',
   db: 'sqlite',
   sqlite: 'sqlite',
+  sqlite3: 'sqlite',
   ovpn: 'vpn-config',
+  // Vektor/embedding indeksleri (T29). Format adi; uygulama adi degil.
+  faiss: 'embedding-index',
+  lance: 'embedding-index',
+  npy: 'embedding-index',
+  npz: 'embedding-index',
+  parquet: 'embedding-index',
 };
 
 /** Native kutuphaneler icin tur: HICBIR .dll CUDA degildir. */
@@ -123,6 +170,7 @@ export async function probeDir(path: string): Promise<Probe> {
   }
 
   const names = new Set(entries.map((e) => e.name));
+  let hasShim = false;
 
   // --- Dizin/manifest isaretleri ---
   for (const e of entries) {
@@ -159,6 +207,11 @@ export async function probeDir(path: string): Promise<Probe> {
       }
       // Ajan calisma alani isaretleri: beceri, oturum, hafiza.
       if (AGENT_DIR_MARKERS.has(n)) p.markers.push(e.name);
+      // Vektor/embedding alt klasoru (or. "<ad>.lance" veri kumesi).
+      if (EMBEDDING_EXT_RE.test(e.name)) {
+        p.vectorStore = true;
+        p.markers.push('vector-index');
+      }
     } else {
       const k = kindOfFile(e.name);
       if (k) p.fileKinds.push(k);
@@ -168,9 +221,24 @@ export async function probeDir(path: string): Promise<Probe> {
       // spesifikasyonu). npm, conda/rattler, uv, pip hepsi koyar.
       // Bu, "bu klasor ne?" sorusunun en guvenilir cevabi.
       if (e.name.toUpperCase() === 'CACHEDIR.TAG') p.markers.push('cachedir-tag');
-      if (e.name === 'package-lock.json' || e.name === '.package-lock.json') {
-        p.fileKinds.push('npm-cache');
+      // Proje kilidi bir ONBELLEK KANITI DEGILDIR; yalnizca "bu bir
+      // proje" isaretidir. npm onbellegi asil olarak _cacache/_npx
+      // duzeniyle taninir (yukaridaki "store" isareti). Bu ayrim olmadan
+      // package-lock.json iceren her klasor "onbellek" sayilip yanlislikla
+      // silme hedefi aliyordu.
+      if (LOCKFILE_RE.test(e.name)) {
+        p.fileKinds.push('lockfile');
+        p.projectManifest = true;
       }
+      if (PROJECT_MANIFEST_RE.test(e.name)) p.projectManifest = true;
+      // Embedding/vektor indeks dosyasi (format adi; uygulama adi degil).
+      if (k === 'embedding-index') {
+        p.vectorStore = true;
+        p.markers.push('vector-index');
+      }
+      // Komut shim'i (npm prefix: foo.cmd / foo.ps1). Tek basina anlamsizdir;
+      // yalnizca node_modules ile BIRLIKTE "global paket kurulumu" kanitidir.
+      if (/\.(cmd|ps1)$/i.test(e.name)) hasShim = true;
       if (CUDA_DLL_RE.test(e.name) || ORT_DLL_RE.test(e.name)) {
         p.fileKinds.push('cuda-runtime');
       }
@@ -179,6 +247,25 @@ export async function probeDir(path: string): Promise<Probe> {
       // Squirrel tarzi guncelleyici ikilisi: surum klasorlerini yonetir.
       if (e.name.toLowerCase() === 'update.exe') p.markers.push('update-exe');
     }
+  }
+
+  // Proje ici bagimlilik klasoru (T31): node_modules / .venv + manifest.
+  // Global paket kurulumuyla karismamasi icin bu kanit, shim isaretinden
+  // ONCE toplanir ve karar katmaninda daha yuksek oncelik alir.
+  await probeProjectArtifact(path, p);
+
+  // Komut shim'i + node_modules: global paket kurulumu (npm prefix).
+  if (hasShim) p.markers.push('shim-dir');
+
+  // --- Vektor/embedding deposu (T29) ---
+  //
+  // Ad TEK BASINA yetmez. Ya bir embedding indeks dosyasi (faiss/lance/
+  // npy/parquet; yukarida isaretlendi) ya da sqlite indeks + rastgele
+  // UUID adli alt klasorler (vektor DB duzeni) gorulmelidir.
+  const uuidDirs = entries.filter((e) => e.isDirectory() && UUID_DIR_RE.test(e.name)).length;
+  if (!p.vectorStore && uuidDirs > 0 && p.fileKinds.includes('sqlite')) {
+    p.vectorStore = true;
+    p.markers.push('vector-index');
   }
 
   // --- Surumlu uygulama deposu: app-<surum> + Update.exe ---
@@ -505,6 +592,103 @@ async function probeNuGetHttpCache(dir: string): Promise<boolean> {
 async function readdirSafe(dir: string): Promise<Dirent[] | null> {
   try {
     return await readdir(longPath(dir), { withFileTypes: true });
+  } catch {
+    return null;
+  }
+}
+
+/** Proje ici bagimlilik klasorleri (T31). Ad tek basina kanit degildir. */
+const PROJECT_DEP_DIRS = new Set(['node_modules', '.venv', 'venv']);
+
+/** Birebir yeniden kurulumu saglayan kilit dosyalari. */
+const NODE_LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'bun.lock'];
+const PY_MANIFESTS = ['pyproject.toml', 'requirements.txt', 'setup.py', 'pipfile'];
+const PY_LOCKFILES = ['uv.lock', 'poetry.lock', 'pipfile.lock'];
+
+/** Proje koku aramasi bu kadar ust seviyeyi gecer (monorepo icin). */
+const MAX_PROJECT_ROOT_LEVELS = 4;
+
+/**
+ * node_modules / .venv gercekten bir PROJEYE mi ait? (T31)
+ *
+ * Karar adla verilmez; ust dizinlerde kaynak manifesti aranir. Bulunursa
+ * "proje bagimliligi" olur ve yeniden uretilebilirlik kaniti toplanir:
+ *   - lockfile  -> birebir yeniden kurulum mumkun
+ *   - patches/  -> yamalarin yeniden uygulanmasi gerekir
+ *   - file:/link:/workspace: -> proje disina bagli yerel paketler
+ *
+ * Ic ice node_modules zinciri proje koku SAYILMAZ; aksi halde bir
+ * bagimliligin icindeki package.json yanlis kanit olurdu.
+ */
+async function probeProjectArtifact(path: string, p: Probe): Promise<void> {
+  const base = path.split('\\').filter(Boolean).pop()?.toLowerCase() ?? '';
+  if (!PROJECT_DEP_DIRS.has(base)) return;
+  const ecosystem: 'node' | 'python' = base === 'node_modules' ? 'node' : 'python';
+
+  let dir = dirname(path);
+  for (let level = 0; level < MAX_PROJECT_ROOT_LEVELS; level++) {
+    const name = dir.split('\\').filter(Boolean).pop()?.toLowerCase() ?? '';
+    if (name === 'node_modules' || name === '.git') return;
+
+    const ents = await readdirSafe(dir);
+    if (!ents) return;
+    const names = new Set(ents.map((e) => e.name.toLowerCase()));
+
+    const manifest =
+      ecosystem === 'node'
+        ? names.has('package.json') ? 'package.json' : null
+        : PY_MANIFESTS.find((m) => names.has(m)) ?? null;
+
+    if (!manifest) {
+      const parent = dirname(dir);
+      if (parent === dir) return;
+      dir = parent;
+      continue;
+    }
+
+    const lockfile =
+      ecosystem === 'node'
+        ? NODE_LOCKFILES.find((l) => names.has(l)) ?? null
+        : PY_LOCKFILES.find((l) => names.has(l)) ?? null;
+
+    let patches = names.has('patches');
+    let localDeps = false;
+    if (ecosystem === 'node') {
+      const pkg = await readJsonSafe(join(dir, 'package.json'));
+      if (pkg) {
+        const pnpm = pkg.pnpm as Record<string, unknown> | undefined;
+        const patched = pnpm?.patchedDependencies;
+        if (patched && typeof patched === 'object' && Object.keys(patched).length > 0) patches = true;
+        for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+          const deps = pkg[field] as Record<string, unknown> | undefined;
+          if (!deps) continue;
+          for (const v of Object.values(deps)) {
+            if (typeof v === 'string' && /^(file:|link:|workspace:|\.{1,2}[\\/])/i.test(v)) {
+              localDeps = true;
+              break;
+            }
+          }
+          if (localDeps) break;
+        }
+      }
+    }
+
+    p.projectArtifact = { ecosystem, projectRoot: dir, manifest, lockfile, patches, localDeps };
+    p.markers.push('project-artifact', 'project-manifest', `project-deps:${ecosystem}`);
+    if (lockfile) p.markers.push(`lockfile:${lockfile}`);
+    if (patches) p.markers.push('patched-deps');
+    if (localDeps) p.markers.push('local-path-deps');
+    return;
+  }
+}
+
+/** Kucuk JSON dosyasini guvenli okur (manifest disi veri sayilmaz). */
+async function readJsonSafe(file: string): Promise<Record<string, unknown> | null> {
+  try {
+    const st = await stat(longPath(file));
+    if (!st.isFile() || st.size > 256 * 1024) return null;
+    const j = JSON.parse(await readFile(longPath(file), 'utf8')) as unknown;
+    return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : null;
   } catch {
     return null;
   }

@@ -8,6 +8,26 @@
 export type CliSource = 'npm-global' | 'uv-tool' | 'dotnet-tool' | 'pip-user' | 'standalone';
 export type CliStatus = 'unused' | 'recent' | 'unknown' | 'protected';
 
+/** T35: ayni dizinin birden fazla PATH kaynaginda tanimli olmasi. */
+export interface PathDuplicate {
+  path: string;
+  sources: Array<'user' | 'machine'>;
+  detail: string;
+}
+
+/** T35: User (HKCU) ve Machine (HKLM) PATH kaynaklari. SALT OKUNUR. */
+export interface PathSourceReport {
+  userDirs: string[];
+  machineDirs: string[];
+  /** process.env.PATH icindeki tekil dizin sayisi */
+  mergedDirs: number;
+  duplicates: PathDuplicate[];
+  /** Kayit defterinde tanimli ama diskte olmayan dizinler */
+  missing: Array<{ path: string; source: 'user' | 'machine' }>;
+  /** Kayit defteri okunamazsa gerekce */
+  note?: string;
+}
+
 export interface UninstallSpec {
   kind: 'npm' | 'uv' | 'dotnet' | 'pip' | 'manual';
   program: string;
@@ -127,6 +147,8 @@ export interface CliInventory {
   shimIssues: ShimIssue[];
   /** T17: PATH'te golgede kalan komut girdileri. */
   pathShadows: PathShadow[];
+  /** T35: User / Machine PATH kaynaklari ve cakismalar (SALT OKUNUR). */
+  pathChannels?: PathSourceReport;
 }
 
 export interface CliInventoryOptions {

@@ -3,6 +3,7 @@ import { formatAge } from '../../src/util/format.ts';
 
 /** Mimari tip etiketleri: kullaniciya "bu ne" sorusunun kisa cevabi. */
 export const ARCHETYPE_LABEL: Record<string, string> = {
+  'project-artifact': 'Proje bağımlılığı',
   'pkg-manager-cache': 'Paket önbelleği',
   'runtime-pool': 'Ortam havuzu',
   'model-store': 'Model deposu',
@@ -16,9 +17,24 @@ export const ARCHETYPE_LABEL: Record<string, string> = {
   'updater-staging': 'Güncelleyici artığı',
   'global-packages': 'Global paket kurulumu',
   'editor-workspace': 'Editör çalışma alanı',
+  'project-workspace': 'Proje çalışma alanı',
   'os-user-data': 'Kullanıcı verisi',
   'virtual-disk': 'Sanal disk',
   unknown: 'Tanımlanamayan',
+};
+
+/** Yeniden üretilebilirlik ekseni (T34): ikinci boyut. */
+export const REGEN_LABEL: Record<string, string> = {
+  regenerable: 'Yeniden üretilebilir',
+  unknown: 'Belirsiz',
+  'user-data': 'Kullanıcı verisi',
+};
+
+/** Kanıt güveni ekseni (T34). */
+export const CONFIDENCE_LABEL: Record<string, string> = {
+  high: 'Güven: yüksek',
+  medium: 'Güven: orta',
+  low: 'Güven: düşük',
 };
 
 export const RISK_LABEL: Record<RiskLevel, string> = {

@@ -5,6 +5,7 @@ import { Row } from './Row.tsx';
 import { formatBytes, padStart, truncatePath } from '../util/format.ts';
 import { prettyPath } from '../util/longpath.ts';
 import { groupByVerdict } from '../core/merge.ts';
+import { defaultSelected } from '../core/selection.ts';
 import { deleteTarget, Journal, type DeleteMode } from '../actions/delete.ts';
 import type { Cluster, ScanResult } from '../core/types.ts';
 
@@ -102,12 +103,11 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
       });
       if (!alive) return;
       setResult(r);
-      // Varsayilan secim: yalnizca "onerilen" ve hedefi olan kumeler
+      // Varsayilan secim: "onerilen" + hedefi olan + yeniden uretilebilirligi
+      // kanitlanmis kumeler (T34). Kullanici verisi/belirsiz varsayilan secilmez.
       const def = new Set<string>();
       for (const c of r.clusters) {
-        if (c.verdict.kind === 'recommend' && (c.deleteTargets?.length ?? 0) > 0) {
-          def.add(c.key);
-        }
+        if (defaultSelected(c)) def.add(c.key);
       }
       setSelected(def);
       setScreen('review');

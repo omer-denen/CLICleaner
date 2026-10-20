@@ -169,7 +169,7 @@ export function renderInventoryMarkdown(inv: CliInventory, generatedAt: number =
   if (broken.length > 0) {
     L.push('## Bozuk / yarım kurulumlar');
     L.push('');
-    L.push('Çalıştırma kanıtı başarısız (stub bin / spawn hatası). Onarım paket yöneticisinin kendi `install` komutuyla yapılır.');
+    L.push('Geçerli PE başlığı bulunamadı (stub bin). Onarım paket yöneticisinin kendi `install` komutuyla yapılır.');
     L.push('');
     for (const t of broken) L.push(...toolSection(t));
   }
@@ -241,6 +241,39 @@ export function renderInventoryMarkdown(inv: CliInventory, generatedAt: number =
       });
       L.push('');
     }
+  }
+
+  // ── PATH kaynaklari (T35) ────────────────────────────────────────
+  const pc = inv.pathChannels;
+  if (pc) {
+    L.push('## PATH kaynakları (User / Machine)');
+    L.push('');
+    L.push('PATH, kullanıcı (HKCU) ve makine (HKLM) kayıtlarının birleşimidir. **SALT OKUNUR**: bu rapor PATH değiştirmez.');
+    L.push('');
+    L.push(`- User PATH: ${pc.userDirs.length} dizin`);
+    L.push(`- Machine PATH: ${pc.machineDirs.length} dizin`);
+    L.push(`- Birleştirilmiş PATH: ${pc.mergedDirs} tekil dizin`);
+    if (pc.duplicates.length > 0) {
+      L.push('');
+      L.push('### Çakışmalar');
+      L.push('');
+      for (const d of pc.duplicates) {
+        L.push(`- ${code(d.path)} — ${d.detail} (${d.sources.join(' + ')})`);
+      }
+    }
+    if (pc.missing.length > 0) {
+      L.push('');
+      L.push('### Diskte olmayan dizinler');
+      L.push('');
+      for (const m of pc.missing.slice(0, 20)) {
+        L.push(`- ${code(m.path)} (${m.source === 'user' ? 'User' : 'Machine'})`);
+      }
+    }
+    if (pc.note) {
+      L.push('');
+      L.push(`Not: ${pc.note}`);
+    }
+    L.push('');
   }
 
   // ── Tum araclar tablosu ──────────────────────────────────────────

@@ -43,8 +43,11 @@ It answers one question with evidence: **"What is this folder, and what happens 
    npx clicleaner
    ```
 
-4. The browser opens automatically. If it does not, paste the
-   `http://localhost:<port>` address printed in the terminal.
+4. The browser opens automatically. The UI opens in **Microsoft Edge**; if
+   Edge is not installed the system default browser is used. If nothing opens,
+   paste the `http://localhost:<port>` address printed in the terminal. Use
+   `clicleaner ui --browser default` or the `CLICLEANER_BROWSER` environment
+   variable to change this.
 5. Press **Inspect**. While the scan runs, the left column shows the directories
    being scanned and the right column shows what is found.
 6. When it finishes press **OK**, then review the list.

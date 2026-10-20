@@ -37,10 +37,10 @@ const RULES: RuleDoc[] = [
     color: C.green,
   },
   {
-    id: 'npm-lock',
-    when: 'package-lock.json veya _npx varsa',
+    id: 'npm-store',
+    when: '_cacache / _npx duzeni varsa (npm onbellegi)',
     becomes: 'paket onbellegi',
-    verdict: 'ONERILEN',
+    verdict: 'ONERILEN — "npm cache verify" guvenli alternatiftir',
     color: C.green,
   },
   {
@@ -129,6 +129,13 @@ const RULES: RuleDoc[] = [
     verdict: 'DOGRULAMA — ogrenilmis beceriler kaybolur',
     color: C.yellow,
   },
+  {
+    id: 'vector-index',
+    when: 'faiss/lance/npy/parquet VEYA sqlite + UUID klasor duzeni',
+    becomes: 'vektor / embedding deposu',
+    verdict: 'DOGRULAMA — yeniden indeksleme pahali olabilir',
+    color: C.yellow,
+  },
 
   // --- asla otomatik silinmez ---
   {
@@ -136,6 +143,20 @@ const RULES: RuleDoc[] = [
     when: 'Icinde .vhd / .vhdx varsa',
     becomes: 'sanal disk (WSL / Docker / VM)',
     verdict: 'KORUNUR — WSL dagitimi bozulur',
+    color: C.red,
+  },
+  {
+    id: 'project-workspace',
+    when: 'Kaynak manifesti (package.json ...) + bagimlilik klasoru (node_modules / .venv)',
+    becomes: 'kullanici projesi',
+    verdict: 'KORUNUR — proje ici tarama yalnizca raporlar',
+    color: C.red,
+  },
+  {
+    id: 'project-artifact',
+    when: 'node_modules / .venv + UST dizinde kaynak manifesti',
+    becomes: 'proje bagimlilik klasoru',
+    verdict: 'KORUNUR — yalnizca raporlanir; kilit dosyasi varsa birebir yeniden kurulur',
     color: C.red,
   },
   {

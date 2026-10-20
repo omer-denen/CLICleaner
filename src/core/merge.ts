@@ -67,6 +67,8 @@ export function mergeClusters(clusters: Cluster[]): Cluster[] {
 const ARCHETYPE_RANK: Record<string, number> = {
   'virtual-disk': 100,
   'os-user-data': 95,
+  'project-workspace': 90,
+  'project-artifact': 88,
   'agent-workspace': 80,
   'editor-workspace': 70,
   'global-packages': 65,
