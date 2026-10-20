@@ -433,6 +433,32 @@ const EN: Record<string, string> = {
   '{n} hedef': '{n} targets',
   'Yolları göster ({n})': 'Show paths ({n})',
   'Yolları gizle': 'Hide paths',
+
+  // --- sol rail / kontrol merkezi (T42 / D3 P0) ---
+  'Kontrol merkezi': 'Control center',
+  Sağlık: 'Health',
+  'Geri kazanılır': 'Reclaimable',
+  'Ajan kirliliği': 'Agent clutter',
+  'AI Debris': 'AI Debris',
+  'Orphaned CLI': 'Orphaned CLI',
+  'Ghost Envs': 'Ghost Envs',
+  Diğer: 'Other',
+  Plan: 'Plan',
+  '0 seçili': '0 selected',
+  '{n} seçili': '{n} selected',
+  'Onay bekliyor': 'Awaiting approval',
+  Uygulanıyor: 'Applying',
+  'Plan hazırlanıyor': 'Preparing plan',
+  '{bytes} seçili · {clusters} küme': '{bytes} selected · {clusters} clusters',
+  'Hiçbir şey seçili değil.': 'Nothing selected.',
+  'Plan oluştur': 'Build plan',
+  'Tümünü planla': 'Plan everything',
+  'Seçili bulgular için gerekçeli plan üret; hiçbir şey taşınmaz':
+    'Build an evidence-based plan for the selected findings; nothing is moved',
+  'Kapsamdaki tüm bulgular için plan üret; doğrudan silme yok':
+    'Build a plan for every finding in scope; there is no direct deletion',
+  'Plan bir adımdır, silme değil. Uygulama için ayrıca yazılı onay gerekir.':
+    'A plan is a step, not a deletion. Applying it requires a separate written approval.',
 };
 
 interface Ctx {

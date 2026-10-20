@@ -30,11 +30,18 @@ import {
 import { CliView } from './components/CliView.tsx';
 import { ConfirmDialog } from './components/ConfirmDialog.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
+import { Rail, type PlanState } from './components/Rail.tsx';
 import { ScanStatusBar } from './components/ScanStatusBar.tsx';
 import { VaultView } from './components/VaultView.tsx';
 import { VirtualClusterList } from './components/VirtualClusterList.tsx';
 import { useI18n } from './i18n.tsx';
 import { VERDICT_HINT } from './labels.ts';
+import {
+  agentClutter,
+  categoryOf,
+  categoryStats,
+  type CategoryKey,
+} from './util/categories.ts';
 import {
   EMPTY_LIVE_SCAN,
   EMPTY_SCAN_PROGRESS,
@@ -161,6 +168,8 @@ export default function App() {
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('size');
   const [mode, setMode] = useState<DeleteMode>('recycle');
+  /** Sol sutun kategorisi (kanittan turetilir; ayrica filtre degildir). */
+  const [category, setCategory] = useState<CategoryKey | 'all'>('all');
 
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [deleting, setDeleting] = useState<DeletingState | null>(null);
@@ -455,8 +464,22 @@ export default function App() {
     if (kindFilter === 'all') base = scan.clusters;
     else if (kindFilter === 'git') base = scan.clusters.filter((c) => (c.evidence.markers ?? []).includes('git-tracked'));
     else base = (groups?.[kindFilter] ?? []);
+    // Sol sutun kategorisi AYRICA bir filtre: ustune birlikte uygulanir.
+    if (category !== 'all') base = base.filter((c) => categoryOf(c) === category);
     return [...base].filter(match).sort((a, b) => compareClusters(a, b, sortMode));
-  }, [scan, groups, filter, kindFilter, sortMode]);
+  }, [scan, groups, filter, kindFilter, sortMode, category]);
+
+  /** Sol sutun: kategori ozeti + saglik olcumleri (yalniz tarama sonucundan). */
+  const cats = useMemo(() => categoryStats(scan?.clusters ?? []), [scan]);
+  const aiRatio = useMemo(() => agentClutter(scan?.clusters ?? []), [scan]);
+  const scannedBytes = useMemo(
+    () => (scan?.clusters ?? []).reduce((a, c) => a + c.totalBytes, 0),
+    [scan],
+  );
+  const scannedReclaimable = useMemo(
+    () => (scan?.clusters ?? []).reduce((a, c) => a + c.reclaimableBytes, 0),
+    [scan],
+  );
 
   const selectedClusters = useMemo(
     () => (scan?.clusters ?? []).filter((c) => selected.has(c.key)),
@@ -534,23 +557,58 @@ export default function App() {
     [scan],
   );
 
+  /**
+   * Verilen kume anahtarlari icin gerekceli plan uretir.
+   * Hicbir sey tasinmaz/silinmez; yalnizca plan ekrani acilir.
+   */
+  const openPlanFor = useCallback(
+    async (keys: string[]) => {
+      if (!scan || keys.length === 0) return;
+      setError(null);
+      setPhase('planning');
+      try {
+        const p = await createPlan({
+          scanId: scanId ?? undefined,
+          keys,
+          mode,
+        });
+        setPlan(p);
+        setPhase('confirm');
+      } catch (e) {
+        setError(errText(e));
+        setPhase('review');
+      }
+    },
+    [scan, scanId, mode],
+  );
+
   const openPlan = useCallback(async () => {
-    if (!scan || selected.size === 0) return;
-    setError(null);
-    setPhase('planning');
-    try {
-      const p = await createPlan({
-        scanId: scanId ?? undefined,
-        keys: [...selected],
-        mode,
-      });
-      setPlan(p);
-      setPhase('confirm');
-    } catch (e) {
-      setError(errText(e));
-      setPhase('review');
-    }
-  }, [scan, scanId, selected, mode]);
+    await openPlanFor([...selected]);
+  }, [openPlanFor, selected]);
+
+  /**
+   * "Tumunu planla" KAPSAMI: aktif kategori + aktif filtre sonucu gorunen,
+   * silme hedefi OLAN kumeler. "Nuke All" YOKTUR: buton yalnizca PLAN
+   * uretir; uygulama icin ayrica yazili onay gerekir.
+   */
+  const scopeKeys = useMemo(
+    () =>
+      activeItems
+        .filter(
+          (c) =>
+            c.verdict.kind !== 'report-only' &&
+            c.verdict.kind !== 'keep' &&
+            (c.deleteTargets?.length ?? 0) > 0,
+        )
+        .map((c) => c.key),
+    [activeItems],
+  );
+
+  const planAll = useCallback(async () => {
+    if (scopeKeys.length === 0) return;
+    setSelected(new Set(scopeKeys));
+    await openPlanFor(scopeKeys);
+  }, [scopeKeys, openPlanFor]);
 
   const confirmDelete = useCallback(
     async (phrase: string, acknowledgeHigh: boolean) => {
@@ -691,14 +749,36 @@ export default function App() {
     );
   }
 
+  /** Sol sutun rozeti icin plan durumu. */
+  const planState: PlanState =
+    phase === 'planning'
+      ? 'planning'
+      : phase === 'confirm'
+        ? 'confirm'
+        : phase === 'deleting'
+          ? 'deleting'
+          : 'idle';
+
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="logo">CLICleaner</span>
-          <span className="dim">{t('kanıt görünür, silme onaylı')}</span>
-        </div>
+      <Rail
+        stats={cats}
+        active={category}
+        onSelect={setCategory}
+        totalBytes={scannedBytes}
+        reclaimableBytes={scannedReclaimable}
+        aiRatio={aiRatio}
+        selectedCount={selected.size}
+        selectedBytes={selectedBytes}
+        planState={planState}
+        onPlan={() => void openPlan()}
+        onPlanAll={() => void planAll()}
+        hasScan={!!scan}
+        scopeCount={scopeKeys.length}
+      />
 
+      <div className="console-main">
+      <header className="topbar">
         <nav className="view-tabs" role="tablist">
           <button
             role="tab"
@@ -1314,6 +1394,7 @@ export default function App() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

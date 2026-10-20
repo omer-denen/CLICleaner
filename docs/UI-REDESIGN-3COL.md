@@ -171,6 +171,18 @@ Marka adı yalnızca kullanıcı yolunda görünür; motor yapıyı okur.
 ## 6. Uygulama fazları
 
 ### P0 — Kabuk ve tasarım belirteçleri
+
+> **Durum: TAMAMLANDI (20.10.2026).** `web/src/components/Rail.tsx` (yeni),
+> `web/src/util/categories.ts` (yeni), `web/src/App.tsx` (kabuk),
+> `web/src/styles.css` (belirteçler), `web/src/i18n.tsx` (TR/EN).
+> Sabit sol rail + içerik kabuğu; sağ sütun P2 için yer ayrıldı.
+> Sapmalar: rail genişliği 264px (planda 248px); `DISK %` göstergesi
+> **sunucu tarafı `statfs` gerektirdiği için ertelendi** (çekirdeğe
+> dokunulmadı) — yerine taranan/geri kazanılır/ajan kirliliği
+> ölçümleri tarama sonucundan gelir. Kategoriler **istemci tarafında,
+> mevcut kanıtlardan** türetilir (mimari tip + dosya türü); çekirdekte
+> yeni sınıflandırma kuralı yok.
+>
 - Sol sabit rail, sağ içerik; `--app-sidebar: 248px`; 8px grid.
 - Tipografi: UI sans + mono (`Cascadia Code/Consolas`) değerler.
 - Renk belirteçleri: mevcut koyu palet + açık tema hazırlığı.
