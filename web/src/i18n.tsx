@@ -434,6 +434,30 @@ const EN: Record<string, string> = {
   'Yolları göster ({n})': 'Show paths ({n})',
   'Yolları gizle': 'Hide paths',
 
+  // --- sağ panel / bağlam (T42 / D3 P2) ---
+  Bağlam: 'Context',
+  'Odaklanan öğe yok.': 'No focused item.',
+  'Bir satıra tıkla, ↑↓ ile gezin veya Enter ile sabitle.':
+    'Click a row, browse with ↑↓, or press Enter to pin it.',
+  'Kanıt yorumu': 'Evidence reading',
+  'Bu metin kanıttan üretilir; bir dil modeli kullanılmaz.':
+    'This text is produced from the evidence; no language model is used.',
+  'Bağımlılık ağacı': 'Dependency tree',
+  'Güvenli komut': 'Safe command',
+  'Bunlar yalnızca plan üretir; hiçbir şeyi silmez.':
+    'These only produce a plan; they delete nothing.',
+  'Manuel komut (PowerShell)': 'Manual command (PowerShell)',
+  'Bu komut aracın kontrolünden geçmez ve geri alınamaz. Yalnız ne silmek istediğinden eminsen kullan.':
+    'This command bypasses the tool and cannot be undone. Use it only if you are sure what you are deleting.',
+  Sabitle: 'Pin',
+  Sabitlendi: 'Pinned',
+  'Sabitlemeyi kaldır': 'Unpin',
+  'Bu öğeyi sabitle': 'Pin this item',
+  'Karar gerekçesini aç': 'Open the decision rationale',
+  'Yalnız bu kümeyi kuru (plan)': 'Dry-run only this cluster',
+  Kopyala: 'Copy',
+  dosya: 'files',
+
   // --- sol rail / kontrol merkezi (T42 / D3 P0) ---
   'Kontrol merkezi': 'Control center',
   'Sol menüyü aç/kapat': 'Toggle the side menu',

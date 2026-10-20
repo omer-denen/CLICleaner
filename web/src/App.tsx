@@ -29,6 +29,7 @@ import {
 } from './api.ts';
 import { CliView } from './components/CliView.tsx';
 import { ConfirmDialog } from './components/ConfirmDialog.tsx';
+import { ContextPanel } from './components/ContextPanel.tsx';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Rail, type PlanState } from './components/Rail.tsx';
 import { ScanStatusBar } from './components/ScanStatusBar.tsx';
@@ -179,6 +180,10 @@ export default function App() {
   const [railOpen, setRailOpen] = useState(true);
   /** Klavye imleci (odaklanan satir). P2'de sag panel bunu okur. */
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  /** Hover ile gecici onizleme; sabitle (Enter) ustune yazar. */
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  /** Sabitlenen oge (Enter). Panelde kalici gorunur. */
+  const [pinnedKey, setPinnedKey] = useState<string | null>(null);
   /** Satir yogunlugu: yogun (32px) / rahat (40px). */
   const [density, setDensity] = useState<'dense' | 'comfortable'>('dense');
   /** Triyaj cipleri: hizli eleme (boyut / risk / zombi). */
@@ -543,6 +548,18 @@ export default function App() {
     searchRef.current?.select();
   }, []);
 
+  /** Enter ile sabitleme: ayni ogeye ikinci kez basmak sabitlemeyi kaldirir. */
+  const togglePin = useCallback((key: string) => {
+    setPinnedKey((prev) => (prev === key ? null : key));
+  }, []);
+
+  /** Sag panelin gosterdigi oge: sabit > hover > klavye imleci. */
+  const contextCluster = useMemo(() => {
+    const key = pinnedKey ?? hoverKey ?? focusedKey;
+    if (!key || !scan) return null;
+    return scan.clusters.find((c) => c.key === key) ?? null;
+  }, [pinnedKey, hoverKey, focusedKey, scan]);
+
   const toggleExpand = useCallback((key: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -799,8 +816,11 @@ export default function App() {
           ? 'deleting'
           : 'idle';
 
+  /** Sag sutun yalniz Disk sekmesinde acik (CLI/Kasa kendi ekraninda). */
+  const ctxOpen = view === 'disk';
+
   return (
-    <div className={`app${railOpen ? '' : ' rail-closed'}`}>
+    <div className={`app${railOpen ? '' : ' rail-closed'}${ctxOpen ? ' with-ctx' : ''}`}>
       {railOpen && (
         <Rail
           stats={cats}
@@ -1158,6 +1178,8 @@ export default function App() {
                   onToggle={toggleSelect}
                   onExpand={toggleExpand}
                   onFocus={setFocusedKey}
+                  onHover={setHoverKey}
+                  onPin={togglePin}
                   onSelectMany={setSelectionFor}
                   onSearchFocus={focusSearch}
                   onEscape={clearSelection}
@@ -1485,6 +1507,16 @@ export default function App() {
         </div>
       )}
       </div>
+
+      {ctxOpen && (
+        <ContextPanel
+          cluster={contextCluster}
+          pinned={pinnedKey !== null && pinnedKey === contextCluster?.key}
+          onTogglePin={() => {
+            if (contextCluster) togglePin(contextCluster.key);
+          }}
+        />
+      )}
     </div>
   );
 }
