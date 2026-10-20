@@ -175,6 +175,8 @@ export default function App() {
   const [mode, setMode] = useState<DeleteMode>('recycle');
   /** Sol sutun kategorisi (kanittan turetilir; ayrica filtre degildir). */
   const [category, setCategory] = useState<CategoryKey | 'all'>('all');
+  /** Sol sutun gorunur mu (dar ekranda veya elle kapatilabilir). */
+  const [railOpen, setRailOpen] = useState(true);
   /** Klavye imleci (odaklanan satir). P2'de sag panel bunu okur. */
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   /** Satir yogunlugu: yogun (32px) / rahat (40px). */
@@ -798,25 +800,37 @@ export default function App() {
           : 'idle';
 
   return (
-    <div className="app">
-      <Rail
-        stats={cats}
-        active={category}
-        onSelect={setCategory}
-        totalBytes={scannedBytes}
-        reclaimableBytes={scannedReclaimable}
-        aiRatio={aiRatio}
-        selectedCount={selected.size}
-        selectedBytes={selectedBytes}
-        planState={planState}
-        onPlan={() => void openPlan()}
-        onPlanAll={() => void planAll()}
-        hasScan={!!scan}
-        scopeCount={scopeKeys.length}
-      />
+    <div className={`app${railOpen ? '' : ' rail-closed'}`}>
+      {railOpen && (
+        <Rail
+          stats={cats}
+          active={category}
+          onSelect={setCategory}
+          totalBytes={scannedBytes}
+          reclaimableBytes={scannedReclaimable}
+          aiRatio={aiRatio}
+          selectedCount={selected.size}
+          selectedBytes={selectedBytes}
+          planState={planState}
+          onPlan={() => void openPlan()}
+          onPlanAll={() => void planAll()}
+          hasScan={!!scan}
+          scopeCount={scopeKeys.length}
+        />
+      )}
 
       <div className="console-main">
       <header className="topbar">
+        <button
+          className="icon-btn rail-toggle"
+          onClick={() => setRailOpen((v) => !v)}
+          aria-expanded={railOpen}
+          aria-label={t('Sol menüyü aç/kapat')}
+          title={t('Sol menüyü aç/kapat')}
+        >
+          {railOpen ? '«' : '»'}
+        </button>
+
         <nav className="view-tabs" role="tablist">
           <button
             role="tab"

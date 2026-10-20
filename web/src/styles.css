@@ -2231,6 +2231,13 @@ input {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--text);
+  white-space: nowrap;
+}
+
+.meter-head > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .meter-bar {
@@ -2637,18 +2644,102 @@ input {
   }
 }
 
+/* --- sol menü anahtarı + kapalı durum --- */
+
+.rail-toggle {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+  padding: 5px 9px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.rail-toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* menü kapalı: içerik tüm genişliği kaplar */
+.app.rail-closed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* dar ekran: rail üstte yatay bloğa düşer */
 
 @media (max-width: 1080px) {
   .app {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
+  /*
+    Rail yatay şeride döner: ekranı kaplamaz, tek satırda kaydırılır.
+    (Dikey düzende tam boy blok, dar ekranda içeriği tamamen gizliyordu.)
+  */
   .rail {
     position: static;
     height: auto;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px 20px;
     border-right: none;
     border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+
+  .rail-head,
+  .rail-title,
+  .rail-note {
+    display: none;
+  }
+
+  .rail-block {
+    flex: 1 1 230px;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .rail-health {
+    flex: 1 1 300px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
+  .meter {
+    flex: 1 1 90px;
+  }
+
+  .rail-cats {
+    flex: 2 1 330px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .rail-cat {
+    width: auto;
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+  }
+
+  .rail-plan {
+    border-top: none;
+    padding-top: 0;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .rail .btn {
+    width: auto;
   }
 
   .console-main {

@@ -102,7 +102,7 @@ export function Rail({
         <span className="dim small">{t('kanıt görünür, silme onaylı')}</span>
       </div>
 
-      <section className="rail-block">
+      <section className="rail-block rail-health">
         <h3 className="rail-title">{t('Sağlık')}</h3>
         <Meter
           label={t('Taranan')}
@@ -124,7 +124,7 @@ export function Rail({
         />
       </section>
 
-      <section className="rail-block">
+      <section className="rail-block rail-cats">
         <h3 className="rail-title">{t('Kategoriler')}</h3>
         <button
           className={`rail-cat${active === 'all' ? ' active' : ''}`}

@@ -436,6 +436,7 @@ const EN: Record<string, string> = {
 
   // --- sol rail / kontrol merkezi (T42 / D3 P0) ---
   'Kontrol merkezi': 'Control center',
+  'Sol menüyü aç/kapat': 'Toggle the side menu',
   Sağlık: 'Health',
   'Geri kazanılır': 'Reclaimable',
   'Ajan kirliliği': 'Agent clutter',
