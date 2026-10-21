@@ -155,6 +155,25 @@ npm run build:web     # 315.60 KB JS / 95.05 KB gzip; 15.08 KB CSS
 - `tests/api.test.ts` — `/api/projects/roots`, filtre/sayım/özet,
   bilinmeyen proje 404.
 
+### 5.4 Ego-browser kontrolü (kullanıcı isteği)
+
+Kullanıcı "ego-browser ile kontrol et" ve "bunu da kurallara yaz" dedi.
+
+- `ego-browser skill` çıktısı izlendi; TaskSpace **3**, page `p1`,
+  `http://127.0.0.1:4399/`.
+- Projeler sekmesi: kök `C:\Users\Code\source\repos` → **3 proje**
+  (3 Git, 1 artifact); `residue-cleaner` raporu: **78.4 MB**
+  `node_modules`, lockfile hash `20b33783ba64…`, "son 3 günde
+  kullanılmış" → plan **engelli** (0 planlanan / 1 engellenen).
+- Ekran görüntüleri: `scratch/ego-m2-projects.png`,
+  `scratch/ego-m2-detail.png`.
+- **Kural 19 (`AGENTS.md`):** tarayıcı doğrulaması `ego-browser` ile
+  yapılır; `ego-browser skill` izlenir, aynı TaskSpace sürdürülür.
+  Headless Edge/CDP yalnız zorunlu hâllerde ve kullanıcı onayıyla.
+- Not: 4399'daki eski sunucu M2 kodundan önce başlatılmıştı
+  (`/api/projects/roots` yok → "Bilinmeyen uç nokta"); yeni kodla
+  yeniden başlatıldı. Sunucu 4399'da açık bırakıldı.
+
 ---
 
 ## 6. Kararlar
