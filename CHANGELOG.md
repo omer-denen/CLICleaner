@@ -21,6 +21,12 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
   `GET /api/cluster`: filtre, sıralama, kategori sayımı ve seçim özeti
   motorda; arayüz yalnız gösterir. Plan ve kasa onay ifadeleri
   `ApprovalRules`'tan gelir (`SIL`, `BOŞALT`).
+- **Arayüz M1:** Disk (sanal liste, canlı SSE tarama, filtreler, kanıt
+  paneli), Plan/Onay (yazılı `SIL`, yüksek risk işaretleme, canlı yürütme)
+  ve Kasa (geri yükleme, seçili öğeleri kalıcı silme). Arayüz yalnız istek
+  gönderir; onay ifadeleri sunucudan gelir. Doğrudan yol silme (`purge` yol
+  modu) arayüzde yoktur; kalıcı silme yalnız kasa öğesi kimliğiyle ve
+  `BOŞALT` onayıyla yapılır.
 - Test: `npm test` 72 test.
 
 ## [2.1.0] - 2026-10-21

@@ -5,6 +5,7 @@ import type {
 } from '../../../src/core/contract.ts';
 import { translate, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
+import { CATEGORY_LABEL, CONFIDENCE_LABEL, REGEN_LABEL } from '../labels.ts';
 
 const LEDGER_LABEL: Record<DashboardLedgerId, MessageKey> = {
   protected: 'ledger.protected',
@@ -32,29 +33,6 @@ const CARD_LABEL: Record<DashboardCardId, MessageKey> = {
   'vault-expired': 'card.vault-expired',
   'schedule-missed': 'card.schedule-missed',
   'schedule-due': 'card.schedule-due',
-};
-
-const REASON: Record<string, MessageKey> = {
-  regenerable: 'reason.regenerable',
-  'user-data': 'reason.user-data',
-  unknown: 'reason.unknown',
-};
-
-const CONFIDENCE: Record<string, MessageKey> = {
-  high: 'confidence.high',
-  medium: 'confidence.medium',
-  low: 'confidence.low',
-};
-
-const CATEGORY: Record<string, MessageKey> = {
-  protected: 'category.protected',
-  duplicate: 'category.duplicate',
-  'old-version': 'category.old-version',
-  orphan: 'category.orphan',
-  unused: 'category.unused',
-  'ai-debris': 'category.ai-debris',
-  'ghost-envs': 'category.ghost-envs',
-  unknown: 'category.unknown',
 };
 
 /**
@@ -133,11 +111,11 @@ export function Dashboard({ data, lang }: { data: DashboardResponse; lang: Lang 
               {data.safeWins.map((win) => (
                 <tr key={win.clusterKey}>
                   <td className="mono">{win.clusterKey}</td>
-                  <td>{t(CATEGORY[win.category] ?? 'category.unknown')}</td>
+                  <td>{t(CATEGORY_LABEL[win.category] ?? 'category.unknown')}</td>
                   <td className="num mono">{formatBytes(win.bytes)}</td>
                   <td className="dim">
-                    {t(REASON[win.regenerability] ?? 'reason.unknown')} ·{' '}
-                    {t(CONFIDENCE[win.confidence] ?? 'confidence.low')}
+                    {t(REGEN_LABEL[win.regenerability] ?? 'reason.unknown')} ·{' '}
+                    {t(CONFIDENCE_LABEL[win.confidence] ?? 'confidence.low')}
                   </td>
                 </tr>
               ))}

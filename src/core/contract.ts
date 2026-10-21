@@ -42,6 +42,8 @@ export interface PlannedClusterView {
   title: string;
   reason: string;
   risk: RiskLevel;
+  /** Kume hedeflerinin toplam bayti (motor hesaplar). */
+  bytes: number;
   targets: PlannedTargetView[];
 }
 

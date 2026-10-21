@@ -42,6 +42,8 @@ export interface PlannedCluster {
   title: string;
   reason: string;
   risk: RiskLevel;
+  /** Kume icindeki hedeflerin toplam bayti (motor hesaplar). */
+  bytes: number;
   targets: PlannedTarget[];
 }
 
@@ -99,6 +101,7 @@ export function buildPlan(
       title: c.title,
       reason: c.verdict.consequence,
       risk: c.verdict.risk,
+      bytes,
       targets: targets.map((t) => ({ target: t, bytes: t.bytes })),
     });
     total += bytes;

@@ -76,6 +76,7 @@
     "init-state": "tsx scripts/init-state.ts"
   },
   "devDependencies": {
+    "@tanstack/react-virtual": "^3.14.21",
     "@types/node": "^22.10.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

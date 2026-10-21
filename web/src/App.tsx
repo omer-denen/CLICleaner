@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DashboardResponse, MetaResponse } from '../../src/core/contract.ts';
+import type {
+  DashboardResponse,
+  MetaResponse,
+  PlanResponse,
+  ScanStatusResponse,
+} from '../../src/core/contract.ts';
 import { api, ApiError } from './api.ts';
 import { translate, type Lang, type MessageKey } from './i18n.ts';
 import { formatBytes } from './format.ts';
 import { Dashboard } from './screens/Dashboard.tsx';
+import { Disk } from './screens/Disk.tsx';
+import { PlanScreen } from './screens/PlanScreen.tsx';
+import { Vault } from './screens/Vault.tsx';
 
 type Screen =
   | 'dashboard'
   | 'disk'
+  | 'plan'
   | 'projects'
   | 'tools'
   | 'env'
@@ -19,6 +28,7 @@ type Screen =
 const NAV: Array<{ id: Screen; label: MessageKey }> = [
   { id: 'dashboard', label: 'nav.dashboard' },
   { id: 'disk', label: 'nav.disk' },
+  { id: 'plan', label: 'nav.plan' },
   { id: 'projects', label: 'nav.projects' },
   { id: 'tools', label: 'nav.tools' },
   { id: 'env', label: 'nav.env' },
@@ -28,12 +38,14 @@ const NAV: Array<{ id: Screen; label: MessageKey }> = [
   { id: 'settings', label: 'nav.settings' },
 ];
 
-const SCAN_KEY: Record<DashboardResponse['scan']['state'], MessageKey> = {
+const SCAN_KEY: Record<ScanStatusResponse['state'], MessageKey> = {
   never: 'scan.never',
   current: 'scan.current',
   stale: 'scan.stale',
   scanning: 'scan.scanning',
 };
+
+const WIDE: Screen[] = ['disk', 'plan', 'vault'];
 
 export function App() {
   const [lang, setLang] = useState<Lang>(() =>
@@ -42,6 +54,8 @@ export function App() {
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [meta, setMeta] = useState<MetaResponse | null>(null);
+  const [status, setStatus] = useState<ScanStatusResponse | null>(null);
+  const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,17 +63,29 @@ export function App() {
     translate(lang, key, vars);
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      // Iki istek de SALT OKUNUR; karar motorda verilir.
-      const [nextDashboard, nextMeta] = await Promise.all([api.dashboard(), api.meta()]);
+      // Tum istekler SALT OKUNUR; karar motorda verilir.
+      const [nextDashboard, nextMeta, nextStatus] = await Promise.all([
+        api.dashboard(),
+        api.meta(),
+        api.scanStatus(),
+      ]);
       setDashboard(nextDashboard);
       setMeta(nextMeta);
+      setStatus(nextStatus);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const refreshStatus = useCallback(async (): Promise<void> => {
+    try {
+      setStatus(await api.scanStatus());
+    } catch {
+      /* durum yenilenemezse eski deger kalir */
     }
   }, []);
 
@@ -71,6 +97,8 @@ export function App() {
     localStorage.setItem('residue.lang', lang);
     document.documentElement.lang = lang;
   }, [lang]);
+
+  const wide = WIDE.includes(screen);
 
   return (
     <div className="app">
@@ -85,9 +113,9 @@ export function App() {
           </div>
         </div>
         <div className="topbar-right">
-          {dashboard && (
-            <span className={`scan-chip scan-${dashboard.scan.state}`}>
-              {t(SCAN_KEY[dashboard.scan.state])}
+          {status && (
+            <span className={`scan-chip scan-${status.state}`}>
+              {t(SCAN_KEY[status.state])}
             </span>
           )}
           <button type="button" className="ghost" onClick={() => void load()}>
@@ -104,7 +132,7 @@ export function App() {
         </div>
       </header>
 
-      <div className="shell">
+      <div className={`shell${wide ? ' shell-wide' : ''}`}>
         <nav className="rail" aria-label={t('nav.sections')}>
           {NAV.map((item) => (
             <button
@@ -136,35 +164,67 @@ export function App() {
             <Dashboard data={dashboard} lang={lang} />
           )}
 
-          {!loading && !error && screen !== 'dashboard' && (
-            <div className="state">{t('common.soon')}</div>
+          {!loading && !error && screen === 'disk' && (
+            <Disk
+              meta={meta}
+              status={status}
+              lang={lang}
+              onStatus={() => void refreshStatus()}
+              onPlan={(nextPlan) => {
+                setPlan(nextPlan);
+                setScreen('plan');
+              }}
+            />
           )}
+
+          {!loading && !error && screen === 'plan' && (
+            <PlanScreen
+              plan={plan}
+              lang={lang}
+              onBack={() => setScreen('disk')}
+              onVault={() => setScreen('vault')}
+              onReplace={setPlan}
+              onExecuted={() => void load()}
+            />
+          )}
+
+          {!loading && !error && screen === 'vault' && (
+            <Vault lang={lang} onChanged={() => void load()} />
+          )}
+
+          {!loading &&
+            !error &&
+            !['dashboard', 'disk', 'plan', 'vault'].includes(screen) && (
+              <div className="state">{t('common.soon')}</div>
+            )}
         </main>
 
-        <aside className="context">
-          <section className="context-block">
-            <h2>{t('safety.title')}</h2>
-            <p className="dim">{t('safety.body')}</p>
-          </section>
-
-          {meta && (
+        {!wide && (
+          <aside className="context">
             <section className="context-block">
-              <h2>{t('context.meta')}</h2>
-              <dl className="meta-list">
-                <dt>{t('context.ui')}</dt>
-                <dd className="mono">{meta.ui ? 'web' : 'api'}</dd>
-                <dt>{t('context.cwd')}</dt>
-                <dd className="mono" title={meta.cwd}>
-                  {meta.cwd ?? '—'}
-                </dd>
-                <dt>{t('context.home')}</dt>
-                <dd className="mono" title={meta.home}>
-                  {meta.home ?? '—'}
-                </dd>
-              </dl>
+              <h2>{t('safety.title')}</h2>
+              <p className="dim">{t('safety.body')}</p>
             </section>
-          )}
-        </aside>
+
+            {meta && (
+              <section className="context-block">
+                <h2>{t('context.meta')}</h2>
+                <dl className="meta-list">
+                  <dt>{t('context.ui')}</dt>
+                  <dd className="mono">{meta.ui ? 'web' : 'api'}</dd>
+                  <dt>{t('context.cwd')}</dt>
+                  <dd className="mono" title={meta.cwd}>
+                    {meta.cwd ?? '—'}
+                  </dd>
+                  <dt>{t('context.home')}</dt>
+                  <dd className="mono" title={meta.home}>
+                    {meta.home ?? '—'}
+                  </dd>
+                </dl>
+              </section>
+            )}
+          </aside>
+        )}
       </div>
 
       <footer className="statusbar">
