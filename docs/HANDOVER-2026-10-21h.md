@@ -146,8 +146,10 @@ dahil).
     `smoke-web --base` **34/34 temiz**.
   - `npx residue-cleaner@2.2.0 --version` (temiz klasör) → `2.2.0`.
   - `git tag v2.2.0`; `main` + tag GitHub'a gönderildi (commit `982ac77`).
-- **Kalan (elle):** GitHub Release sayfaları — `v2.2.0` ve daha önce
-  açılmamış `v2.1.0`. `gh` CLI kurulu değil; başlık = tag adı (AGENTS 17).
+- **GitHub Release gerekli değil (kullanıcı kararı, 21.10.2026):** dağıtım
+  kanalı **npm**'dir (`npx residue-cleaner` / `npm i -g`). Tag'ler kaynak
+  anlık görüntüsü ve README rozeti için tutulur. Bir release sayfası yine de
+  açılırsa başlık = tag adı olur (AGENTS 17); açılmaması eksik iş sayılmaz.
 - **Not:** `npm publish` çıktısı `bin[residue] ... was invalid` uyarısı
   verdi; bu yalnızca `./bin/...` → `bin/...` normalizasyonudur, yayınlanan
   manifestte `bin` **korunmuştur** (kurulumla doğrulandı). Bir sonraki
@@ -165,7 +167,8 @@ dahil).
 3. **`npx residue-cleaner@2.2.0`** yalnız yayından sonra denenebilir; paket
    smoke yerel tarball ile aynı yolu doğruladı.
 4. **T54** (eski CLICleaner kalıntıları) planlı; M5 kapsamı değil.
-5. GitHub Release `v2.1.0` hâlâ elle açılmadı.
+5. **GitHub Release sayfaları** açılmadı; dağıtım npm olduğu için gerekli
+   değil (kullanıcı kararı, 21.10.2026).
 6. Sunucu `:4399` oturumluk; oturum kapanınca durur.
 
 ---
@@ -195,7 +198,6 @@ dahil).
 1. **Oku:** `AGENTS.md` → `SESSION_LOG.md` (en üst M5) → bu belge.
 2. **Doğrula:** `git status`, `npm run typecheck`, `npm test`,
    `npm run build:web`, `npm run smoke`.
-3. **GitHub Release sayfalarını elle aç:** `v2.2.0` ve `v2.1.0`
-   (başlık = tag adı).
-4. **Sonra:** T30 (global AI artıkları) → T37 (yarım güncelleme artıkları)
+3. **Sonra:** T30 (global AI artıkları) → T37 (yarım güncelleme artıkları)
    → T54 (eski CLICleaner kalıntıları, ayrı onay).
+4. GitHub Release gerekmiyor; dağıtım npm üzerinden.
