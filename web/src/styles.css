@@ -1078,6 +1078,7 @@ code,
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 54px;
   padding: 8px 10px;
   border: 0;
   border-bottom: 1px solid var(--line-soft);
@@ -1118,10 +1119,15 @@ code,
 
 .project-markers {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   justify-content: flex-end;
-  max-width: 52%;
+  max-width: 340px;
+  overflow: hidden;
+}
+
+.project-markers .badge {
+  flex: 0 0 auto;
 }
 
 .project-root-path {

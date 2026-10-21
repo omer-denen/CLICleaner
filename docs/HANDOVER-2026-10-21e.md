@@ -173,6 +173,11 @@ Kullanıcı "ego-browser ile kontrol et" ve "bunu da kurallara yaz" dedi.
 - Not: 4399'daki eski sunucu M2 kodundan önce başlatılmıştı
   (`/api/projects/roots` yok → "Bilinmeyen uç nokta"); yeni kodla
   yeniden başlatıldı. Sunucu 4399'da açık bırakıldı.
+- **Hizalama cilası:** proje satırları **54 px** sabit yüksekliğe alındı;
+  rozetler tek satırda (`flex-wrap: nowrap`, taşan gizli). Ego-browser
+  ölçümü: üç satır da **54 px**, rozet satırı ~19 px. Ekran görüntüleri:
+  `scratch/ego-m2-projects-aligned.png`,
+  `scratch/ego-m2-detail-aligned.png`.
 
 ---
 
