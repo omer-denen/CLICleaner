@@ -52,14 +52,19 @@ It answers one question with evidence: **"What is this folder, and what happens 
 5. Pick what you want to move to the vault → `residue clean` → read the plan
    → type `TASI` for medium/high risk → confirm. Permanent deletion
    (`--purge`) asks for `SIL`.
+6. Prefer a browser over the terminal? Run `npx residue-cleaner ui --web`.
 
 The default mode moves items into the tool's own **vault**, so a wrong
 decision is reversible (`residue undo --restore`).
 
+> **2.2.0 note:** The browser UI is back: `residue ui --web` (loopback only;
+> the token travels in an `HttpOnly + SameSite=Strict` cookie and never
+> appears in the URL). The UI never decides anything: lists, totals and
+> approval phrases come from the decision engine. Deletion is still a
+> two-step, written-approval flow.
+>
 > **2.0.0 note:** The project was renamed: **Residue** (npm package
-> `residue-cleaner`, command `residue`). The browser UI was also removed in
-> this release; the tool now runs **from the terminal only**. Rebuilding the
-> UI is planned: [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
+> `residue-cleaner`, command `residue`).
 >
 > The old name was `clicleaner`. Your data (vault, journal) now lives in
 > `%LOCALAPPDATA%\residue`.
@@ -71,6 +76,41 @@ decision is reversible (`residue undo --restore`).
 - `npx residue-cleaner` prints the command list and the help text.
 - You do not have to delete anything; `residue clean --dry-run` shows the
   plan only.
+
+---
+
+## Browser UI (2.2.0)
+
+Prefer a browser over the terminal:
+
+```powershell
+npx residue-cleaner ui --web
+```
+
+- The server listens on **`127.0.0.1` only**; it cannot be reached from the
+  network.
+- Every start generates a fresh token. The token is delivered in an
+  `HttpOnly + SameSite=Strict` cookie and **never appears in the address bar**.
+- Screens: **Overview**, **Disk**, **Plan/Approval**, **Projects**, **Tools**,
+  **PATH & Environment**, **Graph**, **Schedules**, **Vault**, **Settings**.
+- The UI never decides anything: which clusters are listed, which are
+  selectable, all totals and the approval phrases (`TASI`, `SIL`, `BOŞALT`,
+  `TEMİZLE`, `PLANLA`) come from the decision engine. The browser never sends
+  a path to delete.
+- Deletion and plan execution remain **two-step**: plan first, written
+  approval second. High-risk targets are flagged separately; `--yes` cannot
+  skip this.
+- **Keyboard:** `/` focuses search, `?` opens the shortcut list, `Esc` closes;
+  arrow keys move between sections. `Tab`, `Enter` and `Space` select rows and
+  open details. "Skip to content" and "Skip to the list" links jump straight
+  into long screens.
+- **Projects** is read-only: project sources are never delete targets; only
+  dependencies, the lockfile hash and a reproducible recipe are reported.
+- **With the update check off, no network request is made.** When enabled, only
+  the npm registry version number is queried; there is no telemetry.
+
+> The UI runs on the headless API exposed by `residue api`. To bind that API
+> to your own tools instead, use `residue api --port 4321`; it serves no UI.
 
 ---
 
@@ -191,6 +231,14 @@ tracked by Git are protected in every mode anyway.
 **I deleted something by mistake.**
 Restore from the vault: `residue undo --restore`.
 
+**How do I open the browser UI?**
+Run `npx residue-cleaner ui --web`; it opens on `127.0.0.1`. Press `Ctrl+C`
+in the terminal to close it.
+
+**The UI says "invalid token".**
+Every start generates a new token, so an old tab or URL becomes invalid.
+Close the terminal and start `residue ui --web` again.
+
 **Can I disable a standalone tool without deleting it?**
 Yes. Quarantine it: `residue quarantine <ad>`. The shim moves to the vault
 (the command leaves PATH), your data stays in place, and the restore steps
@@ -285,7 +333,9 @@ For more: `residue help`
 
 ## Updates
 
-There is **no automatic update check** (planned behaviour: off by default).
+The automatic update check is **off by default**. Choosing `Daily` or
+`Weekly` in the Settings screen queries only the npm registry version number;
+while it is off, **no network request is made**.
 Manual update:
 
 ```bash
@@ -297,6 +347,8 @@ npx residue-cleaner@latest      # run the latest version without installing
 - GitHub releases: <https://github.com/omer-denen/residue-cleaner/releases>
 
 The automatic update check is **off** by default (no network request is made).
+To enable it, set **Update check** in the Settings screen to `Daily` or
+`Weekly`.
 
 ---
 

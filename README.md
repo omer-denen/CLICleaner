@@ -52,6 +52,7 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
 5. Kasaya taşımak istediklerini seç → `residue clean` → planı oku →
    orta/yüksek riskte `TASI` yaz → onayla. Kalıcı silme (`--purge`) için
    `SIL` istenir.
+6. Terminal yerine tarayıcıyı tercih edersen: `npx residue-cleaner ui --web`.
 
 Varsayılan mod **aracın kendi kasası**dır; yanlış karar verirsen geri
 alabilirsin (`residue undo --restore`).
@@ -74,6 +75,40 @@ alabilirsin (`residue undo --restore`).
 - `npx residue-cleaner` komut listesi ve yardım metnini gösterir.
 - Hiçbir şeyi silmek zorunda değilsin; `residue clean --dry-run` yalnızca
   planı gösterir.
+
+---
+
+## Tarayıcı arayüzü (2.2.0)
+
+Terminal yerine tarayıcıda çalışmak istersen:
+
+```powershell
+npx residue-cleaner ui --web
+```
+
+- Sunucu **yalnızca `127.0.0.1`** üzerinde açılır; ağdan erişilemez.
+- Her başlatmada yeni bir token üretilir. Token `HttpOnly + SameSite=Strict`
+  çerezle taşınır; **adres çubuğunda görünmez**.
+- Ekranlar: **Genel Bakış**, **Disk**, **Plan/Onay**, **Projeler**,
+  **Araçlar**, **PATH & Ortam**, **Graf**, **Planlar**, **Kasa**, **Ayarlar**.
+- Arayüz karar vermez: hangi kümenin listeleneceği, seçilebilirlik, toplamlar
+  ve onay ifadeleri (`TASI`, `SIL`, `BOŞALT`, `TEMİZLE`, `PLANLA`) karar
+  motorundan gelir. Tarayıcı silinecek **yol göndermez**.
+- Silme ve plan yürütme yine **iki aşamalıdır**: önce plan, sonra yazılı onay.
+  Yüksek riskli hedefler ayrıca işaretlenir; `--yes` bu adımı atlayamaz.
+- **Klavye:** `/` aramaya odaklanır, `?` kısayol listesini açar, `Esc` kapatır;
+  bölümler arasında ok tuşlarıyla gezinilir. `Tab`, `Enter` ve `Space` ile
+  satır seçimi ve ayrıntı açma yapılabilir. "İçeriğe geç" ve "Listeye geç"
+  bağlantıları uzun ekranlarda doğrudan içeriğe götürür.
+- **Projeler** ekranı salt okunurdur: proje kaynağı hiçbir zaman silme hedefi
+  olmaz; yalnız bağımlılıklar, lockfile hash'i ve yeniden kurulum tarifi
+  raporlanır.
+- **Güncelleme kontrolü kapalıyken hiçbir ağ isteği yapılmaz.** Açtığında
+  yalnızca npm registry'deki sürüm numarası sorulur; telemetri yoktur.
+
+> Arayüz, `residue api` ile açılan başsız API'nin üzerinde çalışır. API'yi
+> yalnızca kendi araçlarına bağlamak istersen `residue api --port 4321`
+> kullanabilirsin; arayüz sunmaz.
 
 ---
 
@@ -195,6 +230,14 @@ Git tarafından takip edilen dosyalar zaten her koşulda korunur.
 **Yanlış sildim.**
 Kasadan geri al: `residue undo --restore`.
 
+**Tarayıcı arayüzünü nasıl açarım?**
+`npx residue-cleaner ui --web` yaz; tarayıcı `127.0.0.1` üzerinde açılır.
+Kapatmak için terminalde `Ctrl+C` yeterlidir.
+
+**Arayüzde "Geçersiz token" görüyorum.**
+Sunucu her başlatmada yeni bir token üretir; eski sekme veya adres geçersiz
+olur. Terminali kapatıp `residue ui --web` ile yeniden aç.
+
 **Bağımsız bir aracı silmeden devre dışı bırakabilir miyim?**
 Evet. Karantinaya al: `residue quarantine <ad>`. Shim kasaya taşınır (komut
 PATH'ten düşer), verilerin yerinde kalır; geri alma adımları kasaya yazılır.
@@ -287,7 +330,9 @@ Daha fazlası için: `residue help`
 
 ## Güncelleme
 
-Otomatik güncelleme kontrolü **yoktur** (planlanan davranış: varsayılan kapalı).
+Otomatik güncelleme kontrolü **varsayılan olarak kapalıdır**. Ayarlar
+ekranından `Günlük` veya `Haftalık` seçilirse yalnızca npm registry'deki
+sürüm numarası sorulur; kapalıyken **hiçbir ağ isteği yapılmaz**.
 Manuel güncelleme:
 
 ```bash
@@ -299,6 +344,8 @@ npx residue-cleaner@latest      # kurulum yapmadan en güncel sürümü çalış
 - GitHub sürümleri: <https://github.com/omer-denen/residue-cleaner/releases>
 
 Otomatik sürüm kontrolü **kapalıdır** (varsayılan: hiçbir ağ isteği yapılmaz).
+Açmak istersen Ayarlar ekranındaki **Güncelleme kontrolü** seçeneğini
+`Günlük` veya `Haftalık` yap.
 
 ---
 
