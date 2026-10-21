@@ -218,10 +218,12 @@ Hayır. Her şey yerel makinede çalışır.
 Yönetici hakkı gerekmez.
 
 ```bash
-npx residue-cleaner scan        # kurulum yapmadan dene
+npx residue-cleaner scan     # kurulum yapmadan dene
 npm install -g residue-cleaner   # kalıcı kurulum
 residue                  # komut listesini göster
 ```
+
+Kurulumdan sonra komut **`residue`**'dir (`residue-cleaner` da aynı işi görür).
 
 Kaynaktan çalıştırmak için:
 

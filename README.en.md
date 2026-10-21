@@ -220,10 +220,13 @@ No. Everything runs locally.
 No administrator rights needed.
 
 ```bash
-npx residue-cleaner scan        # try without installing
+npx residue-cleaner scan     # try without installing
 npm install -g residue-cleaner   # install globally
 residue                  # print the command list
 ```
+
+After installation the command is **`residue`** (`residue-cleaner` is an alias
+for the same script).
 
 Run from source:
 

@@ -62,11 +62,14 @@ Bu kural `AGENTS.md` 17. maddede de yer alır.
 
 ## 2.0.0 release notu (21.10.2026)
 
-Sürüm **major**: tarayıcı arayüzü kaldırıldı. Release açıklaması bunu
-**açıkça** söylemelidir (kullanıcı 1.x'ten yükseltirken neyin kalktığını
-bilmeli):
+Sürüm **major**: proje yeniden adlandırıldı **Residue**, tarayıcı arayüzü
+kaldırıldı. Release açıklaması bunu **açıkça** söylemelidir (kullanıcı
+1.x'ten yükseltirken neyin kalktığını bilmeli):
 
+- **Proje adı değişti:** `CLICleaner` → **Residue**. npm paketi
+  `residue-cleaner`, komut `residue`.
 - Tarayıcı arayüzü kaldırıldı; araç artık **yalnızca terminalden** çalışır.
+- Yeniden yapım planlanıyor: `docs/WEB-REBUILD-PLAN.md`.
 - `residue` yardım metnini gösterir, `residue ui` terminal arayüzünü açar.
 - Yeniden yapım planlanıyor: `docs/WEB-REBUILD-PLAN.md`.
 

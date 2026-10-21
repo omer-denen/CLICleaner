@@ -5,6 +5,13 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-21
+
+### Düzeltildi
+
+- `npx residue-cleaner` artık çalışıyor: paket adıyla eşleşen bir komut
+  takma adı eklendi. Ana komut yine `residue`.
+
 ## [2.0.0] - 2026-10-21
 
 Tarayıcı arayüzü kaldırıldı ve proje yeniden adlandırıldı: **Residue**

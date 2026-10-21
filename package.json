@@ -1,6 +1,6 @@
 {
   "name": "residue-cleaner",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Residue — CLI cleaner and evidence-first auditor for developer caches, CLI installs and AI runtime leftovers; shows what each folder is before anything is deleted",
   "type": "module",
   "license": "MIT",
@@ -48,7 +48,8 @@
     "LICENSE"
   ],
   "bin": {
-    "residue": "./bin/residue.mjs"
+    "residue": "./bin/residue.mjs",
+    "residue-cleaner": "./bin/residue.mjs"
   },
   "scripts": {
     "scan": "tsx src/cli.ts scan",
