@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { translateUpper } from '../web/src/i18n.ts';
 
-test('turkce buyuk harf: i -> İ (WHAT-İF)', () => {
-  assert.equal(translateUpper('tr', 'graph.whatIf.title'), 'WHAT-İF');
-  assert.equal(translateUpper('en', 'graph.whatIf.title'), 'WHAT-IF');
+test('turkce buyuk harf: dugum testi basligi', () => {
+  assert.equal(translateUpper('tr', 'graph.whatIf.title'), 'DÜĞÜM TESTİ');
+  assert.equal(translateUpper('en', 'graph.whatIf.title'), 'NODE TEST');
 });
 
 test('turkce buyuk harf: baslik ve etiketler', () => {

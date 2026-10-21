@@ -13,10 +13,15 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
   kritik düğümler. Düğümler ve kenarlar tek panelde **sekmeli**; liste sabit
   yükseklikte kaydırılıyor, sayfa aşağı uzamıyor.
 - **Graf: düğümler ağaç görünümünde.** Düğümler türe göre gruplu (araçlar,
-  paketler, shimler, PATH, ayarlar…); grup ve satır aç/kapa; bir satır
-  açılınca **ilişkiler + what-if etkisi** satırın altında birlikte görünüyor.
-  Bakış profili (Koruyan/Deneyen) yalnız sıralamayı değiştirir; what-if her
-  iki profilde de var.
+  paketler, shimler, PATH, ayarlar…); **Genişlet / Daralt** ve satır aç/kapa;
+  bir satır açılınca **ilişkiler + etki analizi** satırın altında birlikte
+  görünüyor. Etki durumu **Kaldırılabilir / Kısmi etki / Engelli** olarak
+  ayrılıyor. Bakış profili (Koruyan/Deneyen) yalnız sıralamayı değiştirir;
+  etki analizi her iki profilde de var.
+- **Graf: “Düğüm testi” sonuçları.** Serbest arama sonucunda yalnız sayı
+  değil, **kaldırılabilir düğümlerin ağaç listesi** de gösteriliyor; her
+  satırda tür/seviye ve “İncele” ile ilgili ağaç satırına gitme var.
+  Başlık “What-if” yerine **Düğüm testi**.
 - **Graf: açıklamalı kök nedenler.** “Kök neden yok” artık ne arandığını ve
   bunun sağlıklı bir sonuç olduğunu açıklıyor. Özet açıklaması kopuk/gölgede/
   döngü kavramlarını tanımlıyor.
@@ -27,7 +32,7 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 ### Düzeltildi
 
 - **Türkçe büyük harf.** Başlık ve etiketler artık dile göre büyütülüyor:
-  Türkçe seçiliyken `what-if` → **WHAT-İF** (noktalı İ), `disk` → **DİSK**.
+  Türkçe seçiliyken `disk` → **DİSK**, `Düğüm testi` → **DÜĞÜM TESTİ**.
   Önceki CSS büyütmesi Türkçe i kuralını uygulamıyordu; tüm ekranlardaki
   başlık, tablo başlığı ve kart etiketleri kapsandı.
 - **Graf metinleri.** “Hiçbir şey silinmez” gibi ifadeler kaldırıldı; ekran

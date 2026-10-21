@@ -235,7 +235,7 @@ export function Graph({ lang }: Props) {
     window.setTimeout(() => {
       document
         .getElementById(`graph-node-${node.id}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 60);
   };
 
@@ -427,7 +427,7 @@ export function Graph({ lang }: Props) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }
             >
-              {tu('graph.whatIf.title')}
+              {t('graph.whatIf.title')}
             </button>
             <button type="button" className="ghost" onClick={() => void load()}>
               {t('graph.refresh')}
@@ -877,6 +877,51 @@ export function Graph({ lang }: Props) {
                   <dd className="mono">{whatIf.result.blocked.length}</dd>
                 </dl>
 
+                {whatIf.result.allowed.length > 0 && (
+                  <>
+                    <h4>
+                      {tu('graph.whatIf.allowedList', {
+                        count: whatIf.result.allowed.length,
+                      })}
+                    </h4>
+                    <div className="graph-tree graph-result-tree">
+                      <ul>
+                        {whatIf.result.allowed.map((id) => {
+                          const node = nodeById.get(id);
+                          return (
+                            <li key={id}>
+                              <span className="mono">{labelOf(id)}</span>
+                              {node && (
+                                <>
+                                  <span className="badge">
+                                    {t(
+                                      GRAPH_NODE_LABEL[node.kind] ??
+                                        'graph.node.unknown',
+                                    )}
+                                  </span>
+                                  <span className={`badge graph-level-${node.level}`}>
+                                    {t(
+                                      GRAPH_LEVEL_LABEL[node.level] ??
+                                        'graph.level.low',
+                                    )}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="ghost graph-sim"
+                                    onClick={() => openNode(node)}
+                                  >
+                                    {t('graph.tree.open')}
+                                  </button>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </>
+                )}
+
                 {whatIf.result.blocked.length > 0 && (
                   <>
                     <h4>{tu('graph.whatIf.blocked')}</h4>
@@ -992,18 +1037,25 @@ function WhatIfTree({
   const blocked = result.result.blocked;
   const broken = result.result.brokenEdges;
   const isolated = result.result.isolated;
+  const partial = blocked.length === 0 && broken.length > 0;
   return (
     <div className="graph-tree">
       <p className="graph-tree-root">
         <span className="mono">{node.label}</span>{' '}
-        <span className={`badge ${blocked.length > 0 ? 'warn' : 'git'}`}>
-          {blocked.length > 0 ? t('graph.tree.blocked') : t('graph.tree.allowed')}
+        <span className={`badge ${blocked.length > 0 || partial ? 'warn' : 'git'}`}>
+          {blocked.length > 0
+            ? t('graph.tree.blocked')
+            : partial
+              ? t('graph.tree.partial')
+              : t('graph.tree.allowed')}
         </span>
       </p>
       <p className="dim">
         {blocked.length > 0
           ? t('graph.tree.blockedNote', { count: blocked.length })
-          : t('graph.tree.allowedNote')}
+          : partial
+            ? t('graph.tree.partialNote', { count: broken.length })
+            : t('graph.tree.allowedNote')}
       </p>
       {blocked.length > 0 && (
         <section>
