@@ -9,7 +9,9 @@ import type {
 import type { CategoryKey, CategoryStat } from './categories.ts';import type { CliInventory, CliSource, CliStatus, CliTool } from './cli-inventory-types.ts';
 import type {
   DependencyLevel,
+  EdgeState,
   GraphEdge,
+  GraphKindGroup,
   GraphNode,
   GraphNodeKind,
   NodeRole,
@@ -418,6 +420,7 @@ export type {
   EdgeState,
   EdgeStrength,
   GraphEdge,
+  GraphKindGroup,
   GraphNode,
   GraphNodeKind,
   NodeRole,
@@ -517,9 +520,32 @@ export interface GraphNodeView extends GraphNode {
   needs: GraphDependentView[];
 }
 
+export interface GraphKindCount {
+  kind: GraphNodeKind;
+  count: number;
+}
+
+export interface GraphStateCount {
+  state: EdgeState;
+  count: number;
+}
+
+/** Ozet kartlari tiklandiginda acilacak ayrinti (MOTOR hesaplar). */
+export interface GraphDetails {
+  nodeKindCounts: GraphKindCount[];
+  edgeStateCounts: GraphStateCount[];
+  brokenEdges: GraphEdge[];
+  shadowedEdges: GraphEdge[];
+  criticalNodes: GraphNodeView[];
+}
+
 export interface GraphViewResponse {
   nodes: GraphNodeView[];
   edges: GraphEdge[];
+  /** Agac gorunumu: dugumler turune gore gruplanmis (SIRALAMA MOTORDA). */
+  groups: GraphKindGroup[];
+  /** Ozet kartlari ayrintisi (kirik/golgeli/kritik + sayimlar). */
+  details: GraphDetails;
   cycles: string[][];
   rootCauses: RootCause[];
   summary: {

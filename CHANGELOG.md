@@ -7,12 +7,19 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ### Eklendi
 
-- **Graf: rol bazlı bakış + satır içi ilişki ağacı.** İki bakış profili:
-  **Koruyan** (satırda “Bağımlılıklar”: bu düğüme kim bağlı, bu düğüm neye
-  bağlı) ve **Deneyen** (satırda “Simüle”: kaldırma etkisi). Sonuç artık
-  ayrı panele taşınmıyor; **satırın altında ağaç ve açıklama** olarak
-  açılıyor. Düğüm ve kenar tanımları ekranda; kenarların neden doğrudan
-  işlem almadığı yazıyor.
+- **Graf: özet kartları + sekmeli çalışma alanı.** Altı özet kartı
+  (düğümler, kenarlar, kopuk, gölgede, döngü, kritik) renk kodlu ve
+  tıklanınca ayrıntı açıyor: tür/sayım listeleri, kopuk ve gölgeli kenarlar,
+  kritik düğümler. Düğümler ve kenarlar tek panelde **sekmeli**; liste sabit
+  yükseklikte kaydırılıyor, sayfa aşağı uzamıyor.
+- **Graf: düğümler ağaç görünümünde.** Düğümler türe göre gruplu (araçlar,
+  paketler, shimler, PATH, ayarlar…); grup ve satır aç/kapa; bir satır
+  açılınca **ilişkiler + what-if etkisi** satırın altında birlikte görünüyor.
+  Bakış profili (Koruyan/Deneyen) yalnız sıralamayı değiştirir; what-if her
+  iki profilde de var.
+- **Graf: açıklamalı kök nedenler.** “Kök neden yok” artık ne arandığını ve
+  bunun sağlıklı bir sonuç olduğunu açıklıyor. Özet açıklaması kopuk/gölgede/
+  döngü kavramlarını tanımlıyor.
 - **Graf hazırlığında ilerleme.** İlk envanter taraması canlı araç sayısı ve
   adım göstergesiyle (1/2 → 2/2) ilerliyor; düz metin yerine ilerleme
   çubuğu gösteriliyor.
@@ -23,6 +30,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
   Türkçe seçiliyken `what-if` → **WHAT-İF** (noktalı İ), `disk` → **DİSK**.
   Önceki CSS büyütmesi Türkçe i kuralını uygulamıyordu; tüm ekranlardaki
   başlık, tablo başlığı ve kart etiketleri kapsandı.
+- **Graf metinleri.** “Hiçbir şey silinmez” gibi ifadeler kaldırıldı; ekran
+  yalnızca ilişki ve etki analizi gösterdiğini söylüyor. Bu, seçim/silme
+  olmayan bir ekranda gereksiz korku yaratıyordu.
 
 ## [2.2.0] - 2026-10-21
 

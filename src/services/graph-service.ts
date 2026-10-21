@@ -1,5 +1,6 @@
 import {
   buildInventoryGraph,
+  groupNodesByKind,
   type DependencyGraph,
 } from '../core/dependency-graph.ts';
 import type { CliInventoryService } from './cli-inventory-service.ts';
@@ -48,24 +49,58 @@ export class GraphService {
         edge,
       };
     };
+    const nodes = g.nodes().map((n) => ({
+      ...n,
+      role: roles.get(n.id) ?? 'isolated',
+      level: levels.get(n.id) ?? 'low',
+      dependents: g.incoming(n.id).map((e) => ref(e.from, e)),
+      needs: g.outgoing(n.id).map((e) => ref(e.to, e)),
+    }));
+    const edges = g.edges();
+    const groups = groupNodesByKind(g.nodes());
+    const brokenEdges = edges.filter(
+      (e) => e.state === 'broken' || e.state === 'missing-chain',
+    );
+    const shadowedEdges = edges.filter((e) => e.state === 'shadowed');
+    const criticalNodes = nodes.filter((n) => n.level === 'critical');
+
+    const stateOrder = [
+      'broken',
+      'missing-chain',
+      'shadowed',
+      'drifted',
+      'cyclic',
+      'intact',
+      'unknown',
+    ] as const;
+    const stateCounts = new Map<string, number>();
+    for (const e of edges) stateCounts.set(e.state, (stateCounts.get(e.state) ?? 0) + 1);
+
     return {
-      nodes: g.nodes().map((n) => ({
-        ...n,
-        role: roles.get(n.id) ?? 'isolated',
-        level: levels.get(n.id) ?? 'low',
-        dependents: g.incoming(n.id).map((e) => ref(e.from, e)),
-        needs: g.outgoing(n.id).map((e) => ref(e.to, e)),
-      })),
-      edges: g.edges(),
+      nodes,
+      edges,
+      groups,
+      details: {
+        nodeKindCounts: groups.map((group) => ({
+          kind: group.kind,
+          count: group.nodeIds.length,
+        })),
+        edgeStateCounts: stateOrder
+          .filter((state) => stateCounts.has(state))
+          .map((state) => ({ state, count: stateCounts.get(state) ?? 0 })),
+        brokenEdges,
+        shadowedEdges,
+        criticalNodes,
+      },
       cycles,
       rootCauses: g.rootCauses(),
       summary: {
-        nodes: g.nodes().length,
-        edges: g.edges().length,
-        broken: g.edges().filter((e) => e.state === 'broken' || e.state === 'missing-chain').length,
-        shadowed: g.edges().filter((e) => e.state === 'shadowed').length,
+        nodes: nodes.length,
+        edges: edges.length,
+        broken: brokenEdges.length,
+        shadowed: shadowedEdges.length,
         cycles: cycles.length,
-        critical: [...levels.values()].filter((l) => l === 'critical').length,
+        critical: criticalNodes.length,
       },
     };
   }

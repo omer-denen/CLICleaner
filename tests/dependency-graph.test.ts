@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DependencyGraph } from '../src/core/dependency-graph.ts';
+import { DependencyGraph, groupNodesByKind } from '../src/core/dependency-graph.ts';
 
 function graph(): DependencyGraph {
   const g = new DependencyGraph();
@@ -76,6 +76,22 @@ test('dugum iliskileri gelen/giden kenarlarla okunur', () => {
     ['s1'],
   );
   assert.equal(g.incoming('boyle-bir-dugum-yok').length, 0);
+});
+
+test('dugumler turune gore gruplanir (agac sirasi motorda)', () => {
+  const groups = groupNodesByKind(graph().nodes());
+  assert.deepEqual(
+    groups.map((g) => g.kind),
+    ['tool', 'package', 'shim', 'config'],
+  );
+  assert.deepEqual(
+    groups.find((g) => g.kind === 'tool')!.nodeIds,
+    ['t1', 't2'],
+  );
+  assert.deepEqual(
+    groups.find((g) => g.kind === 'package')!.nodeIds,
+    ['pkg1', 'a', 'b'],
+  );
 });
 
 test('rol ve seviye', () => {

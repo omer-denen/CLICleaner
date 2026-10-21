@@ -1404,12 +1404,29 @@ code,
 }
 
 .graph-stat {
+  position: relative;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   padding: 9px 11px;
   border: 1px solid var(--line);
+  border-top-width: 3px;
   border-radius: 9px;
   background: var(--panel);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-stat:hover {
+  background: var(--panel-2);
+}
+
+.graph-stat:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
 }
 
 .graph-stat strong {
@@ -1420,6 +1437,128 @@ code,
   font-size: 10.5px;
 }
 
+.graph-stat-toggle {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.graph-stat-info {
+  border-top-color: var(--info);
+}
+
+.graph-stat-info strong {
+  color: var(--info);
+}
+
+.graph-stat-ok {
+  border-top-color: var(--accent);
+}
+
+.graph-stat-ok strong {
+  color: var(--accent);
+}
+
+.graph-stat-warn {
+  border-top-color: var(--warn);
+}
+
+.graph-stat-warn strong {
+  color: var(--warn);
+}
+
+.graph-stat-danger {
+  border-top-color: var(--danger);
+}
+
+.graph-stat-danger strong {
+  color: var(--danger);
+}
+
+.graph-stat-vault {
+  border-top-color: var(--vault);
+}
+
+.graph-stat-vault strong {
+  color: var(--vault);
+}
+
+.graph-stat.active {
+  background: var(--panel-2);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.graph-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.graph-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.graph-tabs button.active {
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.graph-tabs .count {
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.graph-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.graph-scroll-fixed {
+  height: 46vh;
+  max-height: 46vh;
+  min-height: 260px;
+}
+
+.graph-card-detail {
+  border-color: color-mix(in srgb, var(--info) 35%, var(--line));
+}
+
+.graph-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.graph-edge-list li {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.graph-edge-list li .graph-sim {
+  margin-left: auto;
+}
+
 .graph-scroll {
   max-height: 42vh;
   overflow: auto;
@@ -1428,13 +1567,30 @@ code,
   background: var(--panel);
 }
 
-.graph-node-head,
 .graph-node-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) 100px 88px 78px minmax(0, 1fr) 96px 74px;
+  grid-template-columns: 14px minmax(0, 1.3fr) 88px 74px minmax(0, 1fr) 138px;
   align-items: center;
   gap: 7px;
-  padding: 6px 9px;
+  width: 100%;
+  padding: 6px 9px 6px 22px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-node-row:hover {
+  background: var(--panel-2);
+}
+
+.graph-node-row:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -2px;
 }
 
 .graph-edge-head,
@@ -1446,7 +1602,6 @@ code,
   padding: 6px 9px;
 }
 
-.graph-node-head,
 .graph-edge-head {
   position: sticky;
   top: 0;
@@ -1458,15 +1613,105 @@ code,
   letter-spacing: 0.05em;
 }
 
-.graph-node-row,
 .graph-edge-row {
   border-bottom: 1px solid var(--line-soft);
   font-size: 12px;
 }
 
-.graph-node-row:last-child,
 .graph-edge-row:last-child {
   border-bottom: 0;
+}
+
+.panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.graph-tree-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-group + .graph-group {
+  border-top: 1px solid var(--line);
+}
+
+.graph-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-group-head:hover {
+  background: var(--line-soft);
+}
+
+.graph-group-head:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -2px;
+}
+
+.graph-group-head .count {
+  margin-left: auto;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.graph-group-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.chevron {
+  display: inline-block;
+  flex: 0 0 12px;
+  width: 12px;
+  color: var(--faint);
+  transition: transform 120ms ease;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.graph-open-hint {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.graph-node-wrap.active > .graph-node-row {
+  background: color-mix(in srgb, var(--info) 10%, var(--panel));
+}
+
+.graph-inline-section > h5 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.graph-inline-section + .graph-inline-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-soft);
 }
 
 .graph-node-row.active {
@@ -1510,6 +1755,11 @@ code,
 .graph-profile-note {
   margin: -8px 0 14px;
   font-size: 12.5px;
+}
+
+.graph-summary-note {
+  margin: -4px 0 14px;
+  font-size: 11.5px;
 }
 
 .graph-legend {
@@ -1580,7 +1830,7 @@ code,
 }
 
 .graph-inline {
-  padding: 10px 12px 12px;
+  padding: 10px 12px 12px 34px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--bg-soft);
 }
@@ -1599,7 +1849,8 @@ code,
   font-size: 13px;
 }
 
-.graph-tree section h5 {
+.graph-tree section h5,
+.graph-tree section h6 {
   margin: 0 0 4px;
   font-size: 11px;
   font-weight: 600;
@@ -1731,7 +1982,21 @@ code,
   }
 
   .graph-node-row {
-    grid-template-columns: minmax(0, 1fr) 72px 100px;
+    grid-template-columns: 14px minmax(0, 1fr) 64px 92px;
+    padding-left: 14px;
+  }
+
+  .graph-node-row > :nth-child(3),
+  .graph-node-row > :nth-child(5) {
+    display: none;
+  }
+
+  .graph-node-row .badges-right .badge {
+    display: none;
+  }
+
+  .graph-inline {
+    padding-left: 20px;
   }
 
   .graph-sim {

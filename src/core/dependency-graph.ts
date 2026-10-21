@@ -62,6 +62,40 @@ export interface GraphNode {
   meta?: Record<string, unknown>;
 }
 
+export interface GraphKindGroup {
+  kind: GraphNodeKind;
+  nodeIds: string[];
+}
+
+/** Agac gorunumu icin dugumleri TURUNE gore gruplar (motor kurali). */
+const KIND_ORDER: GraphNodeKind[] = [
+  'tool',
+  'package',
+  'shim',
+  'path-entry',
+  'env-var',
+  'project',
+  'state-dir',
+  'shortcut',
+  'runtime',
+  'process',
+  'config',
+  'unknown',
+];
+
+export function groupNodesByKind(nodes: Iterable<GraphNode>): GraphKindGroup[] {
+  const groups = new Map<GraphNodeKind, string[]>();
+  for (const node of nodes) {
+    const list = groups.get(node.kind) ?? [];
+    list.push(node.id);
+    groups.set(node.kind, list);
+  }
+  return KIND_ORDER.filter((kind) => groups.has(kind)).map((kind) => ({
+    kind,
+    nodeIds: groups.get(kind)!,
+  }));
+}
+
 export interface GraphEdge {
   id: string;
   from: string;

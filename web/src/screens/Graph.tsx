@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type {
   CliInventoryStreamEvent,
-  GraphDependentView,
   GraphEdge,
+  GraphNodeKind,
   GraphNodeView,
   GraphViewResponse,
   GraphWhatIfResponse,
@@ -24,17 +24,52 @@ interface Props {
 }
 
 type ScreenProfile = 'protect' | 'experiment';
-type RowMode = 'relations' | 'whatif';
+type WorkspaceTab = 'nodes' | 'edges';
+type SummaryKey = 'nodes' | 'edges' | 'broken' | 'shadowed' | 'cycles' | 'critical';
+type CardTone = 'info' | 'ok' | 'warn' | 'danger' | 'vault';
 
 interface ExpandedRow {
   nodeId: string;
-  mode: RowMode;
   loading: boolean;
   result: GraphWhatIfResponse | null;
   error: string | null;
 }
 
-/** Grafik ekrani: karar MOTORDAN gelir; arayuz yalnizca gosterir. */
+const GROUP_LABEL: Record<GraphNodeKind, MessageKey> = {
+  tool: 'graph.group.tool',
+  package: 'graph.group.package',
+  shim: 'graph.group.shim',
+  'path-entry': 'graph.group.pathEntry',
+  'env-var': 'graph.group.envVar',
+  project: 'graph.group.project',
+  'state-dir': 'graph.group.stateDir',
+  shortcut: 'graph.group.shortcut',
+  runtime: 'graph.group.runtime',
+  process: 'graph.group.process',
+  config: 'graph.group.config',
+  unknown: 'graph.group.unknown',
+};
+
+const SUMMARY_CARDS: Array<{ key: SummaryKey; tone: CardTone }> = [
+  { key: 'nodes', tone: 'info' },
+  { key: 'edges', tone: 'ok' },
+  { key: 'broken', tone: 'danger' },
+  { key: 'shadowed', tone: 'warn' },
+  { key: 'cycles', tone: 'vault' },
+  { key: 'critical', tone: 'danger' },
+];
+
+const ROW_SECTIONS: Record<ScreenProfile, Array<'relations' | 'impact'>> = {
+  protect: ['relations', 'impact'],
+  experiment: ['impact', 'relations'],
+};
+
+/**
+ * GRAF — envanterden turetilen bagimlilik agi.
+ *
+ * Dugum/kenar, gruplar, ozet ayrintisi, kok nedenler ve what-if sonucu
+ * MOTORDAN gelir; arayuz yalnizca gosterir. Grafik islem YAPMAZ.
+ */
 export function Graph({ lang }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
@@ -52,7 +87,10 @@ export function Graph({ lang }: Props) {
   const [profile, setProfile] = useState<ScreenProfile>(() =>
     localStorage.getItem('residue.graphProfile') === 'experiment' ? 'experiment' : 'protect',
   );
+  const [openGroups, setOpenGroups] = useState<Set<GraphNodeKind>>(new Set());
   const [expanded, setExpanded] = useState<ExpandedRow | null>(null);
+  const [tab, setTab] = useState<WorkspaceTab>('nodes');
+  const [detailCard, setDetailCard] = useState<SummaryKey | null>(null);
 
   const [query, setQuery] = useState('');
   const [running, setRunning] = useState(false);
@@ -118,6 +156,7 @@ export function Graph({ lang }: Props) {
     setError(null);
     setView(null);
     setExpanded(null);
+    setDetailCard(null);
     setWhatIf(null);
     setWhatIfError(null);
     try {
@@ -134,7 +173,9 @@ export function Graph({ lang }: Props) {
         await inventory();
       }
       setPhase('graph');
-      setView(await api.graph());
+      const next = await api.graph();
+      setView(next);
+      setOpenGroups(new Set(next.groups.map((group) => group.kind)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -167,31 +208,15 @@ export function Graph({ lang }: Props) {
       t(GRAPH_STATE_LABEL[edge.state] ?? 'graph.state.unknown'),
     ].join(' · ');
 
-  const relationLine = (other: GraphDependentView): string =>
-    `${other.label} · ${edgeMeta(other.edge)}`;
-
-  const toggleRelations = (node: GraphNodeView): void => {
-    setExpanded((prev) =>
-      prev?.nodeId === node.id && prev.mode === 'relations'
-        ? null
-        : { nodeId: node.id, mode: 'relations', loading: false, result: null, error: null },
-    );
-  };
-
-  const toggleWhatIfRow = async (node: GraphNodeView): Promise<void> => {
-    if (expanded?.nodeId === node.id && expanded.mode === 'whatif') {
-      setExpanded(null);
-      return;
-    }
-    setExpanded({ nodeId: node.id, mode: 'whatif', loading: true, result: null, error: null });
+  const loadImpact = async (nodeId: string): Promise<void> => {
     try {
-      const result = await api.graphWhatIfNode(node.id);
+      const result = await api.graphWhatIfNode(nodeId);
       setExpanded((prev) =>
-        prev && prev.nodeId === node.id ? { ...prev, loading: false, result } : prev,
+        prev && prev.nodeId === nodeId ? { ...prev, loading: false, result } : prev,
       );
     } catch (err) {
       setExpanded((prev) =>
-        prev && prev.nodeId === node.id
+        prev && prev.nodeId === nodeId
           ? {
               ...prev,
               loading: false,
@@ -202,14 +227,65 @@ export function Graph({ lang }: Props) {
     }
   };
 
-  const toggleRow = (node: GraphNodeView): void => {
-    if (profile === 'protect') toggleRelations(node);
-    else void toggleWhatIfRow(node);
+  const openNode = (node: GraphNodeView): void => {
+    setTab('nodes');
+    setOpenGroups((prev) => new Set(prev).add(node.kind));
+    setExpanded({ nodeId: node.id, loading: true, result: null, error: null });
+    void loadImpact(node.id);
+    window.setTimeout(() => {
+      document
+        .getElementById(`graph-node-${node.id}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
   };
 
-  const switchProfile = (next: ScreenProfile): void => {
-    setProfile(next);
-    setExpanded(null);
+  const toggleRow = (node: GraphNodeView): void => {
+    if (expanded?.nodeId === node.id) setExpanded(null);
+    else openNode(node);
+  };
+
+  const toggleGroup = (kind: GraphNodeKind): void => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
+
+  const allOpen = Boolean(
+    view && view.groups.length > 0 && view.groups.every((group) => openGroups.has(group.kind)),
+  );
+
+  const toggleAllGroups = (): void => {
+    setOpenGroups(allOpen ? new Set() : new Set((view?.groups ?? []).map((group) => group.kind)));
+  };
+
+  const revealGroup = (kind: GraphNodeKind): void => {
+    setTab('nodes');
+    setOpenGroups((prev) => new Set(prev).add(kind));
+    window.setTimeout(() => {
+      document
+        .getElementById(`graph-group-${kind}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  };
+
+  const toggleCard = (key: SummaryKey): void => {
+    if (detailCard === key) {
+      setDetailCard(null);
+      return;
+    }
+    setDetailCard(key);
+    if (key === 'nodes') setTab('nodes');
+    if (key === 'edges' || key === 'broken' || key === 'shadowed') setTab('edges');
+    if (window.matchMedia('(max-width: 1240px)').matches) {
+      window.setTimeout(() => {
+        document
+          .getElementById('graph-card-detail')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 40);
+    }
   };
 
   const simulate = async (): Promise<void> => {
@@ -227,6 +303,94 @@ export function Graph({ lang }: Props) {
     }
   };
 
+  const renderCardDetail = (): ReactElement | null => {
+    if (!view || !detailCard) return null;
+    if (detailCard === 'nodes') {
+      return (
+        <div className="graph-chips">
+          {view.details.nodeKindCounts.map((item) => (
+            <button
+              key={item.kind}
+              type="button"
+              className="chip"
+              onClick={() => revealGroup(item.kind)}
+            >
+              {t(GROUP_LABEL[item.kind] ?? 'graph.group.unknown')}
+              <span className="chip-count">{item.count}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+    if (detailCard === 'edges') {
+      return (
+        <div className="graph-chips">
+          {view.details.edgeStateCounts.map((item) => (
+            <button
+              key={item.state}
+              type="button"
+              className="chip"
+              onClick={() => setTab('edges')}
+            >
+              {t(GRAPH_STATE_LABEL[item.state] ?? 'graph.state.unknown')}
+              <span className="chip-count">{item.count}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+    if (detailCard === 'broken' || detailCard === 'shadowed') {
+      const edges =
+        detailCard === 'broken' ? view.details.brokenEdges : view.details.shadowedEdges;
+      return edges.length === 0 ? (
+        <p className="dim">{t('graph.card.empty')}</p>
+      ) : (
+        <EdgeList
+          edges={edges}
+          labelOf={labelOf}
+          edgeMeta={edgeMeta}
+          nodeById={nodeById}
+          onReveal={openNode}
+          revealLabel={t('graph.reveal')}
+        />
+      );
+    }
+    if (detailCard === 'critical') {
+      return view.details.criticalNodes.length === 0 ? (
+        <p className="dim">{t('graph.card.empty')}</p>
+      ) : (
+        <ul className="detail-list graph-edge-list">
+          {view.details.criticalNodes.map((node) => (
+            <li key={node.id}>
+              <span className="mono">{node.label}</span>
+              <span className="dim">
+                {t(GRAPH_NODE_LABEL[node.kind] ?? 'graph.node.unknown')} ·{' '}
+                {t(GRAPH_ROLE_LABEL[node.role] ?? 'graph.role.isolated')}
+              </span>
+              <button
+                type="button"
+                className="ghost graph-sim"
+                onClick={() => openNode(node)}
+              >
+                {t('graph.tree.open')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    if (view.cycles.length === 0) return <p className="dim">{t('graph.card.empty')}</p>;
+    return (
+      <ul className="detail-list">
+        {view.cycles.map((cycle) => (
+          <li key={cycle.join('>')} className="mono">
+            {cycle.map(labelOf).join(' → ')}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   return (
     <div className="graph">
       <section className="graph-main">
@@ -241,7 +405,7 @@ export function Graph({ lang }: Props) {
                 type="button"
                 className={profile === 'protect' ? 'active' : ''}
                 aria-pressed={profile === 'protect'}
-                onClick={() => switchProfile('protect')}
+                onClick={() => setProfile('protect')}
               >
                 {t('graph.profile.protect')}
               </button>
@@ -249,7 +413,7 @@ export function Graph({ lang }: Props) {
                 type="button"
                 className={profile === 'experiment' ? 'active' : ''}
                 aria-pressed={profile === 'experiment'}
-                onClick={() => switchProfile('experiment')}
+                onClick={() => setProfile('experiment')}
               >
                 {t('graph.profile.experiment')}
               </button>
@@ -263,7 +427,7 @@ export function Graph({ lang }: Props) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }
             >
-              {t('graph.whatIf.title')}
+              {tu('graph.whatIf.title')}
             </button>
             <button type="button" className="ghost" onClick={() => void load()}>
               {t('graph.refresh')}
@@ -317,22 +481,55 @@ export function Graph({ lang }: Props) {
         {view && (
           <>
             <section className="graph-summary" aria-label={t('graph.summary.nodes')}>
-              {(
-                [
-                  ['nodes', view.summary.nodes],
-                  ['edges', view.summary.edges],
-                  ['broken', view.summary.broken],
-                  ['shadowed', view.summary.shadowed],
-                  ['cycles', view.summary.cycles],
-                  ['critical', view.summary.critical],
-                ] as const
-              ).map(([key, value]) => (
-                <div key={key} className="graph-stat">
-                  <strong className="mono">{value}</strong>
-                  <span className="dim">{t(`graph.summary.${key}` as MessageKey)}</span>
-                </div>
-              ))}
+              {SUMMARY_CARDS.map((card) => {
+                const value = view.summary[card.key];
+                const tone: CardTone =
+                  card.key === 'broken' || card.key === 'critical' || card.key === 'shadowed'
+                    ? value > 0
+                      ? card.tone
+                      : 'ok'
+                    : card.tone;
+                const open = detailCard === card.key;
+                return (
+                  <button
+                    type="button"
+                    key={card.key}
+                    className={`graph-stat graph-stat-${tone}${open ? ' active' : ''}`}
+                    aria-expanded={open}
+                    aria-controls="graph-card-detail"
+                    onClick={() => toggleCard(card.key)}
+                  >
+                    <strong className="mono">{value}</strong>
+                    <span className="dim">
+                      {t(`graph.summary.${card.key}` as MessageKey)}
+                    </span>
+                    <span className="graph-stat-toggle" aria-hidden="true">
+                      {open ? '−' : '+'}
+                    </span>
+                  </button>
+                );
+              })}
             </section>
+            <p className="dim graph-summary-note">{t('graph.summary.note')}</p>
+
+            {detailCard && (
+              <section className="panel graph-card-detail" id="graph-card-detail">
+                <div className="panel-head-row">
+                  <h2>{tu(`graph.summary.${detailCard}` as MessageKey)}</h2>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setDetailCard(null)}
+                  >
+                    {t('graph.tree.close')}
+                  </button>
+                </div>
+                <p className="dim graph-note">
+                  {t(`graph.summary.${detailCard}.what` as MessageKey)}
+                </p>
+                {renderCardDetail()}
+              </section>
+            )}
 
             <dl className="graph-legend">
               <div>
@@ -347,6 +544,7 @@ export function Graph({ lang }: Props) {
 
             <section className="panel">
               <h2>{tu('graph.rootCauses')}</h2>
+              <p className="dim graph-note">{t('graph.rootCauses.note')}</p>
               {view.rootCauses.length === 0 ? (
                 <p className="dim">{t('graph.noRootCauses')}</p>
               ) : (
@@ -366,18 +564,9 @@ export function Graph({ lang }: Props) {
                           <button
                             type="button"
                             className="ghost graph-sim"
-                            disabled={
-                              profile === 'experiment' &&
-                              expanded?.nodeId === node.id &&
-                              expanded.loading
-                            }
-                            aria-expanded={expanded?.nodeId === node.id}
-                            aria-controls={`graph-inline-${node.id}`}
-                            onClick={() => toggleRow(node)}
+                            onClick={() => openNode(node)}
                           >
-                            {profile === 'protect'
-                              ? t('graph.row.relations')
-                              : t('graph.row.simulate')}
+                            {t('graph.reveal')}
                           </button>
                         )}
                       </li>
@@ -387,173 +576,258 @@ export function Graph({ lang }: Props) {
               )}
             </section>
 
-            {view.cycles.length > 0 && (
-              <section className="panel">
-                <h2>{tu('graph.cycles')}</h2>
-                <ul className="detail-list">
-                  {view.cycles.map((cycle) => (
-                    <li key={cycle.join('>')} className="mono">
-                      {cycle.map(labelOf).join(' → ')}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <section className="panel">
-              <h2>{tu('graph.nodes')}</h2>
-              <div className="graph-scroll">
-                <div className="graph-node-head">
-                  <span>{tu('graph.nodes')}</span>
-                  <span>{tu('graph.edge.kind')}</span>
-                  <span>{tu('graph.role')}</span>
-                  <span>{tu('graph.level')}</span>
-                  <span>{tu('graph.path')}</span>
-                  <span />
-                  <span>{tu('graph.action')}</span>
+            <section className="panel graph-workspace">
+              <div className="panel-head-row">
+                <div className="graph-tabs" role="tablist" aria-label={t('graph.workspace')}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'nodes'}
+                    className={tab === 'nodes' ? 'active' : ''}
+                    onClick={() => setTab('nodes')}
+                  >
+                    {tu('graph.nodes')}
+                    <span className="count mono">{view.summary.nodes}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'edges'}
+                    className={tab === 'edges' ? 'active' : ''}
+                    onClick={() => setTab('edges')}
+                  >
+                    {tu('graph.edges')}
+                    <span className="count mono">{view.summary.edges}</span>
+                  </button>
                 </div>
-                {view.nodes.map((node) => {
-                  const open = expanded?.nodeId === node.id;
-                  return (
-                    <div className={`graph-node-wrap${open ? ' active' : ''}`} key={node.id}>
-                      <div className="graph-node-row">
-                        <span className="mono graph-label" title={node.id}>
-                          {node.label}
-                        </span>
-                        <span className="badge">
-                          {t(GRAPH_NODE_LABEL[node.kind] ?? 'graph.node.unknown')}
-                        </span>
-                        <span className="badge">
-                          {t(GRAPH_ROLE_LABEL[node.role] ?? 'graph.role.isolated')}
-                        </span>
-                        <span className={`badge graph-level-${node.level}`}>
-                          {t(GRAPH_LEVEL_LABEL[node.level] ?? 'graph.level.low')}
-                        </span>
-                        <span className="dim mono graph-path" title={node.path ?? ''}>
-                          {node.path ?? '—'}
-                        </span>
-                        <span className="badges-right">
-                          {node.active && (
-                            <span className="badge git">{t('graph.node.active')}</span>
-                          )}
-                          {node.protected && (
-                            <span className="badge">{t('graph.node.protected')}</span>
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          className="ghost graph-sim"
-                          disabled={
-                            profile === 'experiment' &&
-                            open &&
-                            expanded?.loading === true
-                          }
-                          aria-expanded={open}
-                          aria-controls={`graph-inline-${node.id}`}
-                          aria-label={
-                            profile === 'protect'
-                              ? t('graph.row.relationsFor', { name: node.label })
-                              : t('graph.whatIf.simulateNode', { name: node.label })
-                          }
-                          onClick={() => toggleRow(node)}
-                        >
-                          {profile === 'protect'
-                            ? t('graph.row.relations')
-                            : t('graph.row.simulate')}
-                        </button>
-                      </div>
-
-                      {open && expanded && (
-                        <div
-                          className="graph-inline"
-                          id={`graph-inline-${node.id}`}
-                          role="region"
-                          aria-label={t('graph.tree.title', { name: node.label })}
-                        >
-                          {expanded.loading && (
-                            <p className="dim">{t('graph.whatIf.running')}</p>
-                          )}
-                          {expanded.error && (
-                            <div className="banner danger" role="alert">
-                              {expanded.error}
-                            </div>
-                          )}
-                          {expanded.mode === 'relations' && (
-                            <RelationsTree
-                              node={node}
-                              t={t}
-                              tu={tu}
-                              edgeMeta={edgeMeta}
-                              labelOf={labelOf}
-                            />
-                          )}
-                          {expanded.mode === 'whatif' && expanded.result && (
-                            <>
-                              {expanded.result.nodeIds.length === 0 ? (
-                                <p className="dim">{t('graph.whatIf.noMatch')}</p>
-                              ) : (
-                                <WhatIfTree
-                                  node={node}
-                                  result={expanded.result}
-                                  t={t}
-                                  tu={tu}
-                                  edgeMeta={edgeMeta}
-                                  labelOf={labelOf}
-                                />
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="panel">
-              <h2>{tu('graph.edges')}</h2>
-              <p className="dim graph-note">
-                {t(
-                  profile === 'protect'
-                    ? 'graph.edges.noteProtect'
-                    : 'graph.edges.noteExperiment',
+                {tab === 'nodes' && (
+                  <button type="button" className="ghost" onClick={toggleAllGroups}>
+                    {allOpen ? t('graph.tree.collapseAll') : t('graph.tree.expandAll')}
+                  </button>
                 )}
-              </p>
-              <div className="graph-scroll">
-                <div className="graph-edge-head">
-                  <span>{tu('graph.edge.from')}</span>
-                  <span>{tu('graph.edge.to')}</span>
-                  <span>{tu('graph.edge.kind')}</span>
-                  <span>{tu('graph.edge.strength')}</span>
-                  <span>{tu('graph.edge.state')}</span>
-                </div>
-                {view.edges.map((edge) => (
-                  <div className="graph-edge-row" key={edge.id}>
-                    <span className="mono graph-label" title={edge.from}>
-                      {labelOf(edge.from)}
-                    </span>
-                    <span className="mono graph-label" title={edge.to}>
-                      {labelOf(edge.to)}
-                    </span>
-                    <span className="badge">
-                      {t(GRAPH_EDGE_LABEL[edge.kind] ?? 'graph.edge.link')}
-                    </span>
-                    <span className="badge">
-                      {t(GRAPH_STRENGTH_LABEL[edge.strength] ?? 'graph.strength.weak')}
-                    </span>
-                    <span
-                      className={`badge ${
-                        edge.state === 'broken' || edge.state === 'missing-chain'
-                          ? 'warn'
-                          : ''
-                      }`}
-                    >
-                      {t(GRAPH_STATE_LABEL[edge.state] ?? 'graph.state.unknown')}
-                    </span>
-                  </div>
-                ))}
               </div>
+
+              {tab === 'nodes' ? (
+                <>
+                  <p className="dim graph-note">{t('graph.nodes.note')}</p>
+                  <div className="graph-scroll graph-scroll-fixed" role="tabpanel">
+                    <div className="graph-tree-view" role="tree" aria-label={t('graph.nodes')}>
+                      {view.groups.map((group) => {
+                        const groupOpen = openGroups.has(group.kind);
+                        return (
+                          <section
+                            className="graph-group"
+                            key={group.kind}
+                            id={`graph-group-${group.kind}`}
+                          >
+                            <button
+                              type="button"
+                              className="graph-group-head"
+                              aria-expanded={groupOpen}
+                              onClick={() => toggleGroup(group.kind)}
+                            >
+                              <span
+                                className={`chevron${groupOpen ? ' open' : ''}`}
+                                aria-hidden="true"
+                              >
+                                ▸
+                              </span>
+                              <span>{t(GROUP_LABEL[group.kind] ?? 'graph.group.unknown')}</span>
+                              <span className="count mono">{group.nodeIds.length}</span>
+                            </button>
+                            {groupOpen && (
+                              <div className="graph-group-body" role="group">
+                                {group.nodeIds.map((id) => {
+                                  const node = nodeById.get(id);
+                                  if (!node) return null;
+                                  const open = expanded?.nodeId === node.id;
+                                  return (
+                                    <div
+                                      className={`graph-node-wrap${open ? ' active' : ''}`}
+                                      key={node.id}
+                                      id={`graph-node-${node.id}`}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="graph-node-row"
+                                        aria-expanded={open}
+                                        aria-controls={`graph-inline-${node.id}`}
+                                        onClick={() => toggleRow(node)}
+                                      >
+                                        <span
+                                          className={`chevron${open ? ' open' : ''}`}
+                                          aria-hidden="true"
+                                        >
+                                          ▸
+                                        </span>
+                                        <span className="mono graph-label" title={node.id}>
+                                          {node.label}
+                                        </span>
+                                        <span className="badge">
+                                          {t(
+                                            GRAPH_ROLE_LABEL[node.role] ??
+                                              'graph.role.isolated',
+                                          )}
+                                        </span>
+                                        <span className={`badge graph-level-${node.level}`}>
+                                          {t(
+                                            GRAPH_LEVEL_LABEL[node.level] ??
+                                              'graph.level.low',
+                                          )}
+                                        </span>
+                                        <span
+                                          className="dim mono graph-path"
+                                          title={node.path ?? ''}
+                                        >
+                                          {node.path ?? '—'}
+                                        </span>
+                                        <span className="badges-right">
+                                          {node.active && (
+                                            <span className="badge git">
+                                              {t('graph.node.active')}
+                                            </span>
+                                          )}
+                                          {node.protected && (
+                                            <span className="badge">
+                                              {t('graph.node.protected')}
+                                            </span>
+                                          )}
+                                          <span className="dim graph-open-hint">
+                                            {open
+                                              ? t('graph.tree.close')
+                                              : t('graph.tree.open')}
+                                          </span>
+                                        </span>
+                                      </button>
+
+                                      {open && expanded && (
+                                        <div
+                                          className="graph-inline"
+                                          id={`graph-inline-${node.id}`}
+                                          role="region"
+                                          aria-label={t('graph.tree.title', {
+                                            name: node.label,
+                                          })}
+                                        >
+                                          {ROW_SECTIONS[profile].map((section) =>
+                                            section === 'relations' ? (
+                                              <section
+                                                key="relations"
+                                                className="graph-inline-section"
+                                              >
+                                                <h5>{tu('graph.tree.relations')}</h5>
+                                                <RelationsTree
+                                                  node={node}
+                                                  t={t}
+                                                  tu={tu}
+                                                  edgeMeta={edgeMeta}
+                                                  labelOf={labelOf}
+                                                />
+                                              </section>
+                                            ) : (
+                                              <section
+                                                key="impact"
+                                                className="graph-inline-section"
+                                              >
+                                                <h5>{tu('graph.tree.impact')}</h5>
+                                                <p className="dim graph-tree-note">
+                                                  {t('graph.tree.whatIfNote')}
+                                                </p>
+                                                {expanded.loading && (
+                                                  <p className="dim">
+                                                    {t('graph.whatIf.running')}
+                                                  </p>
+                                                )}
+                                                {expanded.error && (
+                                                  <div
+                                                    className="banner danger"
+                                                    role="alert"
+                                                  >
+                                                    {expanded.error}
+                                                  </div>
+                                                )}
+                                                {expanded.result &&
+                                                  expanded.result.nodeIds.length ===
+                                                    0 && (
+                                                    <p className="dim">
+                                                      {t('graph.whatIf.noMatch')}
+                                                    </p>
+                                                  )}
+                                                {expanded.result &&
+                                                  expanded.result.nodeIds.length > 0 && (
+                                                    <WhatIfTree
+                                                      node={node}
+                                                      result={expanded.result}
+                                                      t={t}
+                                                      tu={tu}
+                                                      edgeMeta={edgeMeta}
+                                                      labelOf={labelOf}
+                                                    />
+                                                  )}
+                                              </section>
+                                            ),
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="dim graph-note">
+                    {t(
+                      profile === 'protect'
+                        ? 'graph.edges.noteProtect'
+                        : 'graph.edges.noteExperiment',
+                    )}
+                  </p>
+                  <div className="graph-scroll graph-scroll-fixed" role="tabpanel">
+                    <div className="graph-edge-head">
+                      <span>{tu('graph.edge.from')}</span>
+                      <span>{tu('graph.edge.to')}</span>
+                      <span>{tu('graph.edge.kind')}</span>
+                      <span>{tu('graph.edge.strength')}</span>
+                      <span>{tu('graph.edge.state')}</span>
+                    </div>
+                    {view.edges.map((edge) => (
+                      <div className="graph-edge-row" key={edge.id}>
+                        <span className="mono graph-label" title={edge.from}>
+                          {labelOf(edge.from)}
+                        </span>
+                        <span className="mono graph-label" title={edge.to}>
+                          {labelOf(edge.to)}
+                        </span>
+                        <span className="badge">
+                          {t(GRAPH_EDGE_LABEL[edge.kind] ?? 'graph.edge.link')}
+                        </span>
+                        <span className="badge">
+                          {t(
+                            GRAPH_STRENGTH_LABEL[edge.strength] ??
+                              'graph.strength.weak',
+                          )}
+                        </span>
+                        <span
+                          className={`badge ${
+                            edge.state === 'broken' || edge.state === 'missing-chain'
+                              ? 'warn'
+                              : ''
+                          }`}
+                        >
+                          {t(GRAPH_STATE_LABEL[edge.state] ?? 'graph.state.unknown')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </section>
           </>
         )}
@@ -665,9 +939,9 @@ interface TreeProps {
   labelOf: (id: string) => string;
 }
 
-/** Koruma bakisi: dugumun gelen ve giden iliskileri (SALT OKUNUR). */
+/** Iliski agaci: dugumun gelen ve giden kenarlari. */
 function RelationsTree({ node, ...rest }: TreeProps & { node: GraphNodeView }) {
-  const { t, tu, edgeMeta } = rest;
+  const { t, edgeMeta } = rest;
   if (node.dependents.length === 0 && node.needs.length === 0) {
     return <p className="dim">{t('graph.tree.empty')}</p>;
   }
@@ -676,7 +950,7 @@ function RelationsTree({ node, ...rest }: TreeProps & { node: GraphNodeView }) {
       <p className="graph-tree-root mono">{node.label}</p>
       {node.dependents.length > 0 && (
         <section>
-          <h5>{tu('graph.tree.dependents', { count: node.dependents.length })}</h5>
+          <h6>{t('graph.tree.dependents', { count: node.dependents.length })}</h6>
           <ul>
             {node.dependents.map((item) => (
               <li key={item.edge.id}>
@@ -691,7 +965,7 @@ function RelationsTree({ node, ...rest }: TreeProps & { node: GraphNodeView }) {
       )}
       {node.needs.length > 0 && (
         <section>
-          <h5>{tu('graph.tree.needs', { count: node.needs.length })}</h5>
+          <h6>{t('graph.tree.needs', { count: node.needs.length })}</h6>
           <ul>
             {node.needs.map((item) => (
               <li key={item.edge.id}>
@@ -704,18 +978,17 @@ function RelationsTree({ node, ...rest }: TreeProps & { node: GraphNodeView }) {
           </ul>
         </section>
       )}
-      <p className="dim graph-tree-note">{t('graph.tree.readonly')}</p>
     </div>
   );
 }
 
-/** Deneme bakisi: kaldirma etkisi (MOTORDAN gelen what-if sonucu). */
+/** What-if etkisi: MOTORDAN gelen sonuc. */
 function WhatIfTree({
   node,
   result,
   ...rest
 }: TreeProps & { node: GraphNodeView; result: GraphWhatIfResponse }) {
-  const { t, tu, edgeMeta, labelOf } = rest;
+  const { t, edgeMeta, labelOf } = rest;
   const blocked = result.result.blocked;
   const broken = result.result.brokenEdges;
   const isolated = result.result.isolated;
@@ -734,7 +1007,7 @@ function WhatIfTree({
       </p>
       {blocked.length > 0 && (
         <section>
-          <h5>{tu('graph.whatIf.blocked')}</h5>
+          <h6>{t('graph.whatIf.blocked')}</h6>
           <ul>
             {blocked.map((item) => (
               <li key={item.id}>
@@ -744,7 +1017,10 @@ function WhatIfTree({
                     {item.dependents.map((dep) => (
                       <li key={dep.id}>
                         <span className="mono">{dep.label}</span>
-                        <span className="dim"> → {item.label} · {edgeMeta(dep.edge)}</span>
+                        <span className="dim">
+                          {' '}
+                          → {item.label} · {edgeMeta(dep.edge)}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -756,7 +1032,7 @@ function WhatIfTree({
       )}
       {broken.length > 0 && (
         <section>
-          <h5>{tu('graph.tree.broken', { count: broken.length })}</h5>
+          <h6>{t('graph.tree.broken', { count: broken.length })}</h6>
           <ul>
             {broken.map((edge) => (
               <li key={edge.id}>
@@ -771,7 +1047,7 @@ function WhatIfTree({
       )}
       {isolated.length > 0 && (
         <section>
-          <h5>{tu('graph.tree.isolated', { count: isolated.length })}</h5>
+          <h6>{t('graph.tree.isolated', { count: isolated.length })}</h6>
           <ul>
             {isolated.map((id) => (
               <li key={id} className="mono">
@@ -781,7 +1057,43 @@ function WhatIfTree({
           </ul>
         </section>
       )}
-      <p className="dim graph-tree-note">{t('graph.tree.readonly')}</p>
     </div>
+  );
+}
+
+interface EdgeListProps {
+  edges: GraphEdge[];
+  labelOf: (id: string) => string;
+  edgeMeta: (edge: GraphEdge) => string;
+  nodeById: Map<string, GraphNodeView>;
+  onReveal: (node: GraphNodeView) => void;
+  revealLabel: string;
+}
+
+/** Ozet kartindan acilan kenar listesi (yalniz inceleme). */
+function EdgeList({ edges, labelOf, edgeMeta, nodeById, onReveal, revealLabel }: EdgeListProps) {
+  return (
+    <ul className="detail-list graph-edge-list">
+      {edges.map((edge) => {
+        const from = nodeById.get(edge.from);
+        return (
+          <li key={edge.id}>
+            <span className="mono">
+              {labelOf(edge.from)} → {labelOf(edge.to)}
+            </span>
+            <span className="dim">{edgeMeta(edge)}</span>
+            {from && (
+              <button
+                type="button"
+                className="ghost graph-sim"
+                onClick={() => onReveal(from)}
+              >
+                {revealLabel}
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
