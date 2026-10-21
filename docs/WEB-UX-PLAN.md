@@ -1,5 +1,9 @@
 # WEB UX PLANI — CLICleaner
 
+> **ARŞİV (21.10.2026, sürüm 2.0.0):** Tarayıcı arayüzü projeden söküldü.
+> Bu plan **uygulanmayacak**; tarihsel kayıt olarak durur. Faz 1-2 yapıldı,
+> Faz 3-8 yapılmadı. Yeniden yapım planı: **`docs/WEB-REBUILD-PLAN.md`**.
+>
 > Durum: yaşayan plan. Fazlar sırayla uygulanır; her faz sonunda
 > `typecheck` + `vite build` + ilgili test çalıştırılır.
 > Çelişkiler ve varsayımlar bölümü kullanıcı kararı gerektirir.

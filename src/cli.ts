@@ -24,18 +24,18 @@ function printHelp(): void {
 ${C.bold}CLICleaner${C.reset} — disk artiklarini kanitlarla listeler, secimini sen onaylarsin
 
 ${C.bold}Baslamak icin${C.reset}
-  ${C.cyan}clicleaner${C.reset}                  Tarayici arayuzunu ac (onerilen)
   ${C.cyan}clicleaner scan${C.reset}             Terminalde tara ve listele
   ${C.cyan}clicleaner clean --dry-run${C.reset}  Plani goster; hicbir sey silme
 
 ${C.bold}Gelismis${C.reset}
-  clicleaner ui --tui             Terminal arayuzu (Ink)
-  clicleaner clean                Iki asamali onay + geri donusum kutusu
+  clicleaner ui                  Terminal arayuzu (Ink; gercek terminal gerekir)
+  clicleaner clean                Iki asamali onay + kasa (geri alinabilir)
   clicleaner inventory [...]      Kurulu CLI envanteri (salt okunur)
   clicleaner repair [--only <ad>] Bozuk / yarim kurulumlari onar (ONAR onayi)
   clicleaner quarantine <ad>     Bagimsiz araci kasaya tasi (KARANTINA onayi, geri alinabilir)
   clicleaner explain <ad>         Bir kumenin karar gerekcesi
   clicleaner undo [--restore]     Son silmeyi geri al
+  clicleaner api [--port <n>]     BASSSIZ HTTP/SSE API (arayuz yok; 127.0.0.1)
   clicleaner log [--summary]      Gunluk
   clicleaner doctor               Ortam kontrolu
   clicleaner rules                Kural listesi
@@ -71,11 +71,9 @@ ${C.bold}Hassas siniflar (yalnizca acikca istenirse)${C.reset}
   --reset-rules      Kural dosyalarini plana dahil et (rules/*.rules)
   ${C.gray}Not: bu bayraklar risk sinifini DEGISTIRMEZ; iki asamali onay korunur.${C.reset}
 
-${C.bold}Web arayuzu icin${C.reset}
+${C.bold}Sadece api icin${C.reset}
   --port <n>         Sabit port (varsayilan: bos port otomatik secilir)
-  --browser <ad>     Acilacak tarayici: default (varsayilan) | edge
-  --no-open          Tarayiciyi otomatik acma, yalnizca adresi yaz
-  --tui              Terminal arayuzunu kullan (varsayilan: tarayici)
+  ${C.gray}Not: API arayuz sunmaz. Yalnizca HTTP/SSE uzerinden servis katmanina erisir.${C.reset}
 
 ${C.bold}Sadece inventory icin${C.reset}
   --unused <gun>     Atillik esigi (varsayilan: 21 gun)
@@ -85,7 +83,6 @@ ${C.bold}Sadece inventory icin${C.reset}
   --report <dosya.md>  Paylasilabilir Markdown raporu yaz
 
 ${C.bold}Ornekler${C.reset}
-  clicleaner
   clicleaner scan --env pkgcache
   clicleaner clean --env pkgcache
   clicleaner clean --only nuget --purge
@@ -101,15 +98,15 @@ async function main(): Promise<void> {
 
   // Sürüm: ag isteği YAPMAZ; sadece paketin sürümünü okur.
   // NOT: bu bayraklar '-' ile basladigi icin komut cozumlemesinden ONCE
-  // kontrol edilir (aksi halde 'ui' varsayilir ve web sunucusu acilir).
+  // kontrol edilir (aksi halde varsayilan komut (yardim) calisir).
   if (argv.length > 0 && (argv[0] === '-v' || argv[0] === '--version' || argv[0] === 'version')) {
     console.log(currentVersion());
     return;
   }
 
-  // Komut verilmezse web arayuzu acilir: asil urun budur; terminal
-  // komutlari (scan/clean) bilincli olarak secilir.
-  const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'ui';
+  // Komut verilmezse yardim metni gosterilir: hicbir sey baslatilmaz.
+  // (2.0.0: varsayilan giris artik tarayici arayuzu degil.)
+  const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'help';
   const rest = argv[0] && !argv[0].startsWith('-') ? argv.slice(1) : argv;
 
   if (cmd === '-h' || cmd === '--help' || cmd === 'help') {
@@ -185,14 +182,12 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'ui') {
+    // 2.0.0: tarayici arayuzu kaldirildi; `ui` artik terminal (Ink)
+    // arayuzunu acar. `--tui` geriye uyumluluk icin kabul edilir.
     const envs: Env[] = [];
     const exclude: string[] = [];
     let profile: string | undefined;
     let purge = false;
-    let tui = false;
-    let port = 0;
-    let open = true;
-    let browser: 'edge' | 'default' = 'default';
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
@@ -200,26 +195,34 @@ async function main(): Promise<void> {
       else if (a === '--profile') profile = rest[++i];
       else if (a === '--exclude') exclude.push(rest[++i]!);
       else if (a === '--purge') purge = true;
-      else if (a === '--tui') tui = true;
-      // Geriye uyumluluk: eski `ui --web` hala web arayuzunu acar.
-      else if (a === '--web') tui = false;
-      else if (a === '--port') {
-        const n = Number(rest[++i]);
-        if (Number.isInteger(n) && n >= 0 && n <= 65535) port = n;
-      } else if (a === '--browser') {
-        const v = (rest[++i] ?? '').toLowerCase();
-        if (v === 'edge' || v === 'default') browser = v;
-      } else if (a === '--no-open') open = false;
-    }
-
-    if (!tui) {
-      const { runWeb } = await import('./web/server.ts');
-      await runWeb({ envs, profile, exclude, port, open, browser });
-      return;
     }
 
     const { runTui } = await import('./commands/tui.ts');
     await runTui({ envs, profile, exclude, mode: purge ? 'purge' : 'recycle' });
+    return;
+  }
+
+  if (cmd === 'api') {
+    // BASSSIZ HTTP/SSE API: arayuz yok. Gelecekteki arayuzun
+    // dayanacagi sozlesme burada; bkz. docs/WEB-REBUILD-PLAN.md.
+    const envs: Env[] = [];
+    const exclude: string[] = [];
+    let profile: string | undefined;
+    let port = 0;
+
+    for (let i = 0; i < rest.length; i++) {
+      const a = rest[i];
+      if (a === '--env') envs.push(rest[++i] as Env);
+      else if (a === '--profile') profile = rest[++i];
+      else if (a === '--exclude') exclude.push(rest[++i]!);
+      else if (a === '--port') {
+        const n = Number(rest[++i]);
+        if (Number.isInteger(n) && n >= 0 && n <= 65535) port = n;
+      }
+    }
+
+    const { runApi } = await import('./web/server.ts');
+    await runApi({ envs, profile, exclude, port });
     return;
   }
 

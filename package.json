@@ -1,6 +1,6 @@
 {
   "name": "clicleaner",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "CLI cleaner and evidence-first auditor for developer caches, CLI installs and AI runtime leftovers; shows what each folder is before anything is deleted",
   "type": "module",
   "license": "MIT",
@@ -41,7 +41,6 @@
   "files": [
     "bin/",
     "src/",
-    "dist/web/",
     "README.md",
     "README.en.md",
     "CHANGELOG.md",
@@ -53,35 +52,26 @@
   "scripts": {
     "scan": "tsx src/cli.ts scan",
     "ui": "tsx src/cli.ts ui",
-    "ui:web": "tsx src/cli.ts ui --web",
-    "build:web": "vite build",
+    "api": "tsx src/cli.ts api",
     "inventory": "tsx src/cli.ts inventory",
     "clean": "tsx src/cli.ts clean",
     "explain": "tsx src/cli.ts explain",
     "rules": "tsx src/cli.ts rules",
     "doctor": "tsx src/cli.ts doctor",
     "undo": "tsx src/cli.ts undo",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
+    "typecheck": "tsc --noEmit",
     "preversion": "npm run typecheck",
     "release:patch": "npm version patch -m \"surum: v%s\"",
     "release:minor": "npm version minor -m \"surum: v%s\"",
     "release:major": "npm version major -m \"surum: v%s\"",
-    "prepack": "npm run build:web",
     "start": "tsx src/cli.ts",
-    "dev": "vite",
-    "dev:api": "tsx src/cli.ts ui --no-open --port 4321",
     "status": "tsx src/cli.ts status",
     "log": "tsx src/cli.ts log",
     "init-state": "tsx scripts/init-state.ts"
   },
   "devDependencies": {
-    "@tanstack/react-virtual": "^3.14.21",
     "@types/node": "^22.10.2",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "typescript": "^5.7.2",
-    "vite": "^8.3.4"
+    "typescript": "^5.7.2"
   },
   "engines": {
     "node": ">=22.6"
@@ -89,7 +79,6 @@
   "dependencies": {
     "ink": "^8.0.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1",
     "tsx": "^4.23.15"
   }
 }

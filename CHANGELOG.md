@@ -5,10 +5,26 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ## [Unreleased]
 
-### İyileştirildi
+## [2.0.0] - 2026-10-21
 
-- Liste filtreleri, sıralama ve "tümünü planla" kapsamı artık tek bir merkezden
-  hesaplanır; sonuçlar tüm ekranlarda ve her iki arayüzde aynı çıkar.
+Tarayıcı arayüzü kaldırıldı. Araç artık **yalnızca terminalden** çalışır.
+
+### Kaldırıldı
+
+- **Tarayıcı arayüzü** ve beraberindeki derleme/veri bağımlılıkları.
+- **Masaüstü kısayolu** oluşturma/kaldırma özelliği (yalnız arayüzü açıyordu).
+- Tarayıcı açma seçenekleri ve tarayıcıya özel ayarlar.
+
+### Değiştirildi
+
+- `clicleaner` (komutsuz) artık tarayıcıyı açmaz; **yardım metnini** gösterir.
+- `clicleaner ui` artık **terminal arayüzünü** açar.
+- `clicleaner api` eklendi: arayüzü olmayan, yalnız bu bilgisayarda çalışan
+  HTTP/SSE servis arayüzü.
+
+### Eklendi
+
+- Arayüzün yeniden yapımı için plan belgesi (`docs/WEB-REBUILD-PLAN.md`).
 
 ## [1.0.0] - 2026-10-21
 

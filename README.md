@@ -43,29 +43,29 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
 3. Şunu yaz ve Enter'a bas:
 
    ```powershell
-   npx clicleaner
+   npx clicleaner scan
    ```
 
-4. Tarayıcı otomatik açılır. Arayüz **sistem varsayılan tarayıcında** açılır.
-   Açılmazsa terminalde yazan `http://localhost:<port>` adresini tarayıcıya
-   yapıştır. Edge'i zorlamak için `clicleaner ui --browser edge` veya
-   `CLICLEANER_BROWSER` ortam değişkeni kullanılabilir.
-5. **İncele**'ye bas. Tarama sürerken solda taranan dizinleri, sağda bulunanları
-   canlı görürsün.
-6. Tarama bitince **Tamam** → listeyi incele.
-7. Silmek istediklerini işaretle → **Planla ve onayla** → planı oku → `SIL` yaz →
-   **Planı uygula**.
+4. Araç geliştirici ve AI araçlarının bıraktığı klasörleri tarar; her birini
+   **ne olduğu, silinirse ne olacağı ve gerekçesiyle** listeler. Ölçüm büyük
+   klasörlerde birkaç dakika sürebilir; `Ctrl+C` ile durdurabilirsin.
+5. Silmek istediklerini seç → `clicleaner clean` → planı oku → orta/yüksek risk
+   için `SIL` yaz → onayla.
 
 Varsayılan mod **aracın kendi kasası**dır; yanlış karar verirsen geri
-alabilirsin (`clicleaner undo --restore` veya web arayüzünde **Kasa**).
+alabilirsin (`clicleaner undo --restore`).
+
+> **2.0.0 notu:** Tarayıcı arayüzü bu sürümde kaldırıldı. Araç artık
+> **yalnızca terminalden** çalışır. Arayüzün yeniden yapımı planlanıyor:
+> [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
 
 ### Hiç terminal kullanmadıysan
 
 - `node --version` yaz; `v22.6.0` veya üzeri değilse nodejs.org'dan LTS kur.
-- `npx clicleaner` ilk çalıştırmada paketi indirir; birkaç saniye sürer.
-- Tarama büyük klasörlerde birkaç dakika sürebilir. **Taramayı iptal et**
-  düğmesi her zaman vardır.
-- Kapatmak için terminalde `Ctrl+C`. Hiçbir şeyi silmek zorunda değilsin.
+- `npx clicleaner scan` ilk çalıştırmada paketi indirir; birkaç saniye sürer.
+- `npx clicleaner` komut listesi ve yardım metnini gösterir.
+- Hiçbir şeyi silmek zorunda değilsin; `clicleaner clean --dry-run` yalnızca
+  planı gösterir.
 
 ---
 
@@ -141,8 +141,6 @@ istersen taranacak klasörü sen seçersin:
 clicleaner scan --root C:\projeler\uygulamam
 ```
 
-Web arayüzünde **Projeyi Tara** → klasörü seç → tara.
-
 Bu modda:
 
 - Sonuçlar **salt rapordur**: hiçbir silme hedefi üretilmez.
@@ -162,7 +160,7 @@ Bu modda:
 - **Git farkındalığı:** tracked dosya hedef olamaz; proje taramaları salt rapordur.
 - **Son savunma hattı:** silme katmanı, korunan bir yolun üstünü veya aracın
   kendi veri dizinini hedef almışsa silmeyi reddeder.
-- **Yerel ve açık:** arayüz yalnız bu bilgisayarda çalışır; telemetri yoktur,
+- **Yerel ve açık:** araç yalnızca bu bilgisayarda çalışır; telemetri yoktur,
   kod MIT lisanslıdır.
 
 ---
@@ -182,12 +180,11 @@ Proje taraması (`--root`) hiçbir zaman silme hedefi üretmez; yalnız raporlar
 Git tarafından takip edilen dosyalar zaten her koşulda korunur.
 
 **Yanlış sildim.**
-Kasadan geri al: `clicleaner undo --restore` veya web arayüzünde **Kasa** sekmesi.
+Kasadan geri al: `clicleaner undo --restore`.
 
 **Bağımsız bir aracı silmeden devre dışı bırakabilir miyim?**
-Evet. Karantinaya al: web arayüzünde **Karantinaya al** düğmesi ya da terminalde
-`clicleaner quarantine <ad>`. Shim kasaya taşınır (komut PATH'ten düşer),
-verileriniz yerinde kalır; geri alma adımları kasaya yazılır.
+Evet. Karantinaya al: `clicleaner quarantine <ad>`. Shim kasaya taşınır (komut
+PATH'ten düşer), verilerin yerinde kalır; geri alma adımları kasaya yazılır.
 
 **Tarama neden uzun sürüyor?**
 Diskteki en büyük klasörlerin boyutu ölçülüyor. İstediğin an
@@ -217,9 +214,9 @@ Hayır. Her şey yerel makinede çalışır.
 Yönetici hakkı gerekmez.
 
 ```bash
-npx clicleaner              # kurulum yapmadan dene
+npx clicleaner scan        # kurulum yapmadan dene
 npm install -g clicleaner   # kalıcı kurulum
-clicleaner                  # tarayıcı arayüzünü aç
+clicleaner                  # komut listesini göster
 ```
 
 Kaynaktan çalıştırmak için:
@@ -239,8 +236,7 @@ gerekir.
 
 | Sorun | Çözüm |
 |---|---|
-| Tarayıcı açılmadı | Terminaldeki `http://localhost:<port>` adresini yapıştır |
-| "Geçersiz token" | Sunucu her başlatmada yeni token üretir; eski sekmeyi kapat |
+| "Geçersiz token" | API sunucusu her başlatmada yeni token üretir; eski adresi kapat |
 | Terminal arayüzü bozuk | Gerçek bir terminal (PowerShell / Windows Terminal) kullan |
 | Windows dışı sistem | Şu an yalnızca Windows desteklenir |
 
@@ -249,7 +245,7 @@ gerekir.
 ## Kullanım
 
 ```bash
-clicleaner                     # tarayıcı arayüzü (önerilen)
+clicleaner                     # komut listesi ve yardım
 clicleaner scan                # terminalde tara ve listele
 clicleaner scan --root .       # proje içi artıkları yalnız raporla
 clicleaner clean --dry-run     # yalnızca planı göster, hiçbir şey silme
@@ -258,7 +254,8 @@ clicleaner undo --restore      # kasadan geri al
 clicleaner repair --dry-run    # bozuk / yarım kurulumları göster
 clicleaner repair              # onar (ONAR onayı; çıktı canlı akar)
 clicleaner quarantine <ad>     # bağımsız aracı silmeden kasaya taşı (KARANTINA onayı)
-clicleaner ui --tui            # terminal arayüzü (isteğe bağlı)
+clicleaner ui                  # terminal arayüzü (Ink; gerçek terminal gerekir)
+clicleaner api                 # başsız HTTP/SSE API (arayüz yok; 127.0.0.1)
 ```
 
 Daha fazlası için: `clicleaner help`
@@ -278,8 +275,7 @@ npx clicleaner@latest      # kurulum yapmadan en güncel sürümü çalıştır
 - npm: <https://www.npmjs.com/package/clicleaner>
 - GitHub sürümleri: <https://github.com/omer-denen/CLICleaner/releases>
 
-Arayüzde **Ayarlar → Güncelleme Politikası** ekranı neyin gönderilip
-gönderilmediğini ve manuel güncelleme adreslerini gösterir.
+Otomatik sürüm kontrolü **kapalıdır** (varsayılan: hiçbir ağ isteği yapılmaz).
 
 ---
 
@@ -287,5 +283,5 @@ gönderilmediğini ve manuel güncelleme adreslerini gösterir.
 
 MIT — bkz. [LICENSE](LICENSE).
 
-CLICleaner hiçbir veriyi dışarı göndermez; arayüz yalnızca yerel makinede
+CLICleaner hiçbir veriyi dışarı göndermez; tüm işlemler yerel makinede
 çalışır. Silme kararı her zaman kullanıcıya aittir.

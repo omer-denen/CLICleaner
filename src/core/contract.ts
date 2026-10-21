@@ -185,21 +185,6 @@ export interface UpdateCheckView {
 }
 
 // ---------------------------------------------------------------------------
-// Masaüstü kısayolu (T40)
-// ---------------------------------------------------------------------------
-
-export interface DesktopShortcutView {
-  /** Kisayolun tam yolu */
-  path: string;
-  /** Dosya diskte var mi */
-  exists: boolean;
-  /** Kisayol bize ait mi? (baskasininkisi silinmez) */
-  ours: boolean;
-  /** Kisa yol olusturulamadi mi? (ornegin hedef bulunamadi) */
-  error?: string;
-}
-
-// ---------------------------------------------------------------------------
 // Kasa (vault)
 // ---------------------------------------------------------------------------
 

@@ -5,11 +5,8 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { dirname, extname, join, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { readdir, stat } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { closeRecycle } from '../actions/delete.ts';
 import {
   findVaultEntry,
@@ -19,13 +16,6 @@ import {
   restoreVaultEntry,
 } from '../actions/vault.ts';
 import { exists } from '../actions/restore.ts';
-import {
-  createShortcut,
-  removeShortcut,
-  resolveTarget,
-  shortcutInfo,
-  shortcutPath,
-} from '../actions/desktop-shortcut.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { ApprovalRules } from '../core/approval.ts';
 import { buildFindings } from '../core/findings.ts';
@@ -54,7 +44,6 @@ import type {
   CliRepairPlanRequest,
   CliQuarantineExecuteRequest,
   CliQuarantinePlanRequest,
-  DesktopShortcutView,
   ExecuteRequest,
   FindingsResponse,
   LatestResponse,
@@ -77,11 +66,15 @@ import type {
 } from '../core/contract.ts';
 
 /**
- * CLICleaner yerel web arayuzu — YALNIZ HTTP/SSE adaptoru.
+ * CLICleaner yerel HTTP/SSE API — YALNIZ transport adaptoru.
  *
  * Is mantigi `src/services/` altindadir:
  *   ScanService, DeleteService, CliInventoryService,
- *   CliRemovalService, CliRepairService.
+ *   CliRemovalService, CliRepairService, CliQuarantineService.
+ *
+ * NOT (21.10.2026): tarayici arayuzu (React/Vite) projeden sokuldu.
+ * Bu sunucu BASSSIZ bir API'dir; tek basina arayuz sunmaz. Arayuzun
+ * yeniden yapimi icin plan: `docs/WEB-REBUILD-PLAN.md`.
  *
  * Guvenlik modeli:
  *  - Sunucu YALNIZCA 127.0.0.1 uzerinde dinler; aga acilmaz.
@@ -95,15 +88,8 @@ import type {
  *  - Silme iki asamalidir: once plan (kimlik), sonra onay. Plan
  *    10 dakika sonra duser. Orta/yuksek risk "SIL" yazili onayi
  *    olmadan yurutulmez.
- *  - Tarayici "Origin" ve "Host" basliklari dogrulanir.
+ *  - "Origin" ve "Host" basliklari dogrulanir.
  */
-
-const HERE = fileURLToPath(new URL('.', import.meta.url));
-const ROOT_DIR = resolve(HERE, '..', '..');
-const DIST_DIR = join(ROOT_DIR, 'dist', 'web');
-const WEB_INDEX = join(DIST_DIR, 'index.html');
-
-export type BrowserChoice = 'edge' | 'default';
 
 export interface WebOptions {
   envs?: Env[];
@@ -113,16 +99,6 @@ export interface WebOptions {
   /** 0 = isletim sisteminin bos portu secmesi (onerilen) */
   port?: number;
   host?: string;
-  /** Tarayiciyi otomatik ac */
-  open?: boolean;
-  /**
-   * Hangi tarayici acilsin. Varsayilan 'default' (sistem varsayilani).
-   *
-   * Kullanici hangi tarayiciyi kullaniyorsa arayuz orada acilir.
-   * 'edge' yalnizca ACIKCA istenirse Microsoft Edge'i zorlar; Edge
-   * bulunamazsa sistem varsayilanina dusulur.
-   */
-  browser?: BrowserChoice;
   /**
    * Tarama sonucunu 24 saatlik disk onbellegine yaz (varsayilan true).
    * Testler false verir; kismi tarama kullanicinin onbellegini ezmesin.
@@ -143,7 +119,11 @@ interface WebContext {
   streams: Map<string, Set<ServerResponse>>;
 }
 
-export function createWebServer(opts: WebOptions = {}): { server: Server; token: string } {
+/**
+ * BASSSIZ API sunucusunu kurar. Arayuz yoktur; yalnizca HTTP/SSE
+ * uzerinden servis katmanina erisim saglar.
+ */
+export function createApiServer(opts: WebOptions = {}): { server: Server; token: string } {
   const token = randomBytes(24).toString('hex');
   const streams = new Map<string, Set<ServerResponse>>();
 
@@ -193,16 +173,14 @@ export function createWebServer(opts: WebOptions = {}): { server: Server; token:
   return { server, token };
 }
 
-/** Web arayuzunu baslatir ve kullanici Ctrl+C'ye basana kadar tutar. */
-export async function runWeb(opts: WebOptions = {}): Promise<void> {
+/** API sunucusunu baslatir ve kullanici Ctrl+C'ye basana kadar tutar. */
+export async function runApi(opts: WebOptions = {}): Promise<void> {
   const host = opts.host ?? '127.0.0.1';
   if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') {
-    throw new Error('Guvenlik: web arayuzu yalnizca localhost uzerinde calistirilabilir');
+    throw new Error('Guvenlik: API yalnizca localhost uzerinde calistirilabilir');
   }
 
-  await ensureWebBuild();
-
-  const { server, token } = createWebServer(opts);
+  const { server, token } = createApiServer(opts);
   const port = opts.port ?? 0;
   await new Promise<void>((ok, fail) => {
     server.once('error', fail);
@@ -212,26 +190,17 @@ export async function runWeb(opts: WebOptions = {}): Promise<void> {
   const addr = server.address();
   const actualPort = typeof addr === 'object' && addr ? addr.port : port;
   const openHost = host === '::1' ? '127.0.0.1' : host;
-  const url = `http://${openHost}:${actualPort}/?token=${token}`;
-  const displayUrl = `http://localhost:${actualPort}`;
+  const url = `http://${openHost}:${actualPort}/api/meta?token=${token}`;
 
   console.log('');
-  console.log('  CLICleaner web arayuzu hazir.');
+  console.log('  CLICleaner API hazir (arayuz yok; basit bir HTTP/SSE API).');
   console.log('');
-  console.log(`  Tarayicida acin:  ${displayUrl}`);
+  console.log(`  Adres:        ${url}`);
   console.log('  Yalnizca bu bilgisayarda calisir (127.0.0.1).');
-  if (opts.open !== false) {
-    console.log('  Her baslatmada yeni bir guvenlik token\'i uretilir;');
-    console.log('  tarayici bu token ile otomatik acilir.');
-  } else {
-    console.log('');
-    console.log(`  Elle acmak icin (token ile): ${url}`);
-  }
+  console.log('  Her baslatmada yeni bir guvenlik token\'i uretilir.');
   console.log('');
   console.log('  Kapatmak icin Ctrl+C.');
   console.log('');
-
-  if (opts.open !== false) openBrowser(url, opts.browser ?? 'default');
 
   await new Promise<void>((ok) => {
     const stop = () => {
@@ -265,9 +234,24 @@ async function handleRequest(
     return;
   }
 
-  // Statik dosyalar token istemez; iclerinde veri yoktur.
+  // Arayuz yok (2.0.0): kok yol API bilgisi doner. Statik dosya yoktur.
   if (!pathname.startsWith('/api/')) {
-    await serveStatic(res, pathname);
+    sendJson(res, 200, {
+      name: 'clicleaner',
+      version: currentVersion(),
+      ui: 'none',
+      note: 'Tarayici arayuzu 2.0.0 ile kaldirildi; bu sunucu BASSSIZ bir HTTP/SSE API\'dir.',
+      hint: 'API cagrilari token ister. Ornek: /api/meta?token=<token>',
+      endpoints: [
+        'GET  /api/meta',
+        'GET  /api/latest',
+        'GET  /api/scan/status',
+        'GET  /api/findings',
+        'GET  /api/settings',
+        'GET  /api/vault',
+        'GET  /api/cli/inventory',
+      ],
+    });
     return;
   }
 
@@ -302,58 +286,6 @@ async function handleRequest(
     await ctx.scan.ensureCacheLoaded();
     const last = ctx.scan.last();
     const body: LatestResponse = { scan: last?.scan ?? null, at: last?.at ?? null };
-    sendJson(res, 200, body);
-    return;
-  }
-
-  if (route === 'GET /api/shortcut/desktop') {
-    const info = await shortcutInfo();
-    const body: DesktopShortcutView = {
-      path: info.path,
-      exists: info.exists,
-      ours: info.ours,
-    };
-    sendJson(res, 200, body);
-    return;
-  }
-
-  if (route === 'POST /api/shortcut/desktop') {
-    const target = resolveTarget();
-    if (!target) {
-      const body: DesktopShortcutView = {
-        path: shortcutPath(),
-        exists: false,
-        ours: false,
-        error: 'Giris betigi bulunamadi; kisayol olusturulamadi.',
-      };
-      sendJson(res, 400, body);
-      return;
-    }
-    try {
-      const info = await createShortcut(target);
-      const body: DesktopShortcutView = { path: info.path, exists: info.exists, ours: info.ours };
-      sendJson(res, 200, body);
-    } catch (e) {
-      const body: DesktopShortcutView = {
-        path: shortcutPath(),
-        exists: false,
-        ours: false,
-        error: describeError(e),
-      };
-      sendJson(res, 500, body);
-    }
-    return;
-  }
-
-  if (route === 'DELETE /api/shortcut/desktop') {
-    const result = await removeShortcut();
-    const info = await shortcutInfo();
-    const body: DesktopShortcutView = {
-      path: info.path,
-      exists: info.exists,
-      ours: info.ours,
-      error: result.removed ? undefined : 'Kisayol bulunamadi veya bize ait degil.',
-    };
     sendJson(res, 200, body);
     return;
   }
@@ -956,149 +888,4 @@ function sanitizeProfile(profile: unknown): string | undefined {
 
 function isSafeName(name: string): boolean {
   return /^[a-z0-9._@-]+$/i.test(name) && name.length <= 64;
-}
-
-/**
- * Windows'ta Microsoft Edge ikilisinin bilinen konumlari. Yalnizca
- * Edge ACIKCA istendiginde kullanilir; varsayilan sistem tarayicisidir.
- */
-function edgeCandidates(): string[] {
-  const out: string[] = [];
-  const pf86 = process.env['ProgramFiles(x86)'];
-  const pf = process.env.ProgramFiles;
-  const lad = process.env.LOCALAPPDATA;
-  if (pf86) out.push(join(pf86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
-  if (pf) out.push(join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
-  if (lad) out.push(join(lad, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
-  return out;
-}
-
-/**
- * Acilacak komutu cozer. Disa acik (test edilebilir): hangi tarayicinin
- * nasil acilacagini yalnizca burada belirleriz.
- *
- * Oncelik: acik secim > CLICLEANER_BROWSER ortam degiskeni.
- * Varsayilan sistem tarayicisidir; 'edge' zorlanirsa ve Edge
- * bulunamazsa yine sistem varsayilanina (cmd /c start) dusulur.
- */
-export function resolveBrowserCommand(
-  url: string,
-  choice: BrowserChoice = 'default',
-): { cmd: string; args: string[] } {
-  const envChoice = (process.env.CLICLEANER_BROWSER ?? '').toLowerCase();
-  const eff: BrowserChoice = envChoice === 'default' ? 'default' : envChoice === 'edge' ? 'edge' : choice;
-
-  if (process.platform === 'win32') {
-    if (eff === 'edge') {
-      const edge = edgeCandidates().find((p) => {
-        try {
-          return existsSync(p);
-        } catch {
-          return false;
-        }
-      });
-      if (edge) return { cmd: edge, args: [url] };
-    }
-    return { cmd: 'cmd.exe', args: ['/c', 'start', '', url] };
-  }
-  if (process.platform === 'darwin') return { cmd: 'open', args: [url] };
-  return { cmd: 'xdg-open', args: [url] };
-}
-
-function openBrowser(url: string, choice: BrowserChoice = 'default'): void {
-  try {
-    const { cmd, args } = resolveBrowserCommand(url, choice);
-    spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
-  } catch {
-    /* tarayici acilamadi; adres konsolda yazili */
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Statik dosyalar
-// ---------------------------------------------------------------------------
-
-const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.map': 'application/json; charset=utf-8',
-};
-
-async function serveStatic(res: ServerResponse, pathname: string): Promise<void> {
-  const rel = pathname === '/' || pathname === '' ? 'index.html' : pathname.replace(/^\/+/, '');
-  const file = resolve(DIST_DIR, rel);
-  const dist = DIST_DIR.toLowerCase();
-  const index = WEB_INDEX.toLowerCase();
-
-  const inside = file.toLowerCase() === index || file.toLowerCase().startsWith(dist + sep.toLowerCase());
-  if (!inside) {
-    sendJson(res, 404, { error: 'Bulunamadi' });
-    return;
-  }
-
-  try {
-    const buf = await readFile(file);
-    const ext = extname(file).toLowerCase();
-    res.writeHead(200, {
-      'content-type': MIME[ext] ?? 'application/octet-stream',
-      'cache-control': rel.startsWith('assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
-    });
-    res.end(buf);
-    return;
-  } catch {
-    /* asagida SPA geri donusu denenir */
-  }
-
-  // Uzantisiz yollar tek sayfa uygulamasina duser.
-  if (extname(rel) === '') {
-    try {
-      const idx = await readFile(WEB_INDEX);
-      res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-cache' });
-      res.end(idx);
-      return;
-    } catch {
-      /* derlenmemis */
-    }
-  }
-  sendJson(res, 404, { error: 'Bulunamadi' });
-}
-
-// ---------------------------------------------------------------------------
-// Derleme
-// ---------------------------------------------------------------------------
-
-let buildPromise: Promise<void> | null = null;
-
-/**
- * dist/web yoksa Vite ile derler. Boylece kaynak depodan calistiran
- * kullanici ayrica bir adim yapmak zorunda kalmaz.
- */
-export async function ensureWebBuild(): Promise<void> {
-  if (buildPromise) return buildPromise;
-  buildPromise = (async () => {
-    try {
-      await readFile(WEB_INDEX);
-      return;
-    } catch {
-      /* derlenmemis */
-    }
-
-    console.log('  Web arayuzu derleniyor (ilk calistirma, birkac saniye)...');
-    try {
-      const { build } = await import('vite');
-      await build({ configFile: join(ROOT_DIR, 'vite.config.ts'), logLevel: 'warn' });
-      await readFile(WEB_INDEX);
-    } catch (err) {
-      buildPromise = null;
-      throw err;
-    }
-  })();
-  return buildPromise;
 }

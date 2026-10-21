@@ -42,30 +42,30 @@ It answers one question with evidence: **"What is this folder, and what happens 
 3. Type this and press Enter:
 
    ```powershell
-   npx clicleaner
+   npx clicleaner scan
    ```
 
-4. The browser opens automatically in your **system default browser**. If
-   nothing opens, paste the `http://localhost:<port>` address printed in the
-   terminal. Force Edge with `clicleaner ui --browser edge` or the
-   `CLICLEANER_BROWSER` environment variable.
-5. Press **Inspect**. While the scan runs, the left column shows the directories
-   being scanned and the right column shows what is found.
-6. When it finishes press **OK**, then review the list.
-7. Tick what you want to delete → **Plan and confirm** → read the plan → type
-   `SIL` → **Apply plan**.
+4. The tool scans the folders left behind by developer and AI tooling and
+   lists each one with **what it is, what deletion would cost and why it
+   decided that way**. Measuring large folders can take a few minutes; stop
+   it with `Ctrl+C`.
+5. Pick what you want to delete → `clicleaner clean` → read the plan → type
+   `SIL` for medium/high risk → confirm.
 
 The default mode moves items into the tool's own **vault**, so a wrong
-decision is reversible (`clicleaner undo --restore` or the **Vault** tab in
-the web UI).
+decision is reversible (`clicleaner undo --restore`).
+
+> **2.0.0 note:** The browser UI was removed in this release. The tool now
+> runs **from the terminal only**. Rebuilding the UI is planned:
+> [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
 
 ### Never used a terminal before?
 
 - Run `node --version`; if it is below `v22.6.0`, install the LTS from nodejs.org.
-- `npx clicleaner` downloads the package on first run; it takes a few seconds.
-- A scan may take a few minutes on large folders. The **Cancel scan** button is
-  always available.
-- Press `Ctrl+C` in the terminal to stop. You do not have to delete anything.
+- `npx clicleaner scan` downloads the package on first run; it takes a few seconds.
+- `npx clicleaner` prints the command list and the help text.
+- You do not have to delete anything; `clicleaner clean --dry-run` shows the
+  plan only.
 
 ---
 
@@ -139,8 +139,6 @@ folder to scan:
 clicleaner scan --root C:\projects\myapp
 ```
 
-In the browser UI: **Scan a project** → choose the folder → scan.
-
 In this mode:
 
 - Results are **report-only**: no delete target is ever produced.
@@ -162,7 +160,7 @@ In this mode:
   report-only.
 - **Last line of defence:** if the delete layer is asked to remove an ancestor of
   a protected path, or the tool's own data directory, it refuses.
-- **Local and open:** the UI runs only on this machine; no telemetry, MIT
+- **Local and open:** the tool runs only on this machine; no telemetry, MIT
   licensed.
 
 ---
@@ -182,11 +180,10 @@ A project scan (`--root`) never produces delete targets; it only reports. Files
 tracked by Git are protected in every mode anyway.
 
 **I deleted something by mistake.**
-Restore from the vault: `clicleaner undo --restore` or the **Vault** tab in the web UI.
+Restore from the vault: `clicleaner undo --restore`.
 
 **Can I disable a standalone tool without deleting it?**
-Yes. Quarantine it: use the **Quarantine** button in the browser UI or
-`clicleaner quarantine <ad>` in the terminal. The shim moves to the vault
+Yes. Quarantine it: `clicleaner quarantine <ad>`. The shim moves to the vault
 (the command leaves PATH), your data stays in place, and the restore steps
 are written to the vault.
 
@@ -219,9 +216,9 @@ No. Everything runs locally.
 No administrator rights needed.
 
 ```bash
-npx clicleaner              # try without installing
+npx clicleaner scan        # try without installing
 npm install -g clicleaner   # install globally
-clicleaner                  # open the browser UI
+clicleaner                  # print the command list
 ```
 
 Run from source:
@@ -240,8 +237,7 @@ because the backup vault lives there, do not delete it by hand either.
 
 | Problem | Fix |
 |---|---|
-| Browser did not open | Paste the `http://localhost:<port>` address from the terminal |
-| "Invalid token" | A new token is generated on every start; close the old tab |
+| "Invalid token" | A new token is generated on every start; close the old address |
 | Terminal UI looks broken | Use a real terminal (PowerShell / Windows Terminal) |
 | Non-Windows system | Only Windows is supported for now |
 
@@ -250,7 +246,7 @@ because the backup vault lives there, do not delete it by hand either.
 ## Usage
 
 ```bash
-clicleaner                     # browser UI (recommended)
+clicleaner                     # command list and help
 clicleaner scan                # scan and list in the terminal
 clicleaner scan --root .       # report project-internal leftovers only
 clicleaner clean --dry-run     # show the plan only, delete nothing
@@ -259,7 +255,8 @@ clicleaner undo --restore      # restore from the vault
 clicleaner repair --dry-run    # show broken / partial installations
 clicleaner repair              # repair (ONAR confirmation; live output)
 clicleaner quarantine <ad>     # move a standalone tool to the vault (KARANTINA confirmation)
-clicleaner ui --tui            # terminal UI (optional)
+clicleaner ui                  # terminal UI (Ink; needs a real terminal)
+clicleaner api                 # headless HTTP/SSE API (no UI; 127.0.0.1)
 ```
 
 For more: `clicleaner help`
@@ -279,8 +276,7 @@ npx clicleaner@latest      # run the latest version without installing
 - npm: <https://www.npmjs.com/package/clicleaner>
 - GitHub releases: <https://github.com/omer-denen/CLICleaner/releases>
 
-In the UI, **Settings → Update policy** explains what would and would not be
-sent, and lists the manual update links.
+The automatic update check is **off** by default (no network request is made).
 
 ---
 
@@ -288,5 +284,5 @@ sent, and lists the manual update links.
 
 MIT — see [LICENSE](LICENSE).
 
-CLICleaner never sends data anywhere; the UI runs only on your machine.
+CLICleaner never sends data anywhere; everything runs on your machine.
 The deletion decision always belongs to you.

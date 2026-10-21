@@ -1,5 +1,9 @@
 # 3 Sütunlu Geliştirici Konsolu — Tasarım ve Uygulama Planı
 
+> **ARŞİV (21.10.2026, sürüm 2.0.0):** Tarayıcı arayüzü projeden söküldü
+> (P0-P5 uygulanmıştı, P6 açık kalmıştı). Bu belge tarihsel kayıttır.
+> Yeniden yapım planı: **`docs/WEB-REBUILD-PLAN.md`**.
+>
 > Dalga: **D3 — Geliştirici Konsolu** · Görev: **T42**
 > Durum: **plan** (kod yazılmadı). Bu belge, uygulama sırasını ve kabul
 > ölçütlerini sabitler. Çelişkiler bölümü kullanıcı kararı ister.
