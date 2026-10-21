@@ -166,7 +166,8 @@ npm run build:web     # 386.37 KB JS / 109.96 KB gzip; 21.23 KB CSS
    alışkanlığı olanlar için hata mesajı var.
 5. **T54** (eski CLICleaner kalıntıları) planlı; uygulanmadı.
 6. GitHub Release `v2.1.0` hâlâ elle.
-7. Sunucu `:4399` oturumluk; yeni oturumda yeniden başlatılmalı.
+7. Sunucu `:4399` oturumluk; **oturum kapanırken durduruldu**, yeni
+   oturumda yeniden başlatılmalı.
 
 ---
 
@@ -194,3 +195,71 @@ npm run build:web     # 386.37 KB JS / 109.96 KB gzip; 21.23 KB CSS
 | `web/src/i18n.ts`, `labels.ts`, `styles.css` | TR/EN + stiller |
 | `tests/approval.test.ts`, `tests/api.test.ts` | `PLANLA`, API testleri |
 | `docs/T44-PLAN.md`, `CHANGELOG.md`, `AGENTS.md`, `state.json` | Durum güncellemesi |
+
+---
+
+## 10. Oturum kapanışı — sonraki oturum için
+
+**Kullanıcı kararı (21.10.2026):** M5 **bir sonraki oturumda** yapılacak.
+Bu oturum M4 ile kapatıldı.
+
+### 10.1 Bırakılan durum
+
+- **Commit:** `40a75a5` — “2.2.0 M4: planlar + ayarlar + guncelleme”.
+  **Push yapılmadı.**
+- Çalışma ağacı temiz (AGENTS.md, SESSION_LOG.md, state.json `.gitignore`).
+- `npm test` **92/92**; typecheck temiz; `build:web` **109.96 KB gzip**.
+- `package.json` hâlâ **2.1.0**; 2.2.0 `[Unreleased]`.
+- **Sunucu kapatıldı.** `:4399` dinlemiyor; yeni oturumda yeniden başlat.
+- Ego-browser space 5 bu oturuma aitti; yeni oturumda yeni space açılabilir.
+
+### 10.2 Sonraki oturumun ilk adımları
+
+1. **Oku:** `AGENTS.md` → `SESSION_LOG.md` (en üst M4) →
+   `docs/HANDOVER-2026-10-21g.md` (bu belge) → `docs/T44-PLAN.md` (M5).
+2. **Doğrula:** `git status`, `git log -1`, `npm run typecheck`,
+   `npm test`, `npm run build:web`.
+3. **Sunucuyu başlat:**
+   `node bin/residue.mjs ui --web --no-browser --port 4399`
+   (veya varsayılan port). Çıktıdaki token yalnız `ui --web` gerekmez;
+   tarayıcı `GET /` ile çerezi alır.
+4. **Tarayıcı:** `ego-browser skill` çıktısını izle; tek TaskSpace aç;
+   Araçlar / PATH & Ortam / Graf / Planlar / Ayarlar / Projeler ekranlarını
+   kısa bir turla kontrol et.
+
+### 10.3 M5 kabul listesi (öneri)
+
+- **Klavye-only tur:** nav, tablolar, formlar, onay ifadeleri; `Tab`,
+  `Enter`, `Esc`, `Space`, `/` davranışları.
+- **a11y:** `aria-label`, odak halkası, kontrast, form etiketleri;
+  `role="alert"` hataları.
+- **Headless smoke:** `ui --web` + `GET /` çerezi + tüm API uçları 200/401.
+- **Paket smoke:** `npm pack` → boş klasörde `npx residue-cleaner@2.2.0`
+  (veya yerel tarball) → arayüz açılır; URL'de token yok.
+- **Sürüm:** `CHANGELOG` `[2.2.0]` (teknik detay yok), `npm version minor`
+  → **2.2.0**, tag `v2.2.0`, `npm publish`.
+- **GitHub Release:** `gh` yok; sayfa **elle**, başlık = tag adı
+  (AGENTS 17). **Tag/publish kullanıcı onayı olmadan yapılmaz.**
+- **T54** hâlâ planlı; M5 kapsamında değil.
+
+### 10.4 Bilinen tuzaklar
+
+- **Eski sunucu:** Eski bir `:4399` süreci yeni `dist/web` ile karışırsa
+  “Bilinmeyen uç nokta” görülür. Sunucuyu yeni kodla başlat.
+- **Ego-browser PATH:** `ego-browser` PATH'te olmayabilir; tam yol
+  `C:\Program Files\Citro Labs\ego lite\Application\<sürüm>\ego-browser.exe`.
+  PowerShell'de çok satırlı script `-e` ile verilmez; UTF-8 `.mjs` dosyası
+  ve `-e "await import('file:///...')"` kullan.
+- **CLI plan kuralı:** `residue schedule add` artık `--phrase PLANLA`
+  istiyor; eski komutlar hata verir.
+- **Gerçek plan çalıştırma** hâlâ test edilmedi; M5'te istenirse küçük,
+  güvenli bir kural ve kasa ile denenmeli.
+
+### 10.5 Açık kararlar
+
+1. 2.2.0 yayını M5 sonunda mı, ayrı bir onayla mı? (Öneri: M5 sonunda,
+   kullanıcı onayıyla.)
+2. T54 (eski CLICleaner kalıntıları) 2.2.0 sonrası mı? (Mevcut plan: sonra.)
+3. Plan çalıştırma gerçek cihaz testi M5'e dahil mi? (Öneri: evet, küçük
+   ve geri alınabilir tek kural.)
+
