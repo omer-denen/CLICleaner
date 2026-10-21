@@ -64,6 +64,8 @@ import type {
   LatestResponse,
   MetaResponse,
   PlanRequest,
+  ProjectSort,
+  ProjectTab,
   ScanRequest,
   ScanStartResponse,
   ScanStatusResponse,
@@ -574,6 +576,11 @@ async function handleRequest(
   // -------------------------------------------------------------------------
   // Proje bagimliliklari (yeni motor)
   // -------------------------------------------------------------------------
+  if (route === 'GET /api/projects/roots') {
+    sendJson(res, 200, await ctx.projects.roots());
+    return;
+  }
+
   if (req.method === 'GET' && pathname === '/api/projects') {
     const dir = url.searchParams.get('path');
     if (!dir) {
@@ -593,10 +600,23 @@ async function handleRequest(
       .filter(Boolean);
     const maxDepth = Number(url.searchParams.get('maxDepth') ?? '3');
     const maxProjects = Number(url.searchParams.get('maxProjects') ?? '200');
-    const view = await ctx.projects.discover(roots, {
-      maxDepth: Number.isFinite(maxDepth) ? maxDepth : 3,
-      maxProjects: Number.isFinite(maxProjects) ? maxProjects : 200,
-    });
+    const tabRaw = url.searchParams.get('tab') ?? 'all';
+    const tab: ProjectTab =
+      tabRaw === 'artifacts' || tabRaw === 'git' || tabRaw === 'agent' ? tabRaw : 'all';
+    const sort: ProjectSort = url.searchParams.get('sort') === 'name' ? 'name' : 'recent';
+    const view = await ctx.projects.discover(
+      roots,
+      {
+        maxDepth: Number.isFinite(maxDepth) ? maxDepth : 3,
+        maxProjects: Number.isFinite(maxProjects) ? maxProjects : 200,
+      },
+      {
+        text: url.searchParams.get('text') ?? '',
+        tab,
+        sort,
+      },
+      url.searchParams.get('refresh') === '1',
+    );
     sendJson(res, 200, view);
     return;
   }

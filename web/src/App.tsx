@@ -11,6 +11,7 @@ import { formatBytes } from './format.ts';
 import { Dashboard } from './screens/Dashboard.tsx';
 import { Disk } from './screens/Disk.tsx';
 import { PlanScreen } from './screens/PlanScreen.tsx';
+import { Projects } from './screens/Projects.tsx';
 import { Vault } from './screens/Vault.tsx';
 
 type Screen =
@@ -45,7 +46,7 @@ const SCAN_KEY: Record<ScanStatusResponse['state'], MessageKey> = {
   scanning: 'scan.scanning',
 };
 
-const WIDE: Screen[] = ['disk', 'plan', 'vault'];
+const WIDE: Screen[] = ['disk', 'plan', 'vault', 'projects'];
 
 export function App() {
   const [lang, setLang] = useState<Lang>(() =>
@@ -188,13 +189,17 @@ export function App() {
             />
           )}
 
+          {!loading && !error && screen === 'projects' && (
+            <Projects lang={lang} />
+          )}
+
           {!loading && !error && screen === 'vault' && (
             <Vault lang={lang} onChanged={() => void load()} />
           )}
 
           {!loading &&
             !error &&
-            !['dashboard', 'disk', 'plan', 'vault'].includes(screen) && (
+            !['dashboard', 'disk', 'plan', 'projects', 'vault'].includes(screen) && (
               <div className="state">{t('common.soon')}</div>
             )}
         </main>

@@ -16,7 +16,13 @@ import type { Risk } from './types.ts';
  * Bu modul SAF TypeScript'tir: node builtin importu YOKTUR.
  */
 
-export type ApprovalKind = 'delete' | 'vaultMove' | 'repair' | 'quarantine' | 'vaultPurge';
+export type ApprovalKind =
+  | 'delete'
+  | 'vaultMove'
+  | 'repair'
+  | 'quarantine'
+  | 'vaultPurge'
+  | 'projectRestore';
 
 const PHRASES = {
   /** Kalici silme (yalniz purge). */
@@ -26,6 +32,8 @@ const PHRASES = {
   repair: 'ONAR',
   quarantine: 'KARANTINA',
   vaultPurge: 'BOŞALT',
+  /** Proje tarifini (bagimliliklari) yeniden kurma. */
+  projectRestore: 'KUR',
 } as const satisfies Record<ApprovalKind, string>;
 
 export class ApprovalRules {

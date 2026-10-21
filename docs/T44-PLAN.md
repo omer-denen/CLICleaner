@@ -1,6 +1,6 @@
 # T44 — Arayüz ürün planı (iki profilli konsol)
 
-> **Durum: PLAN + M0 temeli (21.10.2026).** Bu belge
+> **Durum: PLAN + M0-M2 (21.10.2026).** Bu belge
 > `docs/WEB-REBUILD-PLAN.md`'nin yerini alır; oradaki mimari kurallar
 > (motor/arayüz ayrımı) geçerlidir.
 >
@@ -101,6 +101,15 @@ Her ikisi de `tests/` ile doğrulanır. `GET /api/dashboard` ve
 
 Sürüm: **2.2.0** (yeni özellik = minor). M3–M4 sarkarsa 2.2.0 M0–M2 ile
 çıkar, kalanı 2.3.0 olur.
+
+**M2 tamam (21.10.2026, SALT OKUNUR):** `core/project-view.ts`
+(`ProjectList` + `ProjectAnalysis`), `GET /api/projects/roots`,
+`/api/projects/discover` filtre/sıralama/sayım + 60 sn önbellek,
+`/api/projects?path=` artifact + lockfile hash + kurulum/doğrulama tarifi.
+Projeler ekranı: kök düzenleyici, motor özeti, sekmeler (Tümü / bağımlılıklı /
+Git / ajan alanı), arama, sıralama, proje raporu ve plan engelleri.
+Silme, plan yürütme ve tarif çalıştırma arayüzde **yok**; `projects/plan` ve
+`projects/restore` uçları (`KUR` onayı) sonraki dilimdedir.
 
 ---
 

@@ -5,6 +5,11 @@ import type {
   ExecuteStartResponse,
   MetaResponse,
   PlanResponse,
+  ProjectAnalysisResponse,
+  ProjectListResponse,
+  ProjectRootsResponse,
+  ProjectSort,
+  ProjectTab,
   ScanStartResponse,
   ScanStatusResponse,
   VaultListResponse,
@@ -65,6 +70,15 @@ export interface DiskQuery {
   selected: string[];
 }
 
+export interface ProjectDiscoverQuery {
+  roots: string[];
+  text: string;
+  tab: ProjectTab;
+  sort: ProjectSort;
+  /** Kesif onbellegini atla (kullanici "Tara" dedi). */
+  refresh?: boolean;
+}
+
 export const api = {
   meta: (): Promise<MetaResponse> => request<MetaResponse>('/api/meta'),
   dashboard: (): Promise<DashboardResponse> => request<DashboardResponse>('/api/dashboard'),
@@ -86,6 +100,25 @@ export const api = {
 
   cluster: (key: string): Promise<ClusterDetailView> =>
     request<ClusterDetailView>(`/api/cluster?key=${encodeURIComponent(key)}`),
+
+  /** Onerilen kesif kokleri (salt okunur). */
+  projectRoots: (): Promise<ProjectRootsResponse> =>
+    request<ProjectRootsResponse>('/api/projects/roots'),
+
+  /** Proje kesfi: filtre/siralama/sayim MOTORDAN gelir. */
+  discoverProjects: (q: ProjectDiscoverQuery): Promise<ProjectListResponse> => {
+    const p = new URLSearchParams();
+    for (const root of q.roots) p.append('roots', root);
+    if (q.text) p.set('text', q.text);
+    p.set('tab', q.tab);
+    p.set('sort', q.sort);
+    if (q.refresh) p.set('refresh', '1');
+    return request<ProjectListResponse>(`/api/projects/discover?${p.toString()}`);
+  },
+
+  /** Tek proje analizi (SALT OKUNUR; artifact + tarif + hash). */
+  projectAnalysis: (path: string): Promise<ProjectAnalysisResponse> =>
+    request<ProjectAnalysisResponse>(`/api/projects?path=${encodeURIComponent(path)}`),
 
   startScan: (body: {
     envs?: string[];

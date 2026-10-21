@@ -1,4 +1,5 @@
 import { readdir, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { longPath } from '../util/longpath.ts';
 import type { ProjectCandidateView, ProjectDiscoverResponse } from './contract.ts';
@@ -70,6 +71,32 @@ export interface ProjectDiscoveryOptions {
   maxProjects?: number;
   /** Ek olarak atlanacak mutlak yollar. */
   exclude?: string[];
+}
+
+/** Tek klasorun proje kimligi (SALT OKUNUR; agir analiz yapmaz). */
+export async function describeProject(dir: string): Promise<ProjectCandidateView | null> {
+  const abs = resolve(dir);
+  const entries = await listDir(abs);
+  if (!entries) return null;
+  return candidate(abs, entries);
+}
+
+/**
+ * Onerilen kesif kokleri: sunucunun calisma dizini ve kullanici profili.
+ * Yalnizca VAR OLAN dizinler doner; en fazla `max` kok.
+ */
+export async function suggestProjectRoots(max = 5): Promise<string[]> {
+  const out: string[] = [];
+  for (const candidateRoot of [process.cwd(), homedir()]) {
+    const abs = resolve(candidateRoot);
+    if (out.some((p) => p.toLocaleLowerCase('tr-TR') === abs.toLocaleLowerCase('tr-TR'))) {
+      continue;
+    }
+    const s = await stat(longPath(abs)).catch(() => null);
+    if (s?.isDirectory()) out.push(abs);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 interface Entry {

@@ -8,6 +8,7 @@ import type {
 } from './types.ts';
 import type { CategoryKey, CategoryStat } from './categories.ts';
 import type { CliInventory, CliTool } from './cli-inventory-types.ts';
+import type { Ecosystem, ProjectCleanupMode } from './project-deps.ts';
 
 /**
  * Web arayuzu ile sunucu arasindaki veri sozlesmesi.
@@ -696,6 +697,130 @@ export interface ProjectDiscoverResponse {
   projects: ProjectCandidateView[];
   truncated: boolean;
   skipped: number;
+}
+
+export type ProjectTab = 'all' | 'artifacts' | 'git' | 'agent';
+export type ProjectSort = 'recent' | 'name';
+
+export interface ProjectListSummaryView {
+  /** Kesifte bulunan toplam proje (filtreden bagimsiz). */
+  total: number;
+  /** Filtreden gecen proje. */
+  visible: number;
+  withArtifacts: number;
+  git: number;
+  agentWorkspace: number;
+  lockfile: number;
+}
+
+/**
+ * Proje listesi: kesif + MOTORUN filtre/siralama/sayim sonucu.
+ * Arayuz kendi listesini uretmez; yalnizca bu yaniti gosterir.
+ */
+export interface ProjectListResponse extends ProjectDiscoverResponse {
+  generatedAt: number;
+  counts: Record<ProjectTab, number>;
+  summary: ProjectListSummaryView;
+  text: string;
+  tab: ProjectTab;
+  sort: ProjectSort;
+}
+
+export interface ProjectRootsResponse {
+  roots: string[];
+  maxDepth: number;
+  maxProjects: number;
+}
+
+/** Proje ici yeniden uretilebilir klasorun SALT OKUNUR gorunumu. */
+export interface ProjectArtifactView {
+  artifactPath: string;
+  artifactName: string;
+  ecosystem: Ecosystem;
+  packageManager: string;
+  manifest: string | null;
+  lockfile: string | null;
+  lockfileHash: string | null;
+  monorepo: boolean;
+  patches: boolean;
+  localDeps: boolean;
+  lockfileTracked: boolean;
+  artifactTracked: boolean;
+  runtimeInstalled: boolean;
+  runtime: { name: string; version: string | null; installed: boolean };
+  recentlyActive: boolean;
+  idleDays: number;
+  bytes: number;
+  realisticBytes: number;
+  regenerable: boolean;
+  risks: string[];
+  installCommand: string;
+  verifyCommand: string | null;
+}
+
+export interface ProjectPlannedArtifactView {
+  artifactPath: string;
+  bytes: number;
+  realisticBytes: number;
+  regenerable: boolean;
+}
+
+export interface ProjectBlockedArtifactView {
+  artifactPath: string;
+  reason: string;
+}
+
+export interface ProjectPlanView {
+  mode: ProjectCleanupMode;
+  planned: ProjectPlannedArtifactView[];
+  blocked: ProjectBlockedArtifactView[];
+  warnings: string[];
+  totalBytes: number;
+  realisticBytes: number;
+}
+
+export interface ProjectSummaryView {
+  artifacts: number;
+  regenerable: number;
+  tracked: number;
+  risks: number;
+  totalBytes: number;
+  realisticBytes: number;
+}
+
+/** Proje detayi: yalnizca ARTIFACT'lar raporlanir; kaynak asla hedef degil. */
+export interface ProjectAnalysisResponse {
+  root: string;
+  name: string;
+  markers: string[];
+  git: boolean;
+  agentWorkspace: boolean;
+  artifacts: ProjectArtifactView[];
+  plan: ProjectPlanView;
+  summary: ProjectSummaryView;
+}
+
+export interface ProjectPlanResponse extends ProjectAnalysisResponse {
+  planId: string;
+  /** Yazili onay ifadesi; deger ApprovalRules'tan gelir (projectRestore). */
+  phrase: string;
+  approvalKind: 'projectRestore';
+  expiresAt: number;
+}
+
+export interface ProjectRestoreResultView {
+  ok: boolean;
+  projectRoot: string;
+  command: string;
+  output: string;
+  error?: string;
+}
+
+export interface ProjectRestoreResponse {
+  ok: boolean;
+  results: ProjectRestoreResultView[];
+  restored: number;
+  failed: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -82,6 +82,14 @@ test('dashboard ve proje kesfi uclari yanit verir', async () => {
   assert.ok(Array.isArray(body.cards));
   assert.ok(Array.isArray(body.safeWins));
 
+  const roots = await fetch(`${base}/api/projects/roots`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(roots.status, 200);
+  const rootsBody = (await roots.json()) as { roots?: string[]; maxDepth?: number };
+  assert.ok(Array.isArray(rootsBody.roots));
+  assert.equal(typeof rootsBody.maxDepth, 'number');
+
   const projRoot = join(root, 'proj');
   await mkdir(join(projRoot, '.git'), { recursive: true });
   await writeFile(join(projRoot, 'package.json'), '{}', 'utf8');
@@ -90,13 +98,45 @@ test('dashboard ve proje kesfi uclari yanit verir', async () => {
     { headers: { 'x-residue-token': token } },
   );
   assert.equal(p.status, 200);
-  const pb = (await p.json()) as { projects?: Array<{ name: string }> };
+  const pb = (await p.json()) as {
+    projects?: Array<{ name: string }>;
+    counts?: Record<string, number>;
+    summary?: { total: number; visible: number; git: number };
+    tab?: string;
+    sort?: string;
+  };
   assert.ok(pb.projects?.some((x) => x.name === 'proj'));
+  assert.equal(pb.counts?.all, 1);
+  assert.equal(pb.summary?.total, 1);
+  assert.equal(pb.summary?.visible, 1);
+  assert.equal(pb.summary?.git, 1);
+  assert.equal(pb.tab, 'all');
+  assert.equal(pb.sort, 'recent');
+
+  const filtered = await fetch(
+    `${base}/api/projects/discover?roots=${encodeURIComponent(projRoot)}&tab=agent&text=yok`,
+    { headers: { 'x-residue-token': token } },
+  );
+  assert.equal(filtered.status, 200);
+  const fb = (await filtered.json()) as {
+    projects?: unknown[];
+    counts?: Record<string, number>;
+    tab?: string;
+  };
+  assert.equal(fb.projects?.length, 0);
+  assert.equal(fb.counts?.all, 1);
+  assert.equal(fb.tab, 'agent');
 
   const bad = await fetch(`${base}/api/projects/discover`, {
     headers: { 'x-residue-token': token },
   });
   assert.equal(bad.status, 400);
+
+  const missing = await fetch(
+    `${base}/api/projects?path=${encodeURIComponent(join(root, 'yok-boyle-bir-proje'))}`,
+    { headers: { 'x-residue-token': token } },
+  );
+  assert.equal(missing.status, 404);
 });
 
 test('disk gorunumu ve bilinmeyen kume', async () => {

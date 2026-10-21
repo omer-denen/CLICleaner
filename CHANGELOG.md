@@ -17,6 +17,14 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - **Proje keşfi motoru** (`core/project-discovery.ts`) ve
   `GET /api/projects/discover`: `.git`/manifest/artifact kanıtıyla repo
   listesi; salt okunur, silme hedefi üretmez.
+- **Projeler ekranı (T44 / M2, salt okunur):** kök düzenleyici, motor
+  özeti, sekmeler (tümü / bağımlılıklı / Git / ajan alanı), arama ve
+  sıralama; proje raporunda bağımlılık klasörleri, boyutlar, lockfile
+  hash'i, kurulum/doğrulama tarifi, riskler ve plan engelleri. Filtre,
+  sıralama, sayım ve toplamlar `core/project-view.ts` motorundan gelir.
+  Proje kaynağı hiçbir koşulda hedef değildir; arayüzde silme, plan
+  yürütme veya tarif çalıştırma yoktur. Keşif 60 sn önbelleklidir. Onay
+  kurallarına `projectRestore` (`KUR`) eklendi.
 - **Disk görünümü motoru** (`core/disk-view.ts`) ve `GET /api/disk` /
   `GET /api/cluster`: filtre, sıralama, kategori sayımı ve seçim özeti
   motorda; arayüz yalnız gösterir. Plan ve kasa onay ifadeleri
@@ -32,7 +40,7 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - **Kabuk sınırı testi:** `web/src` Node builtin'i, servis/aksiyon katmanını
   veya çekirdek karar sınıflarını import edemez; yalnız sözleşme tipleri ve
   saf `ApprovalRules` paylaşılır.
-- Test: `npm test` 77 test.
+- Test: `npm test` 84 test.
 
 ### Düzeltildi
 

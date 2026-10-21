@@ -31,6 +31,13 @@ test('kasa tasima TASI, kalici silme SIL', () => {
   assert.equal(ApprovalRules.matches('delete', 'SIL'), true);
 });
 
+test('proje tarifi KUR ister; kaynak silme ifadesi kabul edilmez', () => {
+  assert.equal(ApprovalRules.phrase('projectRestore'), 'KUR');
+  assert.equal(ApprovalRules.matches('projectRestore', ' KUR '), true);
+  assert.equal(ApprovalRules.matches('projectRestore', 'SIL'), false);
+  assert.equal(ApprovalRules.matches('projectRestore', 'kur'), false);
+});
+
 test('plan ifadesi MODA bagli: recycle=TASI, purge=SIL', () => {
   const svc = new DeleteService(() => {});
   const safe = scan([cluster({ key: 'safe' })]);
