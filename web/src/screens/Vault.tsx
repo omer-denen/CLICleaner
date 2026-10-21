@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { VaultListResponse } from '../../../src/core/contract.ts';
+import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
 import { translate, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
@@ -68,6 +69,9 @@ export function Vault({ lang, onChanged }: Props) {
       setBusy(false);
     }
   };
+
+  const phraseOk = !data || ApprovalRules.matches('vaultPurge', phrase);
+  const canPurge = !busy && selected.size > 0 && phraseOk;
 
   const purge = async (): Promise<void> => {
     if (!data || selected.size === 0) return;
@@ -200,7 +204,7 @@ export function Vault({ lang, onChanged }: Props) {
                 type="button"
                 className="danger-button"
                 onClick={() => void purge()}
-                disabled={busy || selected.size === 0}
+                disabled={!canPurge}
               >
                 {t('vault.purge')}
               </button>

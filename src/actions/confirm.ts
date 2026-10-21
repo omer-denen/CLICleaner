@@ -11,7 +11,7 @@ import type { DeleteMode, DeletePlan } from './delete.ts';
  * Asama 2 — ONAY:  risk duzeyine gore farkli guclu onay istenir.
  *
  *   dusuk risk  → sadece "evet"
- *   orta risk  → yazilması gereken ifade ("SIL")
+ *   orta risk  → yazilması gereken ifade (kasa: "TASI", kalici: "SIL")
  *   yuksek risk → her hedef icin ayri onay + yazili ifade
  *
  * Amac: yanlislikla silmeyi imkansiz kilmak. Onay ekranindaki
@@ -63,8 +63,9 @@ export async function confirmPlan(
   const hasHigh = plan.clusters.some((c) => c.risk === 'high');
   const hasMedium = plan.clusters.some((c) => c.risk === 'medium');
 
+  const approvalKind = plan.mode === 'recycle' ? 'vaultMove' : 'delete';
   const phrase = ApprovalRules.requiresPhrase(plan.clusters.map((c) => c.risk))
-    ? ApprovalRules.phrase('delete')
+    ? ApprovalRules.phrase(approvalKind)
     : (opts.phrase ?? '');
   const label = hasHigh ? 'YUKSEK RISK' : hasMedium ? 'ORTA RISK' : 'dusuk risk';
 
@@ -86,7 +87,11 @@ export async function confirmPlan(
     // En tehlikeli durum: her kumeyi tek tek sor
     for (const c of plan.clusters.filter((x) => x.risk === 'high')) {
       stdout.write(`\n  ${c.title}\n    ${c.reason}\n`);
-      const a = await rl.question(`    Bu kume silinsin mi? (evet/hayir): `);
+      const a = await rl.question(
+        plan.mode === 'recycle'
+          ? '    Bu kume kasaya tasinsin mi? (evet/hayir): '
+          : '    Bu kume silinsin mi? (evet/hayir): ',
+      );
       if (!isYes(a)) {
         rl.close();
         return { approved: false, reason: 'kullanici vazgecildi' };
@@ -94,7 +99,9 @@ export async function confirmPlan(
     }
   }
 
-  stdout.write(`\n  ${format(plan.totalBytes)} silinecek (${label})\n`);
+  stdout.write(
+    `\n  ${format(plan.totalBytes)} ${plan.mode === 'recycle' ? 'kasaya tasinacak' : 'silinecek'} (${label})\n`,
+  );
   if (plan.mode === 'recycle') {
     stdout.write('  Aracin kendi kasasina tasinacak - geri alinabilir.\n');
   } else {

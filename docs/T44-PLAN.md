@@ -93,7 +93,7 @@ Her ikisi de `tests/` ile doğrulanır. `GET /api/dashboard` ve
 | Dilim | İş | Kabul |
 |---|---|---|
 | **M0** | Kabuk: Vite+React, `dist/web`, `residue ui --web`, çerez token, API istemcisi, TR/EN, 3 sütun, Genel Bakış | `ui --web` açar; URL'de token yok; ekran yalnız `/api/dashboard` verisini gösterir |
-| **M1** | Disk → Plan → Onay → Kasa | 100+ kümede akıcı; SSE yeniden bağlanır; `SIL` onayı; kasa geri yükleme |
+| **M1** | Disk → Plan → Onay → Kasa | 100+ kümede akıcı; SSE yeniden bağlanır; kasaya taşımada `TASI`, kalıcı silmede `SIL`; kasa geri yükleme |
 | **M2** | Projeler | Repo keşfi; source asla hedef değil; tarif + hash |
 | **M3** | Araçlar + PATH/Env + Graf | Kanal bazlı envanter; graf engeli gerekçeli; env planı yedek gösterir |
 | **M4** | Planlar/Zamanlama + Ayarlar + Güncelleme | Kural oluşturma `PLANLA`; yalnız kasaya taşır |

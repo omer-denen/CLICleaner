@@ -101,8 +101,8 @@ import type {
  *    secebilir: /api/fs/dirs salt okunur klasor listesi doner,
  *    proje taramasi report-only sonuclanir ve silme hedefi uretmez.
  *  - Silme iki asamalidir: once plan (kimlik), sonra onay. Plan
- *    10 dakika sonra duser. Orta/yuksek risk "SIL" yazili onayi
- *    olmadan yurutulmez.
+ *    10 dakika sonra duser. Orta/yuksek risk yazili onay ister
+ *    (kasaya tasima: "TASI", kalici silme: "SIL").
  *  - "Origin" ve "Host" basliklari dogrulanir.
  */
 

@@ -49,8 +49,9 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
 4. Araç geliştirici ve AI araçlarının bıraktığı klasörleri tarar; her birini
    **ne olduğu, silinirse ne olacağı ve gerekçesiyle** listeler. Ölçüm büyük
    klasörlerde birkaç dakika sürebilir; `Ctrl+C` ile durdurabilirsin.
-5. Silmek istediklerini seç → `residue clean` → planı oku → orta/yüksek risk
-   için `SIL` yaz → onayla.
+5. Kasaya taşımak istediklerini seç → `residue clean` → planı oku →
+   orta/yüksek riskte `TASI` yaz → onayla. Kalıcı silme (`--purge`) için
+   `SIL` istenir.
 
 Varsayılan mod **aracın kendi kasası**dır; yanlış karar verirsen geri
 alabilirsin (`residue undo --restore`).
@@ -158,7 +159,8 @@ Bu modda:
 
 - **Kanıt:** her kararın yanında "bunu neden öneriyorum" yazar; kanıt yetersizse
   araç "tanımlanamayan" der ve yalnızca raporlar.
-- **İki aşama:** önce plan, sonra yazılı `SIL` onayı. `--yes` bunu atlayamaz.
+- **İki aşama:** önce plan, sonra yazılı onay. Kasaya taşıma `TASI`,
+  kalıcı silme `SIL`; `--yes` bunu atlayamaz.
 - **Kasa:** varsayılan mod; silinenler aracın kendi kasasına taşınır ve geri alınabilir.
 - **Journal:** her yıkıcı adım önce yazılır; yarım kalan işlem `residue recover` ile raporlanır.
 - **Kanıt ağacı:** her öneri gözlem → kanıt → iddia zinciriyle açıklanır.

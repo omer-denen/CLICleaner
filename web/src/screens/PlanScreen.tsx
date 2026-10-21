@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ExecuteEvent, PlanResponse } from '../../../src/core/contract.ts';
+import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
 import { openEvents } from '../sse.ts';
 import { translate, type Lang, type MessageKey } from '../i18n.ts';
@@ -99,6 +100,10 @@ export function PlanScreen({ plan, lang, onBack, onVault, onReplace, onExecuted 
       setError(err instanceof ApiError ? err.message : String(err));
     }
   };
+
+  const phraseOk = !plan.requiresPhrase || ApprovalRules.matches(plan.approvalKind, phrase);
+  const ackOk = !plan.requiresHighAck || ack;
+  const canExecute = !job && !result && phraseOk && ackOk;
 
   const removeCluster = async (key: string): Promise<void> => {
     const remaining = plan.plan.clusters.filter((c) => c.key !== key).map((c) => c.key);
@@ -229,7 +234,7 @@ export function PlanScreen({ plan, lang, onBack, onVault, onReplace, onExecuted 
             type="button"
             className="primary"
             onClick={() => void execute()}
-            disabled={!!job}
+            disabled={!canExecute}
           >
             {t('plan.execute')}
           </button>

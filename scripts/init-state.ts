@@ -61,7 +61,7 @@ const s: ProjectState = {
       id: 'T5',
       title: 'Iki asamali onay + geri donusum kutusu',
       status: 'done',
-      note: 'Dusuk: evet | Orta/Yuksek: "SIL" yazmali | --yes orta riski bypass EDEMEZ',
+      note: 'Dusuk: evet | Orta/Yuksek: kasa icin TASI, kalici silme icin SIL yazmali | --yes orta riski bypass EDEMEZ',
       updatedAt: now,
     },
     {

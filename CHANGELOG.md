@@ -20,14 +20,26 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - **Disk görünümü motoru** (`core/disk-view.ts`) ve `GET /api/disk` /
   `GET /api/cluster`: filtre, sıralama, kategori sayımı ve seçim özeti
   motorda; arayüz yalnız gösterir. Plan ve kasa onay ifadeleri
-  `ApprovalRules`'tan gelir (`SIL`, `BOŞALT`).
+  `ApprovalRules`'tan gelir: kasaya taşıma **`TASI`**, kalıcı silme `SIL`,
+  kasa boşaltma `BOŞALT`. Arayüz düğmesi bu kurala göre pasif kalır;
+  gerçek doğrulama sunucudadır.
 - **Arayüz M1:** Disk (sanal liste, canlı SSE tarama, filtreler, kanıt
-  paneli), Plan/Onay (yazılı `SIL`, yüksek risk işaretleme, canlı yürütme)
-  ve Kasa (geri yükleme, seçili öğeleri kalıcı silme). Arayüz yalnız istek
-  gönderir; onay ifadeleri sunucudan gelir. Doğrudan yol silme (`purge` yol
-  modu) arayüzde yoktur; kalıcı silme yalnız kasa öğesi kimliğiyle ve
-  `BOŞALT` onayıyla yapılır.
-- Test: `npm test` 72 test.
+  paneli), Plan/Onay (yazılı `TASI`; kalıcı silmede `SIL`, yüksek risk
+  işaretleme, canlı yürütme) ve Kasa (geri yükleme, seçili öğeleri kalıcı
+  silme). Arayüz yalnız istek gönderir; onay ifadeleri sunucudan gelir.
+  Doğrudan yol silme (`purge` yol modu) arayüzde yoktur; kalıcı silme
+  yalnız kasa öğesi kimliğiyle ve `BOŞALT` onayıyla yapılır.
+- **Kabuk sınırı testi:** `web/src` Node builtin'i, servis/aksiyon katmanını
+  veya çekirdek karar sınıflarını import edemez; yalnız sözleşme tipleri ve
+  saf `ApprovalRules` paylaşılır.
+- Test: `npm test` 77 test.
+
+### Düzeltildi
+
+- Kasaya taşıma onayı artık **`TASI`** ister; `SIL` yalnız kalıcı silmede
+  kullanılır. Yazılı onay düğmesi, ifade motorun `ApprovalRules` kuralına
+  uymadan ve yüksek risk işaretlenmeden pasif kalır; sunucu doğrulaması
+  son savunma hattı olarak korunur.
 
 ## [2.1.0] - 2026-10-21
 

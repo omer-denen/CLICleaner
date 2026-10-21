@@ -3,9 +3,9 @@ import type { PlannedClusterView, PlannedTargetView } from './contract.ts';
 /**
  * PLAN OZETI.
  *
- * Plan ekraninda gosterilen sayimlar: risk dagilimi ("SIL" yazili onay
- * gerekip gerekmedigini belirler), hedef turu dagilimi, toplam bayt ve
- * plana girmeyen (korunan) kumeler.
+ * Plan ekraninda gosterilen sayimlar: risk dagilimi (yazili onay gerekip
+ * gerekmedigini belirler; kasa: "TASI", kalici: "SIL"), hedef turu
+ * dagilimi, toplam bayt ve plana girmeyen (korunan) kumeler.
  *
  * Bu modul SAF TypeScript'tir: node builtin importu YOKTUR.
  */
@@ -39,7 +39,7 @@ export class PlanSummary {
   /**
    * Risk dagilimi.
    *
-   * "mediumOrHigh" -> yazili "SIL" onayi gerekir.
+   * "mediumOrHigh" -> yazili onay gerekir (kasa: "TASI", kalici: "SIL").
    * "high"         -> ayrica acik isaretleme gerekir.
    */
   riskCounts(): RiskCounts {

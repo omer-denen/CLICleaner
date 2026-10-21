@@ -49,8 +49,9 @@ It answers one question with evidence: **"What is this folder, and what happens 
    lists each one with **what it is, what deletion would cost and why it
    decided that way**. Measuring large folders can take a few minutes; stop
    it with `Ctrl+C`.
-5. Pick what you want to delete → `residue clean` → read the plan → type
-   `SIL` for medium/high risk → confirm.
+5. Pick what you want to move to the vault → `residue clean` → read the plan
+   → type `TASI` for medium/high risk → confirm. Permanent deletion
+   (`--purge`) asks for `SIL`.
 
 The default mode moves items into the tool's own **vault**, so a wrong
 decision is reversible (`residue undo --restore`).
@@ -156,8 +157,8 @@ In this mode:
 
 - **Evidence:** every decision says why it was made; when evidence is missing
   the tool says "unidentified" and only reports.
-- **Two steps:** a plan first, then a written `SIL` approval. `--yes` cannot
-  bypass it.
+- **Two steps:** a plan first, then a written approval. Vault move asks
+  `TASI`, permanent deletion asks `SIL`; `--yes` cannot bypass it.
 - **Vault:** default mode; deleted items move to the tool's vault and can be restored.
 - **Journal:** every destructive step is written first; interrupted work is reported by `residue recover`.
 - **Evidence tree:** every recommendation is explained as observation → evidence → claim.

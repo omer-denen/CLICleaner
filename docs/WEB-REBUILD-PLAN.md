@@ -82,9 +82,10 @@ disiplini uygulardi: yalnizca "bizim" olan silinir).
    Yeni kural eklerken once motora yaz.
 2. **Motor tek "query.ts" degil, sorumluluk siniflari olur.** God class
    yazmak yasak (AGENTS.md kural 12). Her sinif tek is yapar.
-3. **Arayuzun kendi dogrulama mantigi olmaz.** Onay ifadeleri (`SIL`,
-   `ONAR`, `KARANTINA`), filtreler, siralama, secim ozeti **tek kaynaktan**
-   gelir (`src/core/approval.ts`, `cluster-query.ts`, `plan-clock.ts` ...).
+3. **Arayuzun kendi dogrulama mantigi olmaz.** Onay ifadeleri (`TASI`,
+   `SIL`, `ONAR`, `KARANTINA`, `BOŞALT`), filtreler, siralama, secim ozeti
+   **tek kaynaktan** gelir (`src/core/approval.ts`, `cluster-query.ts`,
+   `plan-clock.ts` ...).
    Istemci sabit literal gondermez; sunucu dogrular.
 4. **Sanal liste + tampon olmadan 100+ kume yavaslar.** Yeniden yapilirsa
    sanal liste (`@tanstack/react-virtual` veya dengi) ve SSE tamponu
@@ -126,7 +127,7 @@ Kurallar (AGENTS.md 11-13, 18):
 | P0 | Arayuz kabugu: yerlesik duzen, koyu tema, TR/EN | Terminal ve genis ekran arasinda kirpma yok |
 | P0 | `GET /api/meta` + `GET /api/latest` ile doldurma | Tarama sonucu ekranda; yenileme sonrasi korunur |
 | P0 | Kume listesi (ilk 25 + `--all`), `ClusterQuery` ile | Siralama/arama motorun ayni sonucunu verir |
-| P0 | Onay duvari: `ApprovalRules.phrase` | Orta/yuksek riskte `SIL` yazilir; kucuk harf kabul edilmez (mevcut kural) |
+| P0 | Onay duvari: `ApprovalRules.phrase` | Orta/yuksek riskte kasaya taşımada `TASI`, kalıcı silmede `SIL` yazılır; küçük harf kabul edilmez (mevcut kural) |
 | P0 | Plan ekrani: kume anahtariyla calisma alani | Plandan cikarma basliga gore degil **anahtara** gore calisir |
 | P1 | Sanal liste + SSE tamponu + "N yeni oge" rozeti | 100+ kume akici kalir |
 | P1 | Kasa ekrani + geri yukleme | `GET /api/vault`, `POST /api/vault/restore` |

@@ -77,6 +77,9 @@ export class DeleteService {
     const risks = plan.clusters.map((c) => c.risk);
     const requiresPhrase = ApprovalRules.requiresPhrase(risks);
     const requiresHighAck = ApprovalRules.requiresHighAck(risks);
+    // Ifade MODA baglidir: kasaya tasima "TASI", kalici silme "SIL".
+    const approvalKind = plan.mode === 'recycle' ? 'vaultMove' : 'delete';
+    const approvalPhrase = ApprovalRules.phrase(approvalKind);
     this.plans.set(planId, {
       planId,
       plan,
@@ -96,7 +99,8 @@ export class DeleteService {
       planId,
       plan: view,
       requiresPhrase,
-      phrase: ApprovalRules.phrase('delete'),
+      approvalKind,
+      phrase: approvalPhrase,
       requiresHighAck,
       expiresAt,
     };
@@ -109,10 +113,11 @@ export class DeleteService {
       this.plans.delete(stored.planId);
       throw new ServiceError(410, 'Plan suresi doldu; yeniden planlayin');
     }
-    if (stored.requiresPhrase && !ApprovalRules.matches('delete', phrase)) {
+    const approvalKind = stored.plan.mode === 'recycle' ? 'vaultMove' : 'delete';
+    if (stored.requiresPhrase && !ApprovalRules.matches(approvalKind, phrase)) {
       throw new ServiceError(
         400,
-        `Onay metni hatali ("${ApprovalRules.phrase('delete')}" bekleniyordu)`,
+        `Onay metni hatali ("${ApprovalRules.phrase(approvalKind)}" bekleniyordu)`,
       );
     }
     if (stored.requiresHighAck && acknowledgeHigh !== true) {

@@ -8,17 +8,21 @@ import type { Risk } from './types.ts';
  * kullanir; boylece istemci ile sunucu farkli ifade bekleyemez.
  *
  * Kurallar:
- *   - Orta veya yuksek risk -> yazili ifade ("SIL") zorunlu.
+ *   - Orta veya yuksek risk -> yazili ifade zorunlu.
+ *     Kasa tasima: "TASI" · kalici silme: "SIL".
  *   - Yuksek risk -> ayrica acik isaretleme zorunlu.
  *   - Karsilastirma buyuk/kucuk harf duyarlidir; bas/son bosluk yok sayilir.
  *
  * Bu modul SAF TypeScript'tir: node builtin importu YOKTUR.
  */
 
-export type ApprovalKind = 'delete' | 'repair' | 'quarantine' | 'vaultPurge';
+export type ApprovalKind = 'delete' | 'vaultMove' | 'repair' | 'quarantine' | 'vaultPurge';
 
 const PHRASES = {
+  /** Kalici silme (yalniz purge). */
   delete: 'SIL',
+  /** Kasaya tasima: geri alinabilir; "sil" demek yaniltici olur. */
+  vaultMove: 'TASI',
   repair: 'ONAR',
   quarantine: 'KARANTINA',
   vaultPurge: 'BOŞALT',

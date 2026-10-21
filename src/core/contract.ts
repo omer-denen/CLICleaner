@@ -289,8 +289,10 @@ export interface PlanRequest {
 export interface PlanResponse {
   planId: string;
   plan: PlanView;
-  /** Orta/yuksek risk varsa "SIL" yazili onayi zorunlu */
+  /** Orta/yuksek risk varsa yazili onay zorunlu (kasa: TASI, kalici: SIL) */
   requiresPhrase: boolean;
+  /** Onay turu: kasa tasima `vaultMove`, kalici silme `delete`. */
+  approvalKind: 'vaultMove' | 'delete';
   /** Sunucunun bekledigi yazili ifade (tek kaynak: ApprovalRules). */
   phrase: string;
   /** Yuksek risk varsa ayrica acik isaretleme zorunlu */
