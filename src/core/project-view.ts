@@ -68,7 +68,7 @@ function haystack(project: ProjectCandidateView): string {
     project.artifacts.join(' '),
   ]
     .join('\n')
-    .toLocaleLowerCase('tr-TR');
+    .toLowerCase();
 }
 
 function compareProjects(
@@ -116,7 +116,7 @@ export class ProjectList {
     const tab = asTab(query.tab);
     const sort = asSort(query.sort);
     const text = (query.text ?? '').trim();
-    const needle = text.toLocaleLowerCase('tr-TR');
+    const needle = text.toLowerCase();
     const filtered = this.projects.filter(
       (project) =>
         inTab(project, tab) && (needle.length === 0 || haystack(project).includes(needle)),

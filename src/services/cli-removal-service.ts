@@ -103,6 +103,7 @@ export class CliRemovalService {
       status: it.tool.status,
       confidence: it.tool.confidence,
       idleDays: it.tool.idleDays,
+      totalBytes: it.tool.totalBytes,
       evidence: it.tool.evidence,
       uninstallCommand: it.uninstallCommand,
       reinstallCommand: it.reinstallCommand,
@@ -130,6 +131,8 @@ export class CliRemovalService {
       totalBytes: plan.totalBytes,
       backupBytes: plan.backupBytes,
       requiresPhrase: true,
+      phrase: ApprovalRules.phrase('delete'),
+      approvalKind: 'delete',
       expiresAt: plan.expiresAt,
       ...(blocked.length > 0 ? { blocked } : {}),
     };

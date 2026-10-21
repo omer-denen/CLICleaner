@@ -44,18 +44,31 @@ test('yeni motor uclari yanit verir', async () => {
     const r = await fetch(`${base}${path}`, { headers: { 'x-residue-token': token } });
     assert.equal(r.status, 200, `${path} -> ${r.status}`);
   }
+
+  const cliView = await fetch(`${base}/api/cli/view`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(cliView.status, 200);
+  assert.equal(await cliView.json(), null);
 });
 
-test('env plani plan kimligi dondurur', async () => {
+test('env plani plan kimligi ve yazili ifade dondurur', async () => {
   const r = await fetch(`${base}/api/env/plan`, {
     method: 'POST',
     headers: { 'x-residue-token': token, 'content-type': 'application/json' },
     body: JSON.stringify({ scope: 'user' }),
   });
   assert.equal(r.status, 200);
-  const body = (await r.json()) as { planId?: string; plan?: unknown };
+  const body = (await r.json()) as {
+    planId?: string;
+    plan?: unknown;
+    phrase?: string;
+    approvalKind?: string;
+  };
   assert.equal(typeof body.planId, 'string');
   assert.ok(body.plan);
+  assert.equal(body.phrase, 'TEMIZLE');
+  assert.equal(body.approvalKind, 'envClean');
 });
 
 test('bilinmeyen plan kimligi 404', async () => {

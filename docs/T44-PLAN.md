@@ -111,6 +111,16 @@ Git / ajan alanı), arama, sıralama, proje raporu ve plan engelleri.
 Silme, plan yürütme ve tarif çalıştırma arayüzde **yok**; `projects/plan` ve
 `projects/restore` uçları (`KUR` onayı) sonraki dilimdedir.
 
+**M3 tamam (21.10.2026):** `core/cli-view.ts` (`CliView` filtre/sıralama/
+kaynak sayımı/seçilebilir kimlik), `GET /api/cli/view`, CLI kaldırma planı
+`SIL` + `approvalKind: delete`; `env-engine` onayı `ApprovalRules`
+(`envClean` = `TEMIZLE`), `POST /api/env/plan` ifadeyi döndürür; grafik
+`GraphViewResponse` + `GraphWhatIfResponse` sözleşmeye taşındı.
+Ekranlar: **Araçlar** (SSE envanter, durum/kanal, detay, kaldırma planı),
+**PATH & Ortam** (bulgular, plan öncesi/sonrası, yedek notu ve sonucu,
+yazılı `TEMIZLE`), **Graf** (düğüm/kenar, kök neden, what-if engeli).
+Graf/Env ekranlarında yazma yalnız plandan sonra ve yazılı onayla yapılır.
+
 ---
 
 ## 5. Açık işler

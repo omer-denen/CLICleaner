@@ -81,7 +81,7 @@ async function cleanRoots(roots: string[]): Promise<string[]> {
     if (typeof raw !== 'string' || raw.trim().length === 0) continue;
     const abs = resolve(raw.trim());
     if (!isAbsolute(abs)) continue;
-    if (out.some((p) => p.toLocaleLowerCase('tr-TR') === abs.toLocaleLowerCase('tr-TR'))) {
+    if (out.some((p) => p.toLowerCase() === abs.toLowerCase())) {
       continue;
     }
     const s = await stat(longPath(abs)).catch(() => null);

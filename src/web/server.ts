@@ -23,6 +23,7 @@ import { exists } from '../actions/restore.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
 import { CATEGORY_ORDER } from '../core/categories.ts';
 import { DiskView, toClusterDetail } from '../core/disk-view.ts';
+import { CliView } from '../core/cli-view.ts';
 import type { QueryCriteria } from '../core/cluster-query.ts';
 import { ApprovalRules } from '../core/approval.ts';
 import { buildFindings } from '../core/findings.ts';
@@ -766,6 +767,24 @@ async function handleRequest(
 
   if (route === 'POST /api/cli/inventory') {
     await handleCliInventory(req, res, ctx);
+    return;
+  }
+
+  // Envanter onbelleginden MOTOR filtreli arac listesi. Envanter yoksa
+  // `null` doner; agir tarama tetiklemez.
+  if (route === 'GET /api/cli/view') {
+    const inv = ctx.inventory.getLast();
+    if (!inv) {
+      sendJson(res, 200, null);
+      return;
+    }
+    const view = new CliView(inv).view({
+      text: url.searchParams.get('text') ?? '',
+      status: url.searchParams.get('status') ?? 'all',
+      source: url.searchParams.get('source') ?? 'all',
+      sort: url.searchParams.get('sort') ?? 'status',
+    });
+    sendJson(res, 200, view);
     return;
   }
 

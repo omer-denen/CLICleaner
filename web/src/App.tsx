@@ -10,8 +10,11 @@ import { translate, type Lang, type MessageKey } from './i18n.ts';
 import { formatBytes } from './format.ts';
 import { Dashboard } from './screens/Dashboard.tsx';
 import { Disk } from './screens/Disk.tsx';
+import { Env } from './screens/Env.tsx';
+import { Graph } from './screens/Graph.tsx';
 import { PlanScreen } from './screens/PlanScreen.tsx';
 import { Projects } from './screens/Projects.tsx';
+import { Tools } from './screens/Tools.tsx';
 import { Vault } from './screens/Vault.tsx';
 
 type Screen =
@@ -46,7 +49,15 @@ const SCAN_KEY: Record<ScanStatusResponse['state'], MessageKey> = {
   scanning: 'scan.scanning',
 };
 
-const WIDE: Screen[] = ['disk', 'plan', 'vault', 'projects'];
+const WIDE: Screen[] = [
+  'disk',
+  'plan',
+  'vault',
+  'projects',
+  'tools',
+  'env',
+  'graph',
+];
 
 export function App() {
   const [lang, setLang] = useState<Lang>(() =>
@@ -193,15 +204,28 @@ export function App() {
             <Projects lang={lang} />
           )}
 
+          {!loading && !error && screen === 'tools' && <Tools lang={lang} />}
+
+          {!loading && !error && screen === 'env' && <Env lang={lang} />}
+
+          {!loading && !error && screen === 'graph' && <Graph lang={lang} />}
+
           {!loading && !error && screen === 'vault' && (
             <Vault lang={lang} onChanged={() => void load()} />
           )}
 
           {!loading &&
             !error &&
-            !['dashboard', 'disk', 'plan', 'projects', 'vault'].includes(screen) && (
-              <div className="state">{t('common.soon')}</div>
-            )}
+            ![
+              'dashboard',
+              'disk',
+              'plan',
+              'projects',
+              'tools',
+              'env',
+              'graph',
+              'vault',
+            ].includes(screen) && <div className="state">{t('common.soon')}</div>}
         </main>
 
         {!wide && (

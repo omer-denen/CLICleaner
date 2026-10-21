@@ -7,7 +7,9 @@ import type {
   VerdictKind,
 } from './types.ts';
 import type { CategoryKey, CategoryStat } from './categories.ts';
-import type { CliInventory, CliTool } from './cli-inventory-types.ts';
+import type { CliInventory, CliSource, CliStatus, CliTool } from './cli-inventory-types.ts';
+import type { DependencyLevel, GraphEdge, GraphNode, NodeRole, RootCause, WhatIfResult } from './dependency-graph.ts';
+import type { EnvFinding, EnvPlan } from './env-engine.ts';
 import type { Ecosystem, ProjectCleanupMode } from './project-deps.ts';
 
 /**
@@ -381,14 +383,21 @@ export interface ApiErrorBody {
 // ---------------------------------------------------------------------------
 
 export type {
+  CommandShadow,
   EnvAnalysis,
+  EnvApplyResult,
   EnvChange,
   EnvFinding,
+  EnvFindingKind,
   EnvPlan,
+  EnvScope,
+  EnvSnapshot,
   EnvVariable,
   PathEntry,
+  RegistryType,
 } from './env-engine.ts';
 export type {
+  BlockedRemoval,
   DependencyLevel,
   EdgeKind,
   EdgeState,
@@ -397,6 +406,7 @@ export type {
   GraphNode,
   GraphNodeKind,
   NodeRole,
+  RootCause,
   WhatIfResult,
 } from './dependency-graph.ts';
 export type {
@@ -415,6 +425,49 @@ export type {
 } from './plan-engine.ts';
 
 // ---------------------------------------------------------------------------
+// Ortam / PATH plani (yazili TEMIZLE onayi ister)
+// ---------------------------------------------------------------------------
+
+export interface EnvPlanResponse {
+  planId: string;
+  plan: EnvPlan;
+  findings: EnvFinding[];
+  expiresAt: number;
+  /** Yazili onay ifadesi (ApprovalRules.envClean). */
+  phrase: string;
+  approvalKind: 'envClean';
+}
+
+// ---------------------------------------------------------------------------
+// Bagimlilik grafigi gorunumu
+// ---------------------------------------------------------------------------
+
+export interface GraphNodeView extends GraphNode {
+  role: NodeRole;
+  level: DependencyLevel;
+}
+
+export interface GraphViewResponse {
+  nodes: GraphNodeView[];
+  edges: GraphEdge[];
+  cycles: string[][];
+  rootCauses: RootCause[];
+  summary: {
+    nodes: number;
+    edges: number;
+    broken: number;
+    shadowed: number;
+    cycles: number;
+    critical: number;
+  };
+}
+
+export interface GraphWhatIfResponse {
+  nodeIds: string[];
+  result: WhatIfResult;
+}
+
+// ---------------------------------------------------------------------------
 // CLI envanteri (SALT OKUNUR) + kaldirma plani
 // ---------------------------------------------------------------------------
 
@@ -423,6 +476,70 @@ export interface CliInventoryRequest {
 }
 
 export type CliInventoryResponse = CliInventory;
+export type { CliSource, CliStatus, CliTool } from './cli-inventory-types.ts';
+
+/** Arac listesi filtresi: durum + kaynak + arama + siralama MOTORDAN gelir. */
+export type CliStatusFilter = 'all' | CliStatus;
+export type CliSourceFilter = 'all' | CliSource;
+export type CliSort = 'status' | 'size' | 'idle' | 'name';
+
+export interface CliViewCounts {
+  total: number;
+  unused: number;
+  unknown: number;
+  protected: number;
+  withStateDirs: number;
+  broken: number;
+}
+
+export interface CliSourceStat {
+  source: CliSource;
+  count: number;
+  bytes: number;
+}
+
+export interface CliViewSummary {
+  total: number;
+  visible: number;
+  unused: number;
+  recent: number;
+  unknown: number;
+  protected: number;
+  broken: number;
+  withStateDirs: number;
+  removable: number;
+  unusedBytes: number;
+  totalBytes: number;
+}
+
+export interface CliViewFilter {
+  text: string;
+  status: CliStatusFilter;
+  source: CliSourceFilter;
+  sort: CliSort;
+}
+
+/**
+ * Arac listesi: envanter + MOTORUN filtre/siralama/sayim sonucu.
+ * `selectableIds` yalnizca gorunen ve kaldirilabilir araclari tasir.
+ */
+export interface CliViewResponse {
+  scannedAt: number;
+  unusedDays: number;
+  tools: CliTool[];
+  duplicates: CliInventory['duplicates'];
+  shimIssues: CliInventory['shimIssues'];
+  pathShadows: CliInventory['pathShadows'];
+  pathChannels?: CliInventory['pathChannels'];
+  nodeRuntimes?: CliInventory['nodeRuntimes'];
+  notes: string[];
+  roots: string[];
+  counts: CliViewCounts;
+  sources: CliSourceStat[];
+  summary: CliViewSummary;
+  selectableIds: string[];
+  filter: CliViewFilter;
+}
 
 /**
  * Envanter artik is olarak baslar; sonuc SSE ile canli akar.
@@ -463,6 +580,8 @@ export interface CliPlanItemView {
   status: string;
   confidence: string;
   idleDays: number;
+  /** Aracin toplam boyutu (plan satiri). */
+  totalBytes: number;
   evidence: string[];
   uninstallCommand: string;
   reinstallCommand: string;
@@ -481,6 +600,9 @@ export interface CliPlanResponse {
   backupBytes: number;
   /** CLI kaldirma her zaman yazili onay ister */
   requiresPhrase: true;
+  /** Yazili onay ifadesi (ApprovalRules.delete). */
+  phrase: string;
+  approvalKind: 'delete';
   expiresAt: number;
   /** Bagimlilik grafigi nedeniyle plana ALINMAYAN araclar. */
   blocked?: Array<{ id: string; command: string; reason: string; dependents: string[] }>;

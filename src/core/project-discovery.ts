@@ -89,7 +89,7 @@ export async function suggestProjectRoots(max = 5): Promise<string[]> {
   const out: string[] = [];
   for (const candidateRoot of [process.cwd(), homedir()]) {
     const abs = resolve(candidateRoot);
-    if (out.some((p) => p.toLocaleLowerCase('tr-TR') === abs.toLocaleLowerCase('tr-TR'))) {
+    if (out.some((p) => p.toLowerCase() === abs.toLowerCase())) {
       continue;
     }
     const s = await stat(longPath(abs)).catch(() => null);

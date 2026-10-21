@@ -1,8 +1,20 @@
 import type {
+  CliExecuteResponse,
+  CliInventoryStartResponse,
+  CliPlanResponse,
+  CliSort,
+  CliSourceFilter,
+  CliStatusFilter,
+  CliViewResponse,
   ClusterDetailView,
   DashboardResponse,
   DiskViewResponse,
+  EnvAnalysis,
+  EnvApplyResult,
+  EnvPlanResponse,
   ExecuteStartResponse,
+  GraphViewResponse,
+  GraphWhatIfResponse,
   MetaResponse,
   PlanResponse,
   ProjectAnalysisResponse,
@@ -119,6 +131,52 @@ export const api = {
   /** Tek proje analizi (SALT OKUNUR; artifact + tarif + hash). */
   projectAnalysis: (path: string): Promise<ProjectAnalysisResponse> =>
     request<ProjectAnalysisResponse>(`/api/projects?path=${encodeURIComponent(path)}`),
+
+  /** Envanter onbelleginden MOTOR filtreli arac listesi (yoksa null). */
+  cliView: (q: {
+    text: string;
+    status: CliStatusFilter;
+    source: CliSourceFilter;
+    sort: CliSort;
+  }): Promise<CliViewResponse | null> => {
+    const p = new URLSearchParams();
+    if (q.text) p.set('text', q.text);
+    p.set('status', q.status);
+    p.set('source', q.source);
+    p.set('sort', q.sort);
+    return request<CliViewResponse | null>(`/api/cli/view?${p.toString()}`);
+  },
+
+  startCliInventory: (unusedDays: number): Promise<CliInventoryStartResponse> =>
+    post<CliInventoryStartResponse>('/api/cli/inventory', { unusedDays }),
+
+  cliCancel: (jobId: string): Promise<{ ok: boolean }> =>
+    post<{ ok: boolean }>(`/api/cli/inventory/${jobId}/cancel`, {}),
+
+  cliPlan: (body: {
+    commands: string[];
+    backup: boolean;
+    unusedDays?: number;
+  }): Promise<CliPlanResponse> => post<CliPlanResponse>('/api/cli/plan', body),
+
+  cliExecute: (planId: string, phrase: string): Promise<CliExecuteResponse> =>
+    post<CliExecuteResponse>('/api/cli/execute', { planId, phrase }),
+
+  envAnalyze: (): Promise<EnvAnalysis> => request<EnvAnalysis>('/api/env'),
+
+  envPlan: (body: {
+    scope: 'user' | 'machine' | 'both';
+    removeMissing: boolean;
+    removeDuplicates: boolean;
+  }): Promise<EnvPlanResponse> => post<EnvPlanResponse>('/api/env/plan', body),
+
+  envApply: (planId: string, phrase: string): Promise<EnvApplyResult> =>
+    post<EnvApplyResult>('/api/env/apply', { planId, phrase }),
+
+  graph: (): Promise<GraphViewResponse> => request<GraphViewResponse>('/api/graph'),
+
+  graphWhatIf: (query: string): Promise<GraphWhatIfResponse> =>
+    post<GraphWhatIfResponse>('/api/graph/what-if', { query }),
 
   startScan: (body: {
     envs?: string[];

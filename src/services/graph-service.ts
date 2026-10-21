@@ -1,33 +1,14 @@
 import {
   buildInventoryGraph,
   type DependencyGraph,
-  type GraphEdge,
-  type GraphNode,
-  type NodeRole,
-  type DependencyLevel,
-  type WhatIfResult,
 } from '../core/dependency-graph.ts';
 import type { CliInventoryService } from './cli-inventory-service.ts';
+import type { GraphViewResponse, GraphWhatIfResponse } from '../core/contract.ts';
 
 /**
  * Bagimlilik grafigi servisi. Envanteri (gerekirse) tazeler ve
  * dugum/kenar gorunumu ile what-if sonucu uretir. Silme YAPMAZ.
  */
-
-export interface GraphView {
-  nodes: Array<GraphNode & { role: NodeRole; level: DependencyLevel }>;
-  edges: GraphEdge[];
-  cycles: string[][];
-  rootCauses: ReturnType<DependencyGraph['rootCauses']>;
-  summary: {
-    nodes: number;
-    edges: number;
-    broken: number;
-    shadowed: number;
-    cycles: number;
-    critical: number;
-  };
-}
 
 export class GraphService {
   private readonly inventory: CliInventoryService;
@@ -47,14 +28,14 @@ export class GraphService {
   }
 
   /** Onbellekte envanter yoksa `null` doner; AGIR tarama tetiklemez. */
-  async viewCached(): Promise<GraphView | null> {
+  async viewCached(): Promise<GraphViewResponse | null> {
     const inv = this.inventory.getLast();
     if (!inv) return null;
     const g = await this.graph(false);
     return this.toView(g);
   }
 
-  private toView(g: DependencyGraph): GraphView {
+  private toView(g: DependencyGraph): GraphViewResponse {
     const roles = g.roles();
     const levels = g.levels();
     const cycles = g.cycles();
@@ -78,11 +59,11 @@ export class GraphService {
     };
   }
 
-  async view(): Promise<GraphView> {
+  async view(): Promise<GraphViewResponse> {
     return this.toView(await this.graph());
   }
 
-  async whatIf(query: string): Promise<{ nodeIds: string[]; result: WhatIfResult }> {
+  async whatIf(query: string): Promise<GraphWhatIfResponse> {
     const g = await this.graph();
     const q = query.toLowerCase();
     const nodeIds = g

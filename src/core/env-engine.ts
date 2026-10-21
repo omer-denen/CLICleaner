@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { dataDir } from './data-dir.ts';
+import { ApprovalRules } from './approval.ts';
 import { longPath } from '../util/longpath.ts';
 import { error as logError, info, warn } from '../util/log.ts';
 
@@ -28,7 +29,7 @@ export type RegistryType = 'REG_SZ' | 'REG_EXPAND_SZ' | 'REG_DWORD' | 'REG_MULTI
 
 export const USER_KEY = 'HKCU\\Environment';
 export const MACHINE_KEY = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment';
-export const ENV_CLEAN_PHRASE = 'TEMIZLE';
+export const ENV_CLEAN_PHRASE = ApprovalRules.phrase('envClean');
 
 export interface EnvVariable {
   name: string;
@@ -645,8 +646,12 @@ export async function applyEnvPlan(
     requiresAdmin: plan.requiresAdmin,
     errors: [],
   };
-  if (opts.phrase.trim().toLocaleUpperCase('tr-TR') !== ENV_CLEAN_PHRASE) {
-    result.errors.push({ name: '*', scope: 'user', reason: `Onay ifadesi hatali (${ENV_CLEAN_PHRASE})` });
+  if (!ApprovalRules.matches('envClean', opts.phrase)) {
+    result.errors.push({
+      name: '*',
+      scope: 'user',
+      reason: `Onay ifadesi hatali (${ENV_CLEAN_PHRASE})`,
+    });
     result.failed++;
     return result;
   }

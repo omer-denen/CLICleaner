@@ -38,6 +38,13 @@ test('proje tarifi KUR ister; kaynak silme ifadesi kabul edilmez', () => {
   assert.equal(ApprovalRules.matches('projectRestore', 'kur'), false);
 });
 
+test('ortam temizligi TEMIZLE ister', () => {
+  assert.equal(ApprovalRules.phrase('envClean'), 'TEMIZLE');
+  assert.equal(ApprovalRules.matches('envClean', ' TEMIZLE '), true);
+  assert.equal(ApprovalRules.matches('envClean', 'temizle'), false);
+  assert.equal(ApprovalRules.matches('envClean', 'SIL'), false);
+});
+
 test('plan ifadesi MODA bagli: recycle=TASI, purge=SIL', () => {
   const svc = new DeleteService(() => {});
   const safe = scan([cluster({ key: 'safe' })]);

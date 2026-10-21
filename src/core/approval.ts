@@ -22,7 +22,8 @@ export type ApprovalKind =
   | 'repair'
   | 'quarantine'
   | 'vaultPurge'
-  | 'projectRestore';
+  | 'projectRestore'
+  | 'envClean';
 
 const PHRASES = {
   /** Kalici silme (yalniz purge). */
@@ -34,6 +35,8 @@ const PHRASES = {
   vaultPurge: 'BOŞALT',
   /** Proje tarifini (bagimliliklari) yeniden kurma. */
   projectRestore: 'KUR',
+  /** PATH / ortam degiskeni duzenlemesi (yedek alinir). */
+  envClean: 'TEMIZLE',
 } as const satisfies Record<ApprovalKind, string>;
 
 export class ApprovalRules {

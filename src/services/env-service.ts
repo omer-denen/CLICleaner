@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { ApprovalRules } from '../core/approval.ts';
 import {
   analyzeEnvironment,
   applyEnvPlan,
@@ -10,6 +11,7 @@ import {
   type EnvPlan,
   type PathCleanupOptions,
 } from '../core/env-engine.ts';
+import type { EnvPlanResponse } from '../core/contract.ts';
 import { ServiceError } from './errors.ts';
 
 /**
@@ -23,13 +25,6 @@ const PLAN_TTL_MS = 10 * 60_000;
 
 interface StoredEnvPlan {
   plan: EnvPlan;
-  expiresAt: number;
-}
-
-export interface EnvPlanResponse {
-  planId: string;
-  plan: EnvPlan;
-  findings: EnvAnalysis['findings'];
   expiresAt: number;
 }
 
@@ -47,7 +42,14 @@ export class EnvService {
     const planId = randomBytes(8).toString('hex');
     const expiresAt = Date.now() + PLAN_TTL_MS;
     this.plans.set(planId, { plan, expiresAt });
-    return { planId, plan, findings: analysis.findings, expiresAt };
+    return {
+      planId,
+      plan,
+      findings: analysis.findings,
+      expiresAt,
+      phrase: ApprovalRules.phrase('envClean'),
+      approvalKind: 'envClean',
+    };
   }
 
   async apply(planId: string, phrase: string): Promise<EnvApplyResult> {
