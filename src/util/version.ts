@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
  * Kurulu surumu okur.
  *
  * `package.json` giris betiginin bir ustunde aranir (global kurulumda:
- * node_modules/clicleaner/package.json). Okunamazsa 'unknown' doner —
+ * node_modules/residue-cleaner/package.json). Okunamazsa 'unknown' doner —
  * surum bilgisi ASLA uydurulmaz.
  */
 export function currentVersion(entry: string = process.argv[1] ?? ''): string {

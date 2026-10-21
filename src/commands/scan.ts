@@ -108,7 +108,7 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
     ? () => {}
     : (msg: string) => process.stderr.write(msg);
 
-  log(`\n  CLICleaner taramasi\n`);
+  log(`\n  Residue taramasi\n`);
   log(`  Ortam      : ${root ? `proje: ${root}` : envs.join(', ')}`);
   if (args.profile) log(`  Profil     : ${args.profile}`);
   log(`  Dizinler   : ${targets.length} aday`);

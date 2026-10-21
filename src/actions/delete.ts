@@ -146,7 +146,7 @@ async function isReparsePoint(path: string): Promise<boolean> {
 
 /** Klasor kilit mi? Atomik rename dener (dosya sistemi bunu garantiler). */
 export async function isLocked(path: string): Promise<boolean> {
-  const tmp = `${path}.clicleaner-locktest-${Date.now()}`;
+  const tmp = `${path}.residue-locktest-${Date.now()}`;
   try {
     await rename(longPath(path), longPath(tmp));
     // basarili: geri al
@@ -642,7 +642,7 @@ export class Journal {
 
   async save(dir: string): Promise<string> {
     const { writeFile } = await import('node:fs/promises');
-    const path = `${dir}\\clicleaner-journal-${Date.now()}.json`;
+    const path = `${dir}\\residue-journal-${Date.now()}.json`;
     await writeFile(path, JSON.stringify(this.entries, null, 2), 'utf8');
     return path;
   }

@@ -1788,7 +1788,7 @@ function decideBase(ctx: {
     kind: 'ask',
     title: `${name} — tanimlanamayan klasor`,
     what: 'Icerigi incelendi ama anlamli bir tur isareti bulunamadi.',
-    consequence: 'Silmeden once `clicleaner explain` ile incele.',
+    consequence: 'Silmeden once `residue explain` ile incele.',
     because: [...because, `Toplam ${totalBytes} bayt, ${(ev.markers ?? []).length} isaret`],
     preconditions: ['Kanit yetersiz: elle dogrula'],
   };

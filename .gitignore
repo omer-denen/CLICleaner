@@ -11,7 +11,7 @@ AGENTS.md
 
 # Test/teshis betikleri ve gecici dosyalar
 scratch/
-.clicleaner/
+.residue/
 *.log
 .web-run*
 *.tsbuildinfo

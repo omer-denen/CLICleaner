@@ -51,7 +51,7 @@ export async function runLog(args: string[]): Promise<void> {
     return;
   }
 
-  console.log(`\n${C.bold}CLICleaner gunlugu${C.reset} ${C.gray}(${entries.length} kayit)${C.reset}`);
+  console.log(`\n${C.bold}Residue gunlugu${C.reset} ${C.gray}(${entries.length} kayit)${C.reset}`);
   console.log(`${C.gray}${'─'.repeat(78)}${C.reset}\n`);
 
   for (const e of entries) {

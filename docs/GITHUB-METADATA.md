@@ -30,7 +30,7 @@ cli-cache
 cli-cleaner
 cli-temizleyici
 cli-tools
-clicleaner
+residue
 conda
 cuda
 developer-tools
@@ -52,13 +52,26 @@ kabul eder.
 ## GitHub Release kuralı (20.10.2026)
 
 Release oluşturulurken **özel başlık/etiket verilmez**; GitHub'un varsayılanı
-kullanılır — yani başlık **tag adıdır** (`v1.0.0`).
+kullanılır — yani başlık **tag adıdır** (`v2.0.0`).
 
-- `gh release create v1.0.0` → `--title` **verilmez**.
+- `gh release create v2.0.0` → `--title` **verilmez**.
 - Release açıklaması istenirse yalnız kısa birkaç satır; sürüm notlarının
   tamamı `CHANGELOG.md` içindedir.
 
 Bu kural `AGENTS.md` 17. maddede de yer alır.
+
+## 2.0.0 release notu (21.10.2026)
+
+Sürüm **major**: tarayıcı arayüzü kaldırıldı. Release açıklaması bunu
+**açıkça** söylemelidir (kullanıcı 1.x'ten yükseltirken neyin kalktığını
+bilmeli):
+
+- Tarayıcı arayüzü kaldırıldı; araç artık **yalnızca terminalden** çalışır.
+- `residue` yardım metnini gösterir, `residue ui` terminal arayüzünü açar.
+- Yeniden yapım planlanıyor: `docs/WEB-REBUILD-PLAN.md`.
+
+About açıklaması ve Topics **değişmedi** (zaten CLI odaklı; `web-ui`,
+`react` gibi etiketler zaten kaldırılmıştı).
 
 ## npm keywords
 

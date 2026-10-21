@@ -46,6 +46,8 @@ export function protectedPaths(): string[] {
     env.APPDATA,
     env.USERPROFILE,
     // Aracin kendi verisi (gunluk, gunluk defteri) korunur.
+    // 2.0.0 sonrasi: `residue`; eski ad (`clicleaner`) de korunur.
+    env.LOCALAPPDATA ? `${env.LOCALAPPDATA}\\residue` : undefined,
     env.LOCALAPPDATA ? `${env.LOCALAPPDATA}\\clicleaner` : undefined,
   ];
   return candidates.filter((p): p is string => typeof p === 'string' && p.length > 0);

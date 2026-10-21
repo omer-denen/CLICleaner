@@ -183,7 +183,7 @@ const RULES: RuleDoc[] = [
 ];
 
 export function runRules(): void {
-  console.log(`\n${C.bold}CLICleaner kurallari${C.reset}`);
+  console.log(`\n${C.bold}Residue kurallari${C.reset}`);
   console.log(`${C.gray}Hicbir uygulama adi kuralda gecmez; yalnizca kanit turleri kullanilir.${C.reset}\n`);
 
   const groups = [

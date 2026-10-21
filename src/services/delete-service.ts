@@ -13,6 +13,7 @@ import { ApprovalRules } from '../core/approval.ts';
 import { newId } from './ids.ts';
 import { ServiceError, describeError } from './errors.ts';
 import type { ScanResult } from '../core/types.ts';
+import { dataDir } from '../core/data-dir.ts';
 import type {
   ExecuteEvent,
   ExecuteStartResponse,
@@ -230,7 +231,7 @@ export class DeleteService {
       let journalPath = '';
       if (journal.all().length > 0) {
         try {
-          const dir = join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'journals');
+          const dir = join(dataDir(), 'journals');
           await mkdir(longPath(dir), { recursive: true });
           journalPath = await journal.save(dir);
         } catch {

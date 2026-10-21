@@ -7,7 +7,7 @@ const C = {
   cyan: '\x1b[36m', gray: '\x1b[90m',
 };
 
-/** `clicleaner status` — projenin nereye kadar geldigini gosterir. */
+/** `residue status` — projenin nereye kadar geldigini gosterir. */
 export async function runStatus(args: string[]): Promise<void> {
   const cwd = process.cwd();
 
@@ -20,7 +20,7 @@ export async function runStatus(args: string[]): Promise<void> {
   if (args.includes('--export')) {
     const s = await readState(cwd);
     if (!s) {
-      console.log(`${C.yellow}state.json yok. Once "clicleaner status --init" calistir.${C.reset}`);
+      console.log(`${C.yellow}state.json yok. Once "residue status --init" calistir.${C.reset}`);
       return;
     }
     process.stdout.write(renderHandoff(s));
@@ -30,7 +30,7 @@ export async function runStatus(args: string[]): Promise<void> {
   const s = await readState(cwd);
   if (!s) {
     console.log(`${C.yellow}Durum dosyasi yok: state.json${C.reset}`);
-    console.log(`${C.dim}Olusturmak icin: clicleaner status --init${C.reset}\n`);
+    console.log(`${C.dim}Olusturmak icin: residue status --init${C.reset}\n`);
     return;
   }
 
@@ -84,8 +84,8 @@ export async function runStatus(args: string[]): Promise<void> {
     console.log('');
   }
 
-  console.log(`${C.dim}Detay: clicleaner status --export${C.reset}`);
-  console.log(`${C.dim}Gunluk: clicleaner log --summary${C.reset}\n`);
+  console.log(`${C.dim}Detay: residue status --export${C.reset}`);
+  console.log(`${C.dim}Gunluk: residue log --summary${C.reset}\n`);
 
   info('status goruntulendi', { done: done.length, wip: wip.length, todo: todo.length, acikHata: openBugs.length });
 }
@@ -96,18 +96,18 @@ function initialState(cwd: string): ProjectState {
     version: 1,
     updatedAt: new Date().toISOString(),
     project: {
-      name: 'CLICleaner',
+      name: 'Residue',
       purpose: 'Disk artiklarini kanitlarla listeleyen, secimini kullaniciya onaylatan temizleyici',
       stack: 'TypeScript + Node 24 + Ink/React (tsx runner)',
       entry: 'src/cli.ts',
     },
     commands: [
-      { cmd: 'node bin/clicleaner.mjs scan', desc: 'Tara ve listele' },
-      { cmd: 'node bin/clicleaner.mjs ui', desc: 'Terminal TUI (Ink)' },
-      { cmd: 'node bin/clicleaner.mjs clean', desc: 'Iki asamali onay + geri donusum kutusu' },
-      { cmd: 'node bin/clicleaner.mjs explain <ad>', desc: 'Karar gerekcesini kanitlarla goster' },
-      { cmd: 'node bin/clicleaner.mjs log --summary', desc: 'Gunluk ozeti' },
-      { cmd: 'node bin/clicleaner.mjs doctor', desc: 'Ortam kontrolu' },
+      { cmd: 'node bin/residue.mjs scan', desc: 'Tara ve listele' },
+      { cmd: 'node bin/residue.mjs ui', desc: 'Terminal TUI (Ink)' },
+      { cmd: 'node bin/residue.mjs clean', desc: 'Iki asamali onay + geri donusum kutusu' },
+      { cmd: 'node bin/residue.mjs explain <ad>', desc: 'Karar gerekcesini kanitlarla goster' },
+      { cmd: 'node bin/residue.mjs log --summary', desc: 'Gunluk ozeti' },
+      { cmd: 'node bin/residue.mjs doctor', desc: 'Ortam kontrolu' },
     ],
     tasks: [],
     bugs: [],

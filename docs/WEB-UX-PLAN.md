@@ -1,4 +1,4 @@
-# WEB UX PLANI — CLICleaner
+# WEB UX PLANI — Residue
 
 > **ARŞİV (21.10.2026, sürüm 2.0.0):** Tarayıcı arayüzü projeden söküldü.
 > Bu plan **uygulanmayacak**; tarihsel kayıt olarak durur. Faz 1-2 yapıldı,
@@ -97,15 +97,15 @@
 
 ### Faz 9 — Masaüstü kısayolu (token'li başlatma) — T40
 
-Amaç: web arayüzündeki bir düğme, masaüstüne **CLICleaner** kısayolu
+Amaç: web arayüzündeki bir düğme, masaüstüne **Residue** kısayolu
 eklesin; kısayol her çalıştırmada sunucuyu başlatsın, **yeni token** üretsin
 ve tarayıcıyı doğrudan arayüze yönlendirsin.
 
 - [ ] Server: `GET/POST/DELETE /api/shortcut/desktop`.
       Masaüstü yolu OS'ten alınır (`[Environment]::GetFolderPath('Desktop')`);
       OneDrive yönlendirmesi böylece kendiliğinden doğru olur.
-- [ ] `.lnk` hedefi: global `clicleaner` shim'i varsa `cmd.exe /k "<shim>" ui`;
-      yoksa `process.execPath` + `bin/clicleaner.mjs ui`. Yollar tırnaklanır.
+- [ ] `.lnk` hedefi: global `residue` shim'i varsa `cmd.exe /k "<shim>" ui`;
+      yoksa `process.execPath` + `bin/residue.mjs ui`. Yollar tırnaklanır.
 - [ ] **Token .lnk içine YAZILMAZ.** Her başlatmada `runWeb` rastgele token
       üretir ve `?token=` ile tarayıcıyı açar (mevcut davranış).
 - [ ] UI: **Ayarlar → Masaüstüne kısayol ekle**; durum + tam yol + **Kaldır**.
@@ -123,7 +123,7 @@ ve tarayıcıyı doğrudan arayüze yönlendirsin.
 **Soru:** Kullanıcı yeni sürüm çıktığını nasıl öğrenecek? Bugün **hiçbir
 mekanizma yok**: uygulama yerel çalışır, telemetri göndermez ve kendini
 güncellemez. `npx` kullanıcısı bir sonraki çalıştırmada zaten yeni sürümü
-alır; **global kurulum** yapan kullanıcı ise `npm i -g clicleaner` yapmadıkça
+alır; **global kurulum** yapan kullanıcı ise `npm i -g residue-cleaner` yapmadıkça
 eski sürümde kalır.
 
 Seçenekler:
@@ -131,14 +131,14 @@ Seçenekler:
 1. **Hiç kontrol yok (bugünkü durum).** "Veri dışarı gitmez" sözü aynen
    korunur; kullanıcı sürümü tesadüfen öğrenir. En az sürpriz, en zayıf
    keşfedilebilirlik.
-2. **Elle kontrol:** Ayarlar → "Sürümü kontrol et" + `clicleaner update`
+2. **Elle kontrol:** Ayarlar → "Sürümü kontrol et" + `residue update`
    (yalnız kontrol, kurulum yok). Tek tıkla tek HTTPS isteği; varsayılan
    **kapalı**. "Veri dışarı gitmez" sözü bozulmaz.
 3. **Otomatik kontrol (varsayılan açık), 24 saat önbellekli.**
-   `https://registry.npmjs.org/clicleaner/latest` adresine yalnız sürüm
-   sorgusu; kimlik/telemetri yok, sonuç `%LOCALAPPDATA%\clicleaner\update.json`
+   `https://registry.npmjs.org/residue-cleaner/latest` adresine yalnız sürüm
+   sorgusu; kimlik/telemetri yok, sonuç `%LOCALAPPDATA%\residue\update.json`
    içinde saklanır. Üst barda bloklamayan "Yeni sürüm var" rozeti +
-   `npm i -g clicleaner` kopyalama düğmesi. README'deki "hiçbir veri dışarı
+   `npm i -g residue-cleaner` kopyalama düğmesi. README'deki "hiçbir veri dışarı
    gönderilmez" cümlesi **"telemetri yok; isteğe bağlı sürüm kontrolü"**
    olarak düzeltilmeli.
 4. **npm `update-notifier`**: CLI çıkışında uyarı basar; web arayüzü
@@ -160,7 +160,7 @@ güvenlik riski); yalnız komut gösterilir.
 - [ ] `GET /api/update` (önbellekli) + `POST /api/update/check` (zorla).
 - [ ] Ayar: `updateCheck: 'off' | 'daily' | 'weekly'`, varsayılan `off`.
 - [ ] Üst bar rozeti + ayar satırı + komut kopyalama.
-- [ ] CLI: `clicleaner update` (yalnız kontrol) ve `--no-update-check`.
+- [ ] CLI: `residue update` (yalnız kontrol) ve `--no-update-check`.
 - [ ] Test: `CLICLEANER_UPDATE_URL` ile sentetik kayıt; TTL, çevrimdışı,
       kapalıyken istek yok.
 - [ ] README veri politikası cümlesini netleştir (otomatik kontrol eklenince).
@@ -171,7 +171,7 @@ güvenlik riski); yalnız komut gösterilir.
    Otomatik çalışan silme yapılmayacak; plan hatırlatıcı + onay üretecek.
 2. **Karantina kararı (kullanıcı):** Windows Geri Dönüşüm Kutusu **iptal**.
    Silinen yollar aracın kendi kasasına taşınır
-   (`%LOCALAPPDATA%\clicleaner\vault\<batch>`), manifest + `.restored-*`
+   (`%LOCALAPPDATA%\residue\vault\<batch>`), manifest + `.restored-*`
    çakışma çözümü vardır. Araştırma notu: Windows Storage Sense zaten
    Recycle Bin'i yaş/kota ile temizler; bu yüzden ayrı bir otomatik
    temizlik YAPILMAZ, saklama yalnızca bilgi olarak gösterilir.
@@ -194,5 +194,5 @@ güvenlik riski); yalnız komut gösterilir.
 ## Varsayımlar
 
 - Tek kullanıcılı yerel uygulama; çok kullanıcı/eşzamanlı tarayıcı yok.
-- Tarama önbelleği `%LOCALAPPDATA%\clicleaner` altında; ayarlar aynı yerde.
+- Tarama önbelleği `%LOCALAPPDATA%\residue` altında; ayarlar aynı yerde.
 - TTL varsayılanı 24 saat, 1–720 saat aralığında değiştirilebilir.

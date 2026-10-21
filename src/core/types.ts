@@ -1,5 +1,5 @@
 /**
- * CLICleaner cekirdek tipleri.
+ * Residue cekirdek tipleri.
  *
  * Tasarim ilkesi: hicbir sey "uygulama adiyla" tanimlanmaz. Bir aday
  * (Candidate) yalnizca gozlenen KANITLARDAN siniflanir. Kanit toplayan

@@ -13,13 +13,13 @@ const C = {
 /**
  * Geri alma: Windows Geri Donusum Kutusu yerine aracin KENDI kasasi.
  *
- * Kaynak: `%LOCALAPPDATA%\clicleaner\vault\<batch>\manifest.json`.
+ * Kaynak: `%LOCALAPPDATA%\residue\vault\<batch>\manifest.json`.
  * Kalici silinen (purge) kayitlar geri getirilemez.
  */
 export async function runUndo(allowPurge: boolean): Promise<void> {
   const entries = await listVaultEntries();
 
-  console.log(`\n${C.bold}CLICleaner — kasa / geri alma${C.reset}\n`);
+  console.log(`\n${C.bold}Residue — kasa / geri alma${C.reset}\n`);
   if (entries.length === 0) {
     console.log(`${C.yellow}Kasada geri alinacak kayit yok.${C.reset}`);
     console.log(`${C.dim}Kalici silinen dosyalar geri getirilemez.${C.reset}\n`);
@@ -41,7 +41,7 @@ export async function runUndo(allowPurge: boolean): Promise<void> {
   }
 
   if (!allowPurge) {
-    console.log(`\n${C.gray}Geri yuklemek icin:${C.reset} ${C.cyan}clicleaner undo --restore${C.reset}\n`);
+    console.log(`\n${C.gray}Geri yuklemek icin:${C.reset} ${C.cyan}residue undo --restore${C.reset}\n`);
     return;
   }
 

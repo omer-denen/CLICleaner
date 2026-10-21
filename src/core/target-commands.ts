@@ -32,12 +32,12 @@ export interface ManualCommand {
 export class TargetCommands {
   /** Karar gerekcesini acar (SALT OKUNUR). */
   static explain(key: string): string {
-    return `clicleaner explain ${key}`;
+    return `residue explain ${key}`;
   }
 
   /** Yalniz verilen kume icin plan uretir; hicbir sey silmez. */
   static dryRun(key: string): string {
-    return `clicleaner clean --only ${key} --dry-run`;
+    return `residue clean --only ${key} --dry-run`;
   }
 
   /** Panelde gosterilen guvenli komutlar. */

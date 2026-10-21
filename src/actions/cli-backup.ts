@@ -3,6 +3,7 @@ import { basename, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
 import { walk } from '../core/walker.ts';
 import { CliCommandText } from '../core/cli-command-text.ts';
+import { dataDir } from '../core/data-dir.ts';
 import type { CliTool } from '../core/cli-inventory-types.ts';
 
 /**
@@ -40,7 +41,7 @@ export interface BackupResult {
 }
 
 export function vaultRoot(): string {
-  return join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'vault');
+  return join(dataDir(), 'vault');
 }
 
 function stamp(): string {

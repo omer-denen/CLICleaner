@@ -7,6 +7,7 @@ import type { Env, SensitiveAllow } from '../core/types.ts';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { longPath, prettyPath } from '../util/longpath.ts';
+import { dataDir } from '../core/data-dir.ts';
 import { markScanDirty } from '../store/scan-cache.ts';
 
 const C = {
@@ -175,7 +176,7 @@ export async function runClean(args: CleanArgs): Promise<void> {
   // --- Gunluk ---
   let journalPath = '';
   try {
-    const dir = join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'journals');
+    const dir = join(dataDir(), 'journals');
     await mkdir(longPath(dir), { recursive: true });
     journalPath = await journal.save(dir);
   } catch {
@@ -195,7 +196,7 @@ export async function runClean(args: CleanArgs): Promise<void> {
     console.log(`${C.red}  Hata       : ${failedCount}${C.reset}`);
   }
   if (mode === 'recycle' && removed > 0) {
-    console.log(`${C.cyan}  Geri al    : "clicleaner undo --restore" ile kasadan${C.reset}`);
+    console.log(`${C.cyan}  Geri al    : "residue undo --restore" ile kasadan${C.reset}`);
   } else if (mode === 'purge' && removed > 0) {
     console.log(`${C.red}  Kalici silindi — geri alinamaz${C.reset}`);
   }

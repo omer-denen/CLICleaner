@@ -1,14 +1,15 @@
 {
-  "name": "clicleaner",
+  "name": "residue-cleaner",
   "version": "2.0.0",
-  "description": "CLI cleaner and evidence-first auditor for developer caches, CLI installs and AI runtime leftovers; shows what each folder is before anything is deleted",
+  "description": "Residue — CLI cleaner and evidence-first auditor for developer caches, CLI installs and AI runtime leftovers; shows what each folder is before anything is deleted",
   "type": "module",
   "license": "MIT",
-  "author": "CLICleaner contributors",
+  "author": "Residue contributors",
   "keywords": [
+    "residue",
+    "residue-cleaner",
     "cli-cleaner",
     "cli-temizleyici",
-    "clicleaner",
     "cli-tools",
     "cli-cache",
     "developer-tools",
@@ -29,11 +30,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/omer-denen/CLICleaner.git"
+    "url": "git+https://github.com/omer-denen/residue-cleaner.git"
   },
-  "homepage": "https://github.com/omer-denen/CLICleaner#readme",
+  "homepage": "https://github.com/omer-denen/residue-cleaner#readme",
   "bugs": {
-    "url": "https://github.com/omer-denen/CLICleaner/issues"
+    "url": "https://github.com/omer-denen/residue-cleaner/issues"
   },
   "os": [
     "win32"
@@ -47,7 +48,7 @@
     "LICENSE"
   ],
   "bin": {
-    "clicleaner": "./bin/clicleaner.mjs"
+    "residue": "./bin/residue.mjs"
   },
   "scripts": {
     "scan": "tsx src/cli.ts scan",
@@ -71,6 +72,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/react": "^19.3.0",
     "typescript": "^5.7.2"
   },
   "engines": {

@@ -12,15 +12,15 @@ const C = {
 /**
  * Bir kumenin kararini kanitlariyla birlikte aciklar.
  *
- * Kullanim:  clicleaner explain muhasib
+ * Kullanim:  residue explain muhasib
  * Tarama yapip anahtarla eslesen kume(leri) bulur.
  */
 export async function runExplain(query: string | undefined, opts: { json?: boolean } = {}): Promise<void> {
   if (!query) {
-    console.log(`Kullanim: clicleaner explain <ad>`);
-    console.log(`Ornek : clicleaner explain muhasib`);
-    console.log(`        clicleaner explain npm-cache`);
-    console.log(`        clicleaner explain wsl`);
+    console.log(`Kullanim: residue explain <ad>`);
+    console.log(`Ornek : residue explain muhasib`);
+    console.log(`        residue explain npm-cache`);
+    console.log(`        residue explain wsl`);
     return;
   }
 

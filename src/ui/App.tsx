@@ -7,6 +7,7 @@ import { prettyPath } from '../util/longpath.ts';
 import { groupByVerdict } from '../core/merge.ts';
 import { DefaultSelection } from '../core/selection.ts';
 import { deleteTarget, Journal, type DeleteMode } from '../actions/delete.ts';
+import { dataDir } from '../core/data-dir.ts';
 import type { Cluster, ScanResult } from '../core/types.ts';
 
 type Screen = 'scan' | 'review' | 'confirm' | 'execute' | 'done';
@@ -220,7 +221,7 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
         const { mkdir } = await import('node:fs/promises');
         const { join } = await import('node:path');
         const { longPath } = await import('../util/longpath.ts');
-        const dir = join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'journals');
+        const dir = join(dataDir(), 'journals');
         await mkdir(longPath(dir), { recursive: true });
         await journal.save(dir);
       } catch {
@@ -308,7 +309,7 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
     return (
       <Box flexDirection="column" paddingY={1}>
         <Text color={color.brightCyan} bold>
-          {'  CLICleaner'}
+          {'  Residue'}
         </Text>
         <Text color={color.gray}> {glyph.dot} Kanit toplaniyor</Text>
         <Box marginTop={1} paddingLeft={2}>
@@ -420,7 +421,7 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
           </Text>
           {skipped > 0 && <Text color={color.gray}>{'  Atlandi   : ' + skipped + ' (kilitli veya cok yeni)'}</Text>}
           {failed > 0 && <Text color={color.red}>{'  Hata      : ' + failed}</Text>}
-          <Text color={color.gray}>{'  Gunluk: clicleaner undo'}</Text>
+          <Text color={color.gray}>{'  Gunluk: residue undo'}</Text>
         </Box>
         <Box marginTop={2} paddingLeft={2}>
           <Text color={color.gray}>Cikmak icin </Text>
@@ -445,7 +446,7 @@ export const App: React.FC<AppProps> = ({ onScan, mode }) => {
       {/* Ust bilgi */}
       <Box>
         <Text color={color.bold}>
-          {'  CLICleaner  '}
+          {'  Residue  '}
         </Text>
         <Text color={color.gray}>
           {result?.clusters.length ?? 0} kume {glyph.dot} {formatBytes(result?.clusters.reduce((a, c) => a + c.totalBytes, 0) ?? 0)} tarandi

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { isUpdateMode, type UpdateCheckMode } from '../core/update-check.ts';
+import { dataDir } from '../core/data-dir.ts';
 import { longPath } from '../util/longpath.ts';
 
 /**
@@ -33,7 +34,7 @@ export const MIN_VAULT_DAYS = 1;
 export const MAX_VAULT_DAYS = 3650;
 
 export function settingsPath(): string {
-  return join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'settings.json');
+  return join(dataDir(), 'settings.json');
 }
 
 function clampHours(n: unknown): number {

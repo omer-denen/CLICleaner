@@ -42,11 +42,11 @@ kabuktan ibarettir. Kabuk ise urunun cekirdegi degildir.
 | `src/core/contract.ts` → `DesktopShortcutView` | Kisa yol sozlesmesi |
 | `src/web/server.ts` → `/api/shortcut/desktop` | Kisa yol rotalari (3 adet) |
 | `package.json` → `ui:web`, `build:web`, `dev`, `dev:api`, `prepack` | Vite scriptleri |
-| `package.json` → devDependencies | `vite`, `@vitejs/plugin-react`, `@types/react`, `@types/react-dom`, `@tanstack/react-virtual` |
+| `package.json` → devDependencies | `vite`, `@vitejs/plugin-react`, `@types/react-dom`, `@tanstack/react-virtual` silindi. **`@types/react` KALDI**: Ink terminal arayüzü (`src/ui/*.tsx`) React kullanıyor |
 | `package.json` → dependency `react-dom` | Yalnizca tarayici arayuzu kullanirdi (`react` kaldi: Ink bunu kullanir) |
 | `dist/web/` | Derleme ciktilari |
 
-Masaustundeki gercek kisayol (`%USERPROFILE%\Desktop\CLICleaner.lnk`) de
+Masaustundeki gercek kisayol (`%USERPROFILE%\Desktop\Residue.lnk`) de
 silindi. **Baskasinin kisayollari dokunulmadi** (kod yolu da ayni
 disiplini uygulardi: yalnizca "bizim" olan silinir).
 
@@ -59,19 +59,19 @@ disiplini uygulardi: yalnizca "bizim" olan silinir).
 | **Sozlesme** | `src/core/contract.ts` | **Korundu.** API'nin gidis-gelis tipleri. |
 | **HTTP/SSE adaptoru** | `src/web/server.ts` + `src/web/http.ts` | **Korundu, basliga donusturuldu.** `createApiServer()` / `runApi()`; statik dosya sunmaz, Vite derlemez. |
 | **Kalici durum** | `src/store/scan-cache.ts`, `src/store/settings.ts` | **Korundu.** CLI de kullanir (`clean` "tarama bayatti" isareti yazar). |
-| **Terminal arayuzu** | `src/ui/` (Ink 8) | **Korundu.** `clicleaner ui` → TUI. |
+| **Terminal arayuzu** | `src/ui/` (Ink 8) | **Korundu.** `residue ui` → TUI. |
 | **CLI komutlari** | `src/commands/*` | **Korundu.** `scan`, `clean`, `inventory`, `repair`, `quarantine`, `explain`, `undo`, `log`, `rules`, `doctor`, `status`. |
 
 ### 3.1 Davranış değişiklikleri (2.0.0)
 
 | Önce | Sonra |
 |---|---|
-| `clicleaner` → tarayıcı arayüzünü açar | `clicleaner` → **yardım metnini** basar (hiçbir şey başlatmaz) |
-| `clicleaner ui` → web | `clicleaner ui` → **Ink terminal arayüzü** |
-| `clicleaner ui --web` | kaldırıldı (`--tui` geriye uyumluluk olarak kabul edilir) |
-| — | **`clicleaner api [--port n]`** → başsız HTTP/SSE API (127.0.0.1, token'li) |
-| `clicleaner ui --browser edge` | kaldırıldı (tarayıcı açma kodu silindi) |
-| `clicleaner status` gösterir | aynı |
+| `residue` → tarayıcı arayüzünü açar | `residue` → **yardım metnini** basar (hiçbir şey başlatmaz) |
+| `residue ui` → web | `residue ui` → **Ink terminal arayüzü** |
+| `residue ui --web` | kaldırıldı (`--tui` geriye uyumluluk olarak kabul edilir) |
+| — | **`residue api [--port n]`** → başsız HTTP/SSE API (127.0.0.1, token'li) |
+| `residue ui --browser edge` | kaldırıldı (tarayıcı açma kodu silindi) |
+| `residue status` gösterir | aynı |
 
 ---
 
@@ -152,7 +152,7 @@ teknolojisi serbest), ama **yeni bagimlilik ancak gerekceyle** eklenir.
 
 | Risk | Durum |
 |---|---|
-| Motor "ölü kod" gibi görünebilir | Bilerek korundu: `clicleaner api` ile **canli** ve test edilebilir |
+| Motor "ölü kod" gibi görünebilir | Bilerek korundu: `residue api` ile **canli** ve test edilebilir |
 | Servis katmani yalniz API tarafından kullanilir | API + `scratch/test-*.ts` ile her zaman dogrulanir |
 | `src/core/contract.ts` literal'leri (`'KARANTINA'`) tek kaynak degil | T43b'nin acik riski; yeniden yapimda tip ihraci ile baglanmali |
 | Bagimlilik yuku | Arayuz yokken `react` (Ink) + `tsx` + `typescript` yalniz — minimum |

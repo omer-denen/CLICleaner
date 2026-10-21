@@ -1,16 +1,16 @@
-# CLICleaner
+# Residue
 
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
-![Lisans](https://img.shields.io/github/license/omer-denen/CLICleaner)
-![Sürüm](https://img.shields.io/github/v/tag/omer-denen/CLICleaner?label=s%C3%BCr%C3%BCm)
-![npm](https://img.shields.io/npm/v/clicleaner)
+![Lisans](https://img.shields.io/github/license/omer-denen/residue-cleaner)
+![Sürüm](https://img.shields.io/github/v/tag/omer-denen/residue-cleaner?label=s%C3%BCr%C3%BCm)
+![npm](https://img.shields.io/npm/v/residue-cleaner)
 
 **Türkçe (varsayılan)** · [English](README.en.md)
 
 **CLI temizleyici ve kanıt denetleyicisi.** AI kod araçları ve geliştirici
 araçları arkalarında CLI önbellekleri, model depoları, sanal ortamlar, oturumlar
 ve güncelleyici artıkları bırakır; bunlar Windows "Program ekle/kaldır"
-listesinde **görünmez**. CLICleaner bu klasörleri **adına göre
+listesinde **görünmez**. Residue bu klasörleri **adına göre
 değil, içindeki kanıta göre** tanır: ne olduğunu, silersen tam olarak ne
 olacağını ve kararın gerekçesini gösterir.
 
@@ -43,28 +43,32 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
 3. Şunu yaz ve Enter'a bas:
 
    ```powershell
-   npx clicleaner scan
+   npx residue-cleaner scan
    ```
 
 4. Araç geliştirici ve AI araçlarının bıraktığı klasörleri tarar; her birini
    **ne olduğu, silinirse ne olacağı ve gerekçesiyle** listeler. Ölçüm büyük
    klasörlerde birkaç dakika sürebilir; `Ctrl+C` ile durdurabilirsin.
-5. Silmek istediklerini seç → `clicleaner clean` → planı oku → orta/yüksek risk
+5. Silmek istediklerini seç → `residue clean` → planı oku → orta/yüksek risk
    için `SIL` yaz → onayla.
 
 Varsayılan mod **aracın kendi kasası**dır; yanlış karar verirsen geri
-alabilirsin (`clicleaner undo --restore`).
+alabilirsin (`residue undo --restore`).
 
-> **2.0.0 notu:** Tarayıcı arayüzü bu sürümde kaldırıldı. Araç artık
-> **yalnızca terminalden** çalışır. Arayüzün yeniden yapımı planlanıyor:
-> [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
+> **2.0.0 notu:** Proje yeniden adlandırıldı: **Residue** (npm paketi
+> `residue-cleaner`, komut `residue`). Tarayıcı arayüzü de bu sürümde
+> kaldırıldı; araç artık **yalnızca terminalden** çalışır. Arayüzün yeniden
+> yapımı planlanıyor: [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
+>
+> Eski ad `clicleaner` idi. Verilerin (kasa, günlük) taşındığı yer:
+> `%LOCALAPPDATA%\residue`.
 
 ### Hiç terminal kullanmadıysan
 
 - `node --version` yaz; `v22.6.0` veya üzeri değilse nodejs.org'dan LTS kur.
-- `npx clicleaner scan` ilk çalıştırmada paketi indirir; birkaç saniye sürer.
-- `npx clicleaner` komut listesi ve yardım metnini gösterir.
-- Hiçbir şeyi silmek zorunda değilsin; `clicleaner clean --dry-run` yalnızca
+- `npx residue-cleaner scan` ilk çalıştırmada paketi indirir; birkaç saniye sürer.
+- `npx residue-cleaner` komut listesi ve yardım metnini gösterir.
+- Hiçbir şeyi silmek zorunda değilsin; `residue clean --dry-run` yalnızca
   planı gösterir.
 
 ---
@@ -80,7 +84,7 @@ Python ortamları, paket önbellekleri, ajan oturumları ve becerileri. Bunlar
 "Program ekle/kaldır" listesinde görünmez; hangisinin yeniden indirilebilir,
 hangisinin **senin verin** olduğunu bilmek zordur.
 
-| AI tarafında ne var? | CLICleaner ne yapar? |
+| AI tarafında ne var? | Residue ne yapar? |
 |---|---|
 | Ajan oturumları, beceriler, hafıza | **Korur.** Kullanıcı değeridir; silme hedefi üretmez. |
 | Ajan çalışma alanındaki eklenti bağımlılıkları | **Raporlanır.** Yeniden kurulabilir; beceri ve plan dosyaları korunur. |
@@ -138,7 +142,7 @@ Bir projenin içindeki `node_modules`, `.venv`, `dist` gibi artıkları görmek
 istersen taranacak klasörü sen seçersin:
 
 ```bash
-clicleaner scan --root C:\projeler\uygulamam
+residue scan --root C:\projeler\uygulamam
 ```
 
 Bu modda:
@@ -168,7 +172,7 @@ Bu modda:
 ## Sık sorulanlar
 
 **Sadece bakmak istiyorum, silmek istemiyorum.**
-İncele; hiçbir şey silinmez. Terminalde `clicleaner clean --dry-run` yalnızca
+İncele; hiçbir şey silinmez. Terminalde `residue clean --dry-run` yalnızca
 planı gösterir.
 
 **AI ajanımın sohbetleri, becerileri veya modeli silinir mi?**
@@ -180,10 +184,10 @@ Proje taraması (`--root`) hiçbir zaman silme hedefi üretmez; yalnız raporlar
 Git tarafından takip edilen dosyalar zaten her koşulda korunur.
 
 **Yanlış sildim.**
-Kasadan geri al: `clicleaner undo --restore`.
+Kasadan geri al: `residue undo --restore`.
 
 **Bağımsız bir aracı silmeden devre dışı bırakabilir miyim?**
-Evet. Karantinaya al: `clicleaner quarantine <ad>`. Shim kasaya taşınır (komut
+Evet. Karantinaya al: `residue quarantine <ad>`. Shim kasaya taşınır (komut
 PATH'ten düşer), verilerin yerinde kalır; geri alma adımları kasaya yazılır.
 
 **Tarama neden uzun sürüyor?**
@@ -197,14 +201,14 @@ Diskteki en büyük klasörlerin boyutu ölçülüyor. İstediğin an
 Şu an yalnızca Windows destekleniyor.
 
 **Antivirüs uyarı verdi.**
-Araç dosya silebilir. Önce `clicleaner clean --dry-run` ile plana bak; hiçbir
+Araç dosya silebilir. Önce `residue clean --dry-run` ile plana bak; hiçbir
 şey silinmez.
 
 **Verilerim bir yere gönderiliyor mu?**
 Hayır. Her şey yerel makinede çalışır.
 
 **Nasıl kaldırırım?**
-`npm uninstall -g clicleaner`. `npx` ile denediysen kurulum kalmaz.
+`npm uninstall -g residue-cleaner`. `npx` ile denediysen kurulum kalmaz.
 
 ---
 
@@ -214,22 +218,22 @@ Hayır. Her şey yerel makinede çalışır.
 Yönetici hakkı gerekmez.
 
 ```bash
-npx clicleaner scan        # kurulum yapmadan dene
-npm install -g clicleaner   # kalıcı kurulum
-clicleaner                  # komut listesini göster
+npx residue-cleaner scan        # kurulum yapmadan dene
+npm install -g residue-cleaner   # kalıcı kurulum
+residue                  # komut listesini göster
 ```
 
 Kaynaktan çalıştırmak için:
 
 ```bash
-git clone https://github.com/omer-denen/CLICleaner.git
-cd CLICleaner
+git clone https://github.com/omer-denen/residue-cleaner.git
+cd residue-cleaner
 npm install
 npm start
 ```
 
-**Kaldırma:** `npm uninstall -g clicleaner`.
-Araç verileri `%LOCALAPPDATA%\clicleaner` altındadır (günlükler, tarama
+**Kaldırma:** `npm uninstall -g residue-cleaner`.
+Araç verileri `%LOCALAPPDATA%\residue` altındadır (günlükler, tarama
 önbelleği, yedek kasası). **Araç bu dizini kendi taramalarında hedef olarak
 göstermez ve silmez**; yedek kasası orada yaşadığı için elle de silmemek
 gerekir.
@@ -245,20 +249,20 @@ gerekir.
 ## Kullanım
 
 ```bash
-clicleaner                     # komut listesi ve yardım
-clicleaner scan                # terminalde tara ve listele
-clicleaner scan --root .       # proje içi artıkları yalnız raporla
-clicleaner clean --dry-run     # yalnızca planı göster, hiçbir şey silme
-clicleaner clean               # iki aşamalı onay + kasa (geri alınabilir)
-clicleaner undo --restore      # kasadan geri al
-clicleaner repair --dry-run    # bozuk / yarım kurulumları göster
-clicleaner repair              # onar (ONAR onayı; çıktı canlı akar)
-clicleaner quarantine <ad>     # bağımsız aracı silmeden kasaya taşı (KARANTINA onayı)
-clicleaner ui                  # terminal arayüzü (Ink; gerçek terminal gerekir)
-clicleaner api                 # başsız HTTP/SSE API (arayüz yok; 127.0.0.1)
+residue                     # komut listesi ve yardım
+residue scan                # terminalde tara ve listele
+residue scan --root .       # proje içi artıkları yalnız raporla
+residue clean --dry-run     # yalnızca planı göster, hiçbir şey silme
+residue clean               # iki aşamalı onay + kasa (geri alınabilir)
+residue undo --restore      # kasadan geri al
+residue repair --dry-run    # bozuk / yarım kurulumları göster
+residue repair              # onar (ONAR onayı; çıktı canlı akar)
+residue quarantine <ad>     # bağımsız aracı silmeden kasaya taşı (KARANTINA onayı)
+residue ui                  # terminal arayüzü (Ink; gerçek terminal gerekir)
+residue api                 # başsız HTTP/SSE API (arayüz yok; 127.0.0.1)
 ```
 
-Daha fazlası için: `clicleaner help`
+Daha fazlası için: `residue help`
 
 ---
 
@@ -268,12 +272,12 @@ Otomatik güncelleme kontrolü **yoktur** (planlanan davranış: varsayılan kap
 Manuel güncelleme:
 
 ```bash
-npm i -g clicleaner        # global kurulumu güncelle
-npx clicleaner@latest      # kurulum yapmadan en güncel sürümü çalıştır
+npm i -g residue-cleaner        # global kurulumu güncelle
+npx residue-cleaner@latest      # kurulum yapmadan en güncel sürümü çalıştır
 ```
 
-- npm: <https://www.npmjs.com/package/clicleaner>
-- GitHub sürümleri: <https://github.com/omer-denen/CLICleaner/releases>
+- npm: <https://www.npmjs.com/package/residue-cleaner>
+- GitHub sürümleri: <https://github.com/omer-denen/residue-cleaner/releases>
 
 Otomatik sürüm kontrolü **kapalıdır** (varsayılan: hiçbir ağ isteği yapılmaz).
 
@@ -283,5 +287,5 @@ Otomatik sürüm kontrolü **kapalıdır** (varsayılan: hiçbir ağ isteği yap
 
 MIT — bkz. [LICENSE](LICENSE).
 
-CLICleaner hiçbir veriyi dışarı göndermez; tüm işlemler yerel makinede
+Residue hiçbir veriyi dışarı göndermez; tüm işlemler yerel makinede
 çalışır. Silme kararı her zaman kullanıcıya aittir.

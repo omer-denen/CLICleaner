@@ -1,15 +1,16 @@
 import { cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
+import { dataDir } from '../core/data-dir.ts';
 import { walk } from '../core/walker.ts';
 
 /**
- * CLICleaner kasasi (quarantine vault).
+ * Residue kasasi (quarantine vault).
  *
  * Windows Geri Donusum Kutusu KULLANILMAZ. Silinen yollar aracin kendi
  * veri dizinindeki kasaya tasinir; her parti icin manifest tutulur:
- *   %LOCALAPPDATA%\clicleaner\vault\<batch>\manifest.json
- *   %LOCALAPPDATA%\clicleaner\vault\<batch>\items\00001
+ *   %LOCALAPPDATA%\residue\vault\<batch>\manifest.json
+ *   %LOCALAPPDATA%\residue\vault\<batch>\items\00001
  *
  * Ayni surucude `rename` atomiktir ve hizlidir; farkli surucude
  * kopyala+sil yedegine dusulur. Kasa kendi veri dizininde oldugu icin
@@ -32,7 +33,7 @@ export interface VaultBatch {
 }
 
 export function vaultRoot(): string {
-  return join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'vault');
+  return join(dataDir(), 'vault');
 }
 
 export async function newVaultBatch(now = Date.now()): Promise<VaultBatch> {

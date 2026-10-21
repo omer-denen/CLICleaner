@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
  * Kurallar:
  *   - Kapaliyken HICBIR ag istegi yapilmaz.
  *   - Acikken TEK bir HTTPS istegi gider:
- *     `registry.npmjs.org/clicleaner/latest`.
+ *     `registry.npmjs.org/residue-cleaner/latest`.
  *   - Gonderilen tek veri registry adresidir; kimlik, disk yolu, tarama
  *     sonucu veya kullanim verisi GONDERILMEZ.
  *   - Sonuc 24 saat onbellekte tutulur.
@@ -35,7 +35,7 @@ export interface UpdateCheckResult {
   error?: string;
 }
 
-export const REGISTRY_URL = 'https://registry.npmjs.org/clicleaner/latest';
+export const REGISTRY_URL = 'https://registry.npmjs.org/residue-cleaner/latest';
 const CACHE_MS = 24 * 3_600_000;
 const TIMEOUT_MS = 8000;
 

@@ -1,6 +1,6 @@
 /**
  * state.json uretir: projenin bugunku gercek durumu.
- * Bu dosya elle duzenlenebilir; clicleaner status ile okunur.
+ * Bu dosya elle duzenlenebilir; residue status ile okunur.
  */
 import { writeState, type ProjectState } from '../src/util/state.ts';
 
@@ -10,22 +10,22 @@ const s: ProjectState = {
   version: 1,
   updatedAt: now,
   project: {
-    name: 'CLICleaner',
+    name: 'Residue',
     purpose: 'Disk artiklarini kanitlarla listeleyen, secimini kullaniciya onaylatan temizleyici',
     stack: 'TypeScript + Node 24 + Ink 8 / React 19 (tsx runner; Bun kurulu degil)',
     entry: 'src/cli.ts',
   },
   commands: [
-    { cmd: 'node bin/clicleaner.mjs scan', desc: 'Tara ve listele (gruplu rapor)' },
-    { cmd: 'node bin/clicleaner.mjs ui', desc: 'Terminal TUI — Ink, TTY gerektirir' },
-    { cmd: 'node bin/clicleaner.mjs clean', desc: 'Iki asamali onay + geri donusum kutusu' },
-    { cmd: 'node bin/clicleaner.mjs clean --only <ad>', desc: 'Tek kumu temizle' },
-    { cmd: 'node bin/clicleaner.mjs clean --purge', desc: 'Kalici silme (yazili onay gerekir)' },
-    { cmd: 'node bin/clicleaner.mjs explain <ad>', desc: 'Karar gerekcesini kanitlarla goster' },
-    { cmd: 'node bin/clicleaner.mjs log --summary', desc: 'Son 1 saat: siniflandirma/uyari/hata' },
-    { cmd: 'node bin/clicleaner.mjs doctor', desc: 'Ortam kontrolu (uzun yol, geri donusum, GPU)' },
-    { cmd: 'node bin/clicleaner.mjs undo --restore', desc: 'Geri donusum kutusundan geri al' },
-    { cmd: 'node bin/clicleaner.mjs rules', desc: 'Kural listesi (kanit -> karar)' },
+    { cmd: 'node bin/residue.mjs scan', desc: 'Tara ve listele (gruplu rapor)' },
+    { cmd: 'node bin/residue.mjs ui', desc: 'Terminal TUI — Ink, TTY gerektirir' },
+    { cmd: 'node bin/residue.mjs clean', desc: 'Iki asamali onay + geri donusum kutusu' },
+    { cmd: 'node bin/residue.mjs clean --only <ad>', desc: 'Tek kumu temizle' },
+    { cmd: 'node bin/residue.mjs clean --purge', desc: 'Kalici silme (yazili onay gerekir)' },
+    { cmd: 'node bin/residue.mjs explain <ad>', desc: 'Karar gerekcesini kanitlarla goster' },
+    { cmd: 'node bin/residue.mjs log --summary', desc: 'Son 1 saat: siniflandirma/uyari/hata' },
+    { cmd: 'node bin/residue.mjs doctor', desc: 'Ortam kontrolu (uzun yol, geri donusum, GPU)' },
+    { cmd: 'node bin/residue.mjs undo --restore', desc: 'Geri donusum kutusundan geri al' },
+    { cmd: 'node bin/residue.mjs rules', desc: 'Kural listesi (kanit -> karar)' },
   ],
 
   tasks: [
@@ -68,7 +68,7 @@ const s: ProjectState = {
       id: 'T6',
       title: 'Gunluk sistemi (karar gerekceleri + hatalar)',
       status: 'done',
-      note: 'clicleaner log --summary',
+      note: 'residue log --summary',
       updatedAt: now,
     },
     {

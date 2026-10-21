@@ -102,7 +102,7 @@ export function renderInventoryMarkdown(inv: CliInventory, generatedAt: number =
 
   const L: string[] = [];
 
-  L.push('# CLICleaner — CLI envanteri');
+  L.push('# Residue — CLI envanteri');
   L.push('');
   L.push(`Tarama: ${formatDateTime(inv.scannedAt)} · Rapor: ${formatDateTime(generatedAt)}`);
   L.push(`Atıllık eşiği: ${inv.unusedDays} gün · Depo: ${inv.roots.length} dizin`);

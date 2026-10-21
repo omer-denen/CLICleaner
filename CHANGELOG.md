@@ -7,7 +7,20 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ## [2.0.0] - 2026-10-21
 
-Tarayıcı arayüzü kaldırıldı. Araç artık **yalnızca terminalden** çalışır.
+Tarayıcı arayüzü kaldırıldı ve proje yeniden adlandırıldı: **Residue**
+(npm paketi `residue-cleaner`, komut `residue`). Araç artık **yalnızca
+terminalden** çalışır.
+
+### Değiştirildi
+
+- **Proje adı:** `CLICleaner` → **Residue**. npm paketi `residue-cleaner`,
+  komut `residue`.
+- **Veri dizini:** `%LOCALAPPDATA%\clicleaner` → `%LOCALAPPDATA%\residue`
+  (kasa, günlük ve tarama önbelleği taşındı; eski dizin silinmez).
+- `clicleaner` (komutsuz) artık tarayıcıyı açmaz; **yardım metnini** gösterir.
+- `residue ui` artık **terminal arayüzünü** açar.
+- `residue api` eklendi: arayüzü olmayan, yalnız bu bilgisayarda çalışan
+  HTTP/SSE servis arayüzü.
 
 ### Kaldırıldı
 
@@ -15,16 +28,12 @@ Tarayıcı arayüzü kaldırıldı. Araç artık **yalnızca terminalden** çal�
 - **Masaüstü kısayolu** oluşturma/kaldırma özelliği (yalnız arayüzü açıyordu).
 - Tarayıcı açma seçenekleri ve tarayıcıya özel ayarlar.
 
-### Değiştirildi
-
-- `clicleaner` (komutsuz) artık tarayıcıyı açmaz; **yardım metnini** gösterir.
-- `clicleaner ui` artık **terminal arayüzünü** açar.
-- `clicleaner api` eklendi: arayüzü olmayan, yalnız bu bilgisayarda çalışan
-  HTTP/SSE servis arayüzü.
-
 ### Eklendi
 
 - Arayüzün yeniden yapımı için plan belgesi (`docs/WEB-REBUILD-PLAN.md`).
+
+> Not: Bu sürümden önce yayınlanan npm paketi `clicleaner`'dır ve
+> kullanımdan kaldırılmıştır. Yeni paket: `residue-cleaner`.
 
 ## [1.0.0] - 2026-10-21
 

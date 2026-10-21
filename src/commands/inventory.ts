@@ -35,7 +35,7 @@ export async function runInventory(args: string[]): Promise<void> {
       const inline = a.startsWith('--report=') ? a.slice('--report='.length) : '';
       const val = inline || args[i + 1] || '';
       if (!val || (!inline && val.startsWith('--'))) {
-        console.error('Kullanim: clicleaner inventory --report <dosya.md>');
+        console.error('Kullanim: residue inventory --report <dosya.md>');
         process.exitCode = 1;
         return;
       }
@@ -67,7 +67,7 @@ export async function runInventory(args: string[]): Promise<void> {
     return;
   }
 
-  console.log(`\n${C.bold}CLICleaner — CLI envanteri${C.reset}`);
+  console.log(`\n${C.bold}Residue — CLI envanteri${C.reset}`);
   console.log(
     `${C.gray}${inv.tools.length} arac · ${inv.roots.length} depo · atillik esigi: ${inv.unusedDays} gun${C.reset}`,
   );
@@ -237,7 +237,7 @@ export async function runInventory(args: string[]): Promise<void> {
     `${C.bold}  Atil: ${unused.length}${C.reset}${C.gray} · dogrulama: ${unknown.length} · yakin: ${recent.length} · korunan: ${protectedTools.length} · shim sorunu: ${inv.shimIssues.length} · PATH cakismasi: ${inv.pathChannels?.duplicates.length ?? 0}${C.reset}`,
   );
   console.log(`${C.dim}  Bu komut SALT OKUNUR; hicbir sey silinmedi.${C.reset}`);
-  console.log(`${C.dim}  Kaldirma icin: clicleaner cli-remove <ad> (gelecek surum)${C.reset}\n`);
+  console.log(`${C.dim}  Kaldirma icin: residue cli-remove <ad> (gelecek surum)${C.reset}\n`);
 }
 
 export type { CliTool };

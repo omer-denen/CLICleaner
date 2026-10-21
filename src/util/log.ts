@@ -1,9 +1,10 @@
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { dataDir } from '../core/data-dir.ts';
 import { longPath } from './longpath.ts';
 
 /**
- * CLICleaner gunlugu.
+ * Residue gunlugu.
  *
  * Onemlilik: bu bir hata ayiklama blogu DEGIL. Arac neden oyle
  * karar verdigini, hangi kaniti hangi sonuca cevirdigini ve hangi
@@ -23,7 +24,7 @@ export interface Entry {
 let stream: Promise<void> | null = null;
 
 export function logDir(): string {
-  return join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'logs');
+  return join(dataDir(), 'logs');
 }
 
 async function ensureDir(): Promise<string> {
@@ -37,7 +38,7 @@ export async function log(level: Level, msg: string, data?: Record<string, unkno
   try {
     const d = await ensureDir();
     const e: Entry = { at: new Date().toISOString(), level, msg, ...(data ? { data } : {}) };
-    await appendFile(longPath(join(d, 'clicleaner.log')), JSON.stringify(e) + '\n', 'utf8');
+    await appendFile(longPath(join(d, 'residue.log')), JSON.stringify(e) + '\n', 'utf8');
   } catch {
     /* gunluk yazilamazsa sessizce gec */
   }
@@ -49,7 +50,7 @@ export function logSync(level: Level, msg: string, data?: Record<string, unknown
     stream = (async () => {
       const d = await ensureDir();
       const e: Entry = { at: new Date().toISOString(), level, msg, ...(data ? { data } : {}) };
-      await appendFile(longPath(join(d, 'clicleaner.log')), JSON.stringify(e) + '\n', 'utf8');
+      await appendFile(longPath(join(d, 'residue.log')), JSON.stringify(e) + '\n', 'utf8');
     })().catch(() => {});
   }
   void stream;
@@ -63,7 +64,7 @@ export const debug = (m: string, d?: Record<string, unknown>) => log('debug', m,
 /** Tum gunlugu oku (filtreli). */
 export async function readLog(filter?: { level?: Level; since?: number; limit?: number }): Promise<Entry[]> {
   const d = logDir();
-  const p = join(d, 'clicleaner.log');
+  const p = join(d, 'residue.log');
   const out: Entry[] = [];
   let txt: string;
   try {
@@ -93,7 +94,7 @@ export async function readLog(filter?: { level?: Level; since?: number; limit?: 
 export async function clearLog(): Promise<void> {
   try {
     const d = await ensureDir();
-    await writeFile(longPath(join(d, 'clicleaner.log')), '', 'utf8');
+    await writeFile(longPath(join(d, 'residue.log')), '', 'utf8');
   } catch {
     /* yoksay */
   }

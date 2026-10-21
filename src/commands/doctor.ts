@@ -17,7 +17,7 @@ interface Check {
   detail: string;
 }
 
-/** Ortam kontrolu: CLICleaner'in bu makinede dogru calisip calismadigini dogrular. */
+/** Ortam kontrolu: Residue'in bu makinede dogru calisip calismadigini dogrular. */
 export async function runDoctor(): Promise<void> {
   const checks: Check[] = [];
   const env = process.env;
@@ -89,7 +89,7 @@ export async function runDoctor(): Promise<void> {
   });
 
   // --- Rapora yaz ---
-  console.log(`\n${C.bold}CLICleaner — ortam kontrolu${C.reset}\n`);
+  console.log(`\n${C.bold}Residue — ortam kontrolu${C.reset}\n`);
   for (const c of checks) {
     const mark = c.status === 'ok' ? `${C.green}${C.bold}v${C.reset}` : c.status === 'warn' ? `${C.yellow}${C.bold}!${C.reset}` : `${C.red}${C.bold}x${C.reset}`;
     console.log(`  ${mark} ${c.name.padEnd(22)} ${C.gray}${c.detail}${C.reset}`);
@@ -116,12 +116,12 @@ async function testLongPath(): Promise<{ ok: boolean; detail: string }> {
   const base = process.env.LOCALAPPDATA ?? process.env.TEMP ?? '.';
   // ~300 karakterlik yol uret
   const deep = Array.from({ length: 12 }, (_, i) => `seviye${i}`.padEnd(24, 'x')).join('\\');
-  const p = `${base}\\clicleaner-test\\${deep}\\probe.txt`;
+  const p = `${base}\\residue-test\\${deep}\\probe.txt`;
   try {
     const { mkdir, writeFile, rm } = await import('node:fs/promises');
     await mkdir(longPath(p.slice(0, p.lastIndexOf('\\'))), { recursive: true });
     await writeFile(longPath(p), 'x', 'utf8');
-    await rm(longPath(`${base}\\clicleaner-test`), { recursive: true, force: true });
+    await rm(longPath(`${base}\\residue-test`), { recursive: true, force: true });
     return { ok: true, detail: `${p.length} karakterlik yol erisilebilir` };
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
@@ -137,7 +137,7 @@ async function testRecycleAccess(): Promise<{ status: 'ok' | 'warn' | 'fail'; de
   // Daha once hatali bir cagri (GetSpecialFolderOption) kullanildi;
   // dogru yontem DeleteDirectory/DeleteFile uzerinden bir dosya
   // gonderip cagrinin calisip calismadigini olcmek.
-  const tmp = join(process.env.TEMP ?? '.', `clicleaner-recycle-probe-${Date.now()}.tmp`);
+  const tmp = join(process.env.TEMP ?? '.', `residue-recycle-probe-${Date.now()}.tmp`);
   try {
     const { writeFile, rm } = await import('node:fs/promises');
     const { longPath } = await import('../util/longpath.ts');

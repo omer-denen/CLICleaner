@@ -1,16 +1,16 @@
-# CLICleaner
+# Residue
 
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
-![License](https://img.shields.io/github/license/omer-denen/CLICleaner)
-![Version](https://img.shields.io/github/v/tag/omer-denen/CLICleaner?label=version)
-![npm](https://img.shields.io/npm/v/clicleaner)
+![License](https://img.shields.io/github/license/omer-denen/residue-cleaner)
+![Version](https://img.shields.io/github/v/tag/omer-denen/residue-cleaner?label=version)
+![npm](https://img.shields.io/npm/v/residue-cleaner)
 
 [Türkçe (varsayılan)](README.md) · **English**
 
 **A CLI cleaner that shows its evidence.** AI coding tools and developer
 tooling leave CLI caches, model stores, virtual environments, sessions and
 updater leftovers behind — none of them show up in the Windows "Add or remove
-programs" list. CLICleaner recognises these folders
+programs" list. Residue recognises these folders
 **by the evidence inside them, not by their names**: it tells you what each
 folder is, what exactly deletion would cost, and why it decided that way.
 
@@ -42,29 +42,33 @@ It answers one question with evidence: **"What is this folder, and what happens 
 3. Type this and press Enter:
 
    ```powershell
-   npx clicleaner scan
+   npx residue-cleaner scan
    ```
 
 4. The tool scans the folders left behind by developer and AI tooling and
    lists each one with **what it is, what deletion would cost and why it
    decided that way**. Measuring large folders can take a few minutes; stop
    it with `Ctrl+C`.
-5. Pick what you want to delete → `clicleaner clean` → read the plan → type
+5. Pick what you want to delete → `residue clean` → read the plan → type
    `SIL` for medium/high risk → confirm.
 
 The default mode moves items into the tool's own **vault**, so a wrong
-decision is reversible (`clicleaner undo --restore`).
+decision is reversible (`residue undo --restore`).
 
-> **2.0.0 note:** The browser UI was removed in this release. The tool now
-> runs **from the terminal only**. Rebuilding the UI is planned:
-> [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
+> **2.0.0 note:** The project was renamed: **Residue** (npm package
+> `residue-cleaner`, command `residue`). The browser UI was also removed in
+> this release; the tool now runs **from the terminal only**. Rebuilding the
+> UI is planned: [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
+>
+> The old name was `clicleaner`. Your data (vault, journal) now lives in
+> `%LOCALAPPDATA%\residue`.
 
 ### Never used a terminal before?
 
 - Run `node --version`; if it is below `v22.6.0`, install the LTS from nodejs.org.
-- `npx clicleaner scan` downloads the package on first run; it takes a few seconds.
-- `npx clicleaner` prints the command list and the help text.
-- You do not have to delete anything; `clicleaner clean --dry-run` shows the
+- `npx residue-cleaner scan` downloads the package on first run; it takes a few seconds.
+- `npx residue-cleaner` prints the command list and the help text.
+- You do not have to delete anything; `residue clean --dry-run` shows the
   plan only.
 
 ---
@@ -79,7 +83,7 @@ Python environments, package caches, agent sessions and skills. They never
 appear in "Add or remove programs", and it is hard to tell what can be
 regenerated and what is **your data**.
 
-| What is on the AI side? | What CLICleaner does |
+| What is on the AI side? | What Residue does |
 |---|---|
 | Agent sessions, skills, memory | **Keeps them.** User value; never produces a delete target. |
 | Plugin dependencies inside an agent workspace | **Reported.** Regenerable; skills and plan files are kept. |
@@ -136,7 +140,7 @@ To look at `node_modules`, `.venv` or `dist` inside a project, you choose the
 folder to scan:
 
 ```bash
-clicleaner scan --root C:\projects\myapp
+residue scan --root C:\projects\myapp
 ```
 
 In this mode:
@@ -168,7 +172,7 @@ In this mode:
 ## FAQ
 
 **I only want to look, not delete.**
-Inspect; nothing is deleted. In the terminal, `clicleaner clean --dry-run`
+Inspect; nothing is deleted. In the terminal, `residue clean --dry-run`
 shows the plan only.
 
 **Will it delete my AI agent's chats, skills or model?**
@@ -180,10 +184,10 @@ A project scan (`--root`) never produces delete targets; it only reports. Files
 tracked by Git are protected in every mode anyway.
 
 **I deleted something by mistake.**
-Restore from the vault: `clicleaner undo --restore`.
+Restore from the vault: `residue undo --restore`.
 
 **Can I disable a standalone tool without deleting it?**
-Yes. Quarantine it: `clicleaner quarantine <ad>`. The shim moves to the vault
+Yes. Quarantine it: `residue quarantine <ad>`. The shim moves to the vault
 (the command leaves PATH), your data stays in place, and the restore steps
 are written to the vault.
 
@@ -199,14 +203,14 @@ Install the LTS from [nodejs.org](https://nodejs.org); verify with
 Windows only for now.
 
 **My antivirus warned me.**
-The tool can delete files. Run `clicleaner clean --dry-run` first; it deletes
+The tool can delete files. Run `residue clean --dry-run` first; it deletes
 nothing.
 
 **Is my data sent anywhere?**
 No. Everything runs locally.
 
 **How do I uninstall it?**
-`npm uninstall -g clicleaner`. If you only used `npx`, nothing is installed.
+`npm uninstall -g residue-cleaner`. If you only used `npx`, nothing is installed.
 
 ---
 
@@ -216,22 +220,22 @@ No. Everything runs locally.
 No administrator rights needed.
 
 ```bash
-npx clicleaner scan        # try without installing
-npm install -g clicleaner   # install globally
-clicleaner                  # print the command list
+npx residue-cleaner scan        # try without installing
+npm install -g residue-cleaner   # install globally
+residue                  # print the command list
 ```
 
 Run from source:
 
 ```bash
-git clone https://github.com/omer-denen/CLICleaner.git
-cd CLICleaner
+git clone https://github.com/omer-denen/residue-cleaner.git
+cd residue-cleaner
 npm install
 npm start
 ```
 
-**Uninstall:** `npm uninstall -g clicleaner`.
-Tool data lives under `%LOCALAPPDATA%\clicleaner` (logs, scan cache, backup
+**Uninstall:** `npm uninstall -g residue-cleaner`.
+Tool data lives under `%LOCALAPPDATA%\residue` (logs, scan cache, backup
 vault). **The tool never lists or deletes this directory in its own scans**;
 because the backup vault lives there, do not delete it by hand either.
 
@@ -246,20 +250,20 @@ because the backup vault lives there, do not delete it by hand either.
 ## Usage
 
 ```bash
-clicleaner                     # command list and help
-clicleaner scan                # scan and list in the terminal
-clicleaner scan --root .       # report project-internal leftovers only
-clicleaner clean --dry-run     # show the plan only, delete nothing
-clicleaner clean               # two-step confirmation + vault (reversible)
-clicleaner undo --restore      # restore from the vault
-clicleaner repair --dry-run    # show broken / partial installations
-clicleaner repair              # repair (ONAR confirmation; live output)
-clicleaner quarantine <ad>     # move a standalone tool to the vault (KARANTINA confirmation)
-clicleaner ui                  # terminal UI (Ink; needs a real terminal)
-clicleaner api                 # headless HTTP/SSE API (no UI; 127.0.0.1)
+residue                     # command list and help
+residue scan                # scan and list in the terminal
+residue scan --root .       # report project-internal leftovers only
+residue clean --dry-run     # show the plan only, delete nothing
+residue clean               # two-step confirmation + vault (reversible)
+residue undo --restore      # restore from the vault
+residue repair --dry-run    # show broken / partial installations
+residue repair              # repair (ONAR confirmation; live output)
+residue quarantine <ad>     # move a standalone tool to the vault (KARANTINA confirmation)
+residue ui                  # terminal UI (Ink; needs a real terminal)
+residue api                 # headless HTTP/SSE API (no UI; 127.0.0.1)
 ```
 
-For more: `clicleaner help`
+For more: `residue help`
 
 ---
 
@@ -269,12 +273,12 @@ There is **no automatic update check** (planned behaviour: off by default).
 Manual update:
 
 ```bash
-npm i -g clicleaner        # update the global install
-npx clicleaner@latest      # run the latest version without installing
+npm i -g residue-cleaner        # update the global install
+npx residue-cleaner@latest      # run the latest version without installing
 ```
 
-- npm: <https://www.npmjs.com/package/clicleaner>
-- GitHub releases: <https://github.com/omer-denen/CLICleaner/releases>
+- npm: <https://www.npmjs.com/package/residue-cleaner>
+- GitHub releases: <https://github.com/omer-denen/residue-cleaner/releases>
 
 The automatic update check is **off** by default (no network request is made).
 
@@ -284,5 +288,5 @@ The automatic update check is **off** by default (no network request is made).
 
 MIT — see [LICENSE](LICENSE).
 
-CLICleaner never sends data anywhere; everything runs on your machine.
+Residue never sends data anywhere; everything runs on your machine.
 The deletion decision always belongs to you.

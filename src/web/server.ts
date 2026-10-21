@@ -66,7 +66,7 @@ import type {
 } from '../core/contract.ts';
 
 /**
- * CLICleaner yerel HTTP/SSE API — YALNIZ transport adaptoru.
+ * Residue yerel HTTP/SSE API — YALNIZ transport adaptoru.
  *
  * Is mantigi `src/services/` altindadir:
  *   ScanService, DeleteService, CliInventoryService,
@@ -193,7 +193,7 @@ export async function runApi(opts: WebOptions = {}): Promise<void> {
   const url = `http://${openHost}:${actualPort}/api/meta?token=${token}`;
 
   console.log('');
-  console.log('  CLICleaner API hazir (arayuz yok; basit bir HTTP/SSE API).');
+  console.log('  Residue API hazir (arayuz yok; basit bir HTTP/SSE API).');
   console.log('');
   console.log(`  Adres:        ${url}`);
   console.log('  Yalnizca bu bilgisayarda calisir (127.0.0.1).');
@@ -237,7 +237,7 @@ async function handleRequest(
   // Arayuz yok (2.0.0): kok yol API bilgisi doner. Statik dosya yoktur.
   if (!pathname.startsWith('/api/')) {
     sendJson(res, 200, {
-      name: 'clicleaner',
+      name: 'residue',
       version: currentVersion(),
       ui: 'none',
       note: 'Tarayici arayuzu 2.0.0 ile kaldirildi; bu sunucu BASSSIZ bir HTTP/SSE API\'dir.',
@@ -256,7 +256,7 @@ async function handleRequest(
   }
 
   if (pathname === '/api/health') {
-    sendJson(res, 200, { ok: true, name: 'clicleaner' });
+    sendJson(res, 200, { ok: true, name: 'residue' });
     return;
   }
 
@@ -863,7 +863,7 @@ function sameOrigin(req: IncomingMessage): boolean {
 }
 
 function authorized(req: IncomingMessage, url: URL, token: string): boolean {
-  const header = req.headers['x-clicleaner-token'];
+  const header = req.headers['x-residue-token'];
   const raw = Array.isArray(header) ? header[0] : header;
   const provided = raw ?? url.searchParams.get('token') ?? '';
   if (provided.length !== token.length) return false;

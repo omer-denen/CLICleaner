@@ -5,7 +5,7 @@ import { scanCliInventory, type CliTool } from '../core/cli-inventory.ts';
 import { ApprovalRules } from '../core/approval.ts';
 
 /**
- * `clicleaner repair` — bozuk / yarim kurulumlari terminalde gosterir
+ * `residue repair` — bozuk / yarim kurulumlari terminalde gosterir
  * ve onarir.
  *
  * Onarim komutu calisirken stdout/stderr ANLIK olarak terminale akar;

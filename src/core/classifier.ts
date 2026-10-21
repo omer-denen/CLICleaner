@@ -15,7 +15,7 @@ import type { FileKind, LogSignal, OwnerSignal } from './types.ts';
  *
  * Bir uygulamanin adi dosya/dizin adindan veya icerikten cikarilir;
  * kodda ozel kural yazilmaz. Boylece yeni bir AI araci ciktiginda
- * CLICleaner otomatik tanimaya devam eder.
+ * Residue otomatik tanimaya devam eder.
  */
 
 const MAX_TEXT_PROBE = 512 * 1024; // 512 KB'tan fazla dosya okunmaz

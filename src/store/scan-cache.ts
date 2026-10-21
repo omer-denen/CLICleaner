@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
+import { dataDir } from '../core/data-dir.ts';
 import type { ScanResult } from '../core/types.ts';
 
 /**
@@ -14,12 +15,12 @@ import type { ScanResult } from '../core/types.ts';
 export const SCAN_CACHE_TTL_MS = 24 * 60 * 60_000; // varsayilan: 1 gun
 
 export function scanCachePath(): string {
-  return join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'scans', 'last-scan.json');
+  return join(dataDir(), 'scans', 'last-scan.json');
 }
 
 /** Disk degisti isareti: son tarama artik guncel sayilmaz. */
 export function scanDirtyPath(): string {
-  return join(process.env.LOCALAPPDATA ?? '.', 'clicleaner', 'scans', 'dirty.json');
+  return join(dataDir(), 'scans', 'dirty.json');
 }
 
 export async function markScanDirty(at = Date.now()): Promise<void> {

@@ -31,7 +31,7 @@ export async function runQuarantine(args: string[]): Promise<void> {
   const names = args.filter((a) => !a.startsWith('-')).map((n) => n.toLowerCase());
 
   if (names.length === 0) {
-    console.error('Kullanim: clicleaner quarantine <ad> [<ad>...] [--dry-run]');
+    console.error('Kullanim: residue quarantine <ad> [<ad>...] [--dry-run]');
     console.error('Yalnizca paket yoneticisi olmayan bagimsiz (standalone) araclar.');
     process.exitCode = 1;
     return;

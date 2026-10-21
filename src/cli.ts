@@ -21,25 +21,25 @@ const C = {
 
 function printHelp(): void {
   console.log(`
-${C.bold}CLICleaner${C.reset} — disk artiklarini kanitlarla listeler, secimini sen onaylarsin
+${C.bold}Residue${C.reset} — disk artiklarini kanitlarla listeler, secimini sen onaylarsin
 
 ${C.bold}Baslamak icin${C.reset}
-  ${C.cyan}clicleaner scan${C.reset}             Terminalde tara ve listele
-  ${C.cyan}clicleaner clean --dry-run${C.reset}  Plani goster; hicbir sey silme
+  ${C.cyan}residue scan${C.reset}             Terminalde tara ve listele
+  ${C.cyan}residue clean --dry-run${C.reset}  Plani goster; hicbir sey silme
 
 ${C.bold}Gelismis${C.reset}
-  clicleaner ui                  Terminal arayuzu (Ink; gercek terminal gerekir)
-  clicleaner clean                Iki asamali onay + kasa (geri alinabilir)
-  clicleaner inventory [...]      Kurulu CLI envanteri (salt okunur)
-  clicleaner repair [--only <ad>] Bozuk / yarim kurulumlari onar (ONAR onayi)
-  clicleaner quarantine <ad>     Bagimsiz araci kasaya tasi (KARANTINA onayi, geri alinabilir)
-  clicleaner explain <ad>         Bir kumenin karar gerekcesi
-  clicleaner undo [--restore]     Son silmeyi geri al
-  clicleaner api [--port <n>]     BASSSIZ HTTP/SSE API (arayuz yok; 127.0.0.1)
-  clicleaner log [--summary]      Gunluk
-  clicleaner doctor               Ortam kontrolu
-  clicleaner rules                Kural listesi
-  clicleaner status               Proje durumu (gelistirici)
+  residue ui                  Terminal arayuzu (Ink; gercek terminal gerekir)
+  residue clean                Iki asamali onay + kasa (geri alinabilir)
+  residue inventory [...]      Kurulu CLI envanteri (salt okunur)
+  residue repair [--only <ad>] Bozuk / yarim kurulumlari onar (ONAR onayi)
+  residue quarantine <ad>     Bagimsiz araci kasaya tasi (KARANTINA onayi, geri alinabilir)
+  residue explain <ad>         Bir kumenin karar gerekcesi
+  residue undo [--restore]     Son silmeyi geri al
+  residue api [--port <n>]     BASSSIZ HTTP/SSE API (arayuz yok; 127.0.0.1)
+  residue log [--summary]      Gunluk
+  residue doctor               Ortam kontrolu
+  residue rules                Kural listesi
+  residue status               Proje durumu (gelistirici)
 
 ${C.bold}Ortam secimi${C.reset}  ${C.gray}(--env ile birden fazla)${C.reset}
 ${ENVS.map((e) => `  ${C.cyan}${e.id.padEnd(16)}${C.reset}${e.label.padEnd(26)}${C.gray}${e.description}${C.reset}`).join('\n')}
@@ -83,13 +83,13 @@ ${C.bold}Sadece inventory icin${C.reset}
   --report <dosya.md>  Paylasilabilir Markdown raporu yaz
 
 ${C.bold}Ornekler${C.reset}
-  clicleaner scan --env pkgcache
-  clicleaner clean --env pkgcache
-  clicleaner clean --only nuget --purge
-  clicleaner inventory --unused 21 --verbose
-  clicleaner inventory --report envanter.md
-  clicleaner scan --profile audit --json
-  clicleaner scan --root C:\\projeler\\uygulamam    Proje ici artiklari tara (rapor)
+  residue scan --env pkgcache
+  residue clean --env pkgcache
+  residue clean --only nuget --purge
+  residue inventory --unused 21 --verbose
+  residue inventory --report envanter.md
+  residue scan --profile audit --json
+  residue scan --root C:\\projeler\\uygulamam    Proje ici artiklari tara (rapor)
 `);
 }
 
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
         // Eksik deger sessizce tam taramaya donusmemeli: kullanici
         // proje taramasi beklerken tum diski taramis olurdu.
         if (!v || v.startsWith('-')) {
-          throw new Error('--root bir dizin yolu ister. Ornek: clicleaner scan --root C:\\proje');
+          throw new Error('--root bir dizin yolu ister. Ornek: residue scan --root C:\\proje');
         }
         root = v;
       } else if (a === '--json') json = true;
@@ -276,7 +276,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`Komut henuz uygulanmadi: ${cmd}`);
-  console.log(`Simdilik 'scan' ve 'clean' calisiyor. --help icin: clicleaner --help`);
+  console.log(`Simdilik 'scan' ve 'clean' calisiyor. --help icin: residue --help`);
 }
 
 function toJson(r: Awaited<ReturnType<typeof runScan>>) {

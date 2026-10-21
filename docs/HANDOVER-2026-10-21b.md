@@ -1,4 +1,9 @@
 # Devir belgesi — 21.10.2026 · T43: motor/ayüz ayrımı
+> **AD NOTU (21.10.2026, 2.0.0):** Bu belge eski adla (**CLICleaner**)
+> yazılmıştır ve olduğu gibi bırakılmıştır (tarihsel kayıt). Proje artık
+> **Residue**: npm paketi `residue-cleaner`, komut `residue`, veri dizini
+> `%LOCALAPPDATA%\residue`. Bu belgedeki `clicleaner ...` komutları
+> `residue ...` olarak okunmalıdır.
 
 > Bu oturumun kapanış kaydı.
 > Önceki devir: `docs/HANDOVER-2026-10-20b.md` · `docs/HANDOVER-2026-10-21.md`

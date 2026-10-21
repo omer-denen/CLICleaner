@@ -8,7 +8,7 @@
 > Durum: **plan** (kod yazılmadı). Bu belge, uygulama sırasını ve kabul
 > ölçütlerini sabitler. Çelişkiler bölümü kullanıcı kararı ister.
 
-> **Planlama vazgeçilmezdir.** CLICleaner'in en vurucu özelliği, silmeden
+> **Planlama vazgeçilmezdir.** Residue'in en vurucu özelliği, silmeden
 > önce **gerekçeli bir plan** üretmesidir. Yeni arayüz "Nuke All" gibi
 > doğrudan silme eylemi içermez; her toplu eylem önce plana dönüşür.
 > Plan bir modal değil, **birinci sınıf bir çalışma alanıdır**.
@@ -119,8 +119,8 @@ Odaklanan (klavye) veya hover edilen öğenin röntgeni; `Enter` ile sabitlenir.
 - **Kanıt yorumu** — "AI meta-açıklaması"nın deterministik karşılığı:
   kanıtlardan üretilen düz metin. Örnek: *"Bu klasör bir vektör indeksi
   içeriyor; aktif bir referans bulunamadı. Kasa modunda güvenle taşınabilir."*
-- **Komut kopyala** — önce güvenli yol: `clicleaner explain <anahtar>` /
-  `clicleaner clean --only <anahtar> --dry-run`. Manual silme komutu ayrı
+- **Komut kopyala** — önce güvenli yol: `residue explain <anahtar>` /
+  `residue clean --only <anahtar> --dry-run`. Manual silme komutu ayrı
   sekmede, açık uyarıyla: Windows PowerShell
   `Remove-Item -LiteralPath '<yol>' -Recurse` (bash `rm -rf` değil).
   **Yol istemciden gelmez**; sunucu anahtardan çözer.
@@ -128,7 +128,7 @@ Odaklanan (klavye) veya hover edilen öğenin röntgeni; `Enter` ile sabitlenir.
   `/mnt/c/Program Files/nodejs/npm` olarak çözülebilir; prefix'i
   `C:\Users\<kullanıcı>\AppData\Roaming\npm` olur. Yani bu **Linux npm'i
   değildir**; Windows shim/paket üretir. WSL'de ayrı Node yoksa
-  `node: not found` alınır (bu makinede doğrulandı). CLICleaner Windows
+  `node: not found` alınır (bu makinede doğrulandı). Residue Windows
   yollarını taradığı için **PowerShell'de** çalıştırılmalıdır; WSL yalnız
   `cmd.exe /c npm ...` ile Windows npm'i çağırabilir, bu da yine Windows
   tarafında çalışır. UI'da manual komut PowerShell olarak gösterilir.

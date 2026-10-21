@@ -1,6 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
+import { DATA_DIR_NAME, LEGACY_DATA_DIR_NAME } from './data-dir.ts';
 import type { Env, EnvDef, Part } from './types.ts';
 
 /** Ortam tanimlari: --env secimi ve profil sistemi bunlari kullanir. */
@@ -107,13 +108,23 @@ export interface DiscoveryResult {
  * Bunlar tarama hedefi OLAMAZ: kullanici "artik" sanip silerse yedek
  * kasasi, gunluk defteri ve geri donus adimlari kaybolur. Yol adi
  * sabit kodlanmaz; ortam degiskenlerinden turetilir.
+ *
+ * 2.0.0 sonrasi ad `residue`; eski ad (`clicleaner`) da korunur.
  */
 export function ownDataDirs(env: NodeJS.ProcessEnv = process.env): string[] {
   const out: string[] = [];
   const local = env.LOCALAPPDATA ?? '';
   const home = env.USERPROFILE ?? env.HOME ?? '';
-  if (local) out.push(join(local, 'clicleaner'));
-  if (home) out.push(join(home, '.clicleaner'));
+  if (local) {
+    out.push(join(local, DATA_DIR_NAME));
+    // Eski ad (2.0.0 oncesi): gecis sirasinda da korunur. Kasa verisi
+    // orada duruyor olabilir; yanlislikla silinmemeli.
+    out.push(join(local, LEGACY_DATA_DIR_NAME));
+  }
+  if (home) {
+    out.push(join(home, `.${DATA_DIR_NAME}`));
+    out.push(join(home, `.${LEGACY_DATA_DIR_NAME}`));
+  }
   return out;
 }
 

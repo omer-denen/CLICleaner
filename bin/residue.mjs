@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLICleaner giris noktasi.
+ * Residue giris noktasi.
  *
  * TypeScript dosyalari (ve .tsx) dogrudan calistirilabilir olmali; bu
  * yuzden tsx yukleyicisi devreye alinir. tsx kurulu degilse kullaniciya
@@ -22,7 +22,7 @@ try {
   register();
 } catch (err) {
   console.error(
-    '\nCLICleaner calistirilamadi: "tsx" yukleyicisi bulunamadi.\n' +
+    '\nResidue calistirilamadi: "tsx" yukleyicisi bulunamadi.\n' +
       'Projeye girip su komutu calistir:  npm install\n',
   );
   console.error(String(err));
