@@ -14,6 +14,8 @@ import { Env } from './screens/Env.tsx';
 import { Graph } from './screens/Graph.tsx';
 import { PlanScreen } from './screens/PlanScreen.tsx';
 import { Projects } from './screens/Projects.tsx';
+import { Schedules } from './screens/Schedules.tsx';
+import { Settings } from './screens/Settings.tsx';
 import { Tools } from './screens/Tools.tsx';
 import { Vault } from './screens/Vault.tsx';
 
@@ -57,6 +59,8 @@ const WIDE: Screen[] = [
   'tools',
   'env',
   'graph',
+  'schedules',
+  'settings',
 ];
 
 export function App() {
@@ -210,6 +214,14 @@ export function App() {
 
           {!loading && !error && screen === 'graph' && <Graph lang={lang} />}
 
+          {!loading && !error && screen === 'schedules' && (
+            <Schedules lang={lang} />
+          )}
+
+          {!loading && !error && screen === 'settings' && (
+            <Settings lang={lang} version={meta?.version} />
+          )}
+
           {!loading && !error && screen === 'vault' && (
             <Vault lang={lang} onChanged={() => void load()} />
           )}
@@ -224,6 +236,8 @@ export function App() {
               'tools',
               'env',
               'graph',
+              'schedules',
+              'settings',
               'vault',
             ].includes(screen) && <div className="state">{t('common.soon')}</div>}
         </main>

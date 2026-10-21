@@ -1,6 +1,7 @@
 import { ScheduleService, type ScheduleInput, type ScheduleView } from '../services/schedule-service.ts';
 import { ScanService } from '../services/scan-service.ts';
 import { DeleteService } from '../services/delete-service.ts';
+import { ApprovalRules } from '../core/approval.ts';
 import type { CategoryKey } from '../core/categories.ts';
 
 const C = {
@@ -96,7 +97,13 @@ export async function runSchedule(args: string[]): Promise<void> {
       const minutes = numberFlag(args, '--in') ?? 60;
       input.runAt = Date.now() + Math.max(1, minutes) * 60_000;
     }
-    const rule = await svc.create(input);
+    const phrase = valueOf(args, '--phrase');
+    if (!ApprovalRules.matches('schedule', phrase)) {
+      throw new Error(
+        `Kural olusturmak icin --phrase ${ApprovalRules.phrase('schedule')} gerekli`,
+      );
+    }
+    const rule = await svc.create(input, { require: true, phrase: phrase ?? '' });
     if (json) {
       console.log(JSON.stringify(rule, null, 2));
       return;
@@ -151,6 +158,7 @@ export async function runSchedule(args: string[]): Promise<void> {
   }
 
   console.log('  Kullanim: residue schedule [list|add|remove|preview|run|history|catchup] [--json]');
+  console.log('  Kural eklemek icin: residue schedule add --name "..." --at 03:00 --phrase PLANLA');
 }
 
 function printRule(v: ScheduleView): void {

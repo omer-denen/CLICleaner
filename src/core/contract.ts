@@ -6,11 +6,18 @@ import type {
   SkippedEntry,
   VerdictKind,
 } from './types.ts';
-import type { CategoryKey, CategoryStat } from './categories.ts';
-import type { CliInventory, CliSource, CliStatus, CliTool } from './cli-inventory-types.ts';
+import type { CategoryKey, CategoryStat } from './categories.ts';import type { CliInventory, CliSource, CliStatus, CliTool } from './cli-inventory-types.ts';
 import type { DependencyLevel, GraphEdge, GraphNode, NodeRole, RootCause, WhatIfResult } from './dependency-graph.ts';
 import type { EnvFinding, EnvPlan } from './env-engine.ts';
+import type {
+  ScheduleFrequency,
+  ScheduleRule,
+  ScheduleRun,
+  ScheduleSelector,
+} from './plan-engine.ts';
 import type { Ecosystem, ProjectCleanupMode } from './project-deps.ts';
+
+export type { CategoryKey, CategoryStat } from './categories.ts';
 
 /**
  * Web arayuzu ile sunucu arasindaki veri sozlesmesi.
@@ -423,6 +430,49 @@ export type {
   ScheduleRun,
   ScheduleSelector,
 } from './plan-engine.ts';
+
+// ---------------------------------------------------------------------------
+// Planlar / zamanlama (M4) — yalniz KASAYA tasir
+// ---------------------------------------------------------------------------
+
+export interface ScheduleView extends ScheduleRule {
+  nextRunAt: number | null;
+  due: boolean;
+  missed: number;
+  lastRun: ScheduleRun | null;
+}
+
+export interface ScheduleCreateRequest {
+  name: string;
+  frequency: ScheduleFrequency;
+  hour?: number;
+  minute?: number;
+  weekday?: number;
+  runAt?: number;
+  selector?: ScheduleSelector;
+  enabled?: boolean;
+  compensateMissed?: boolean;
+  /** API icin yazili onay (ApprovalRules.schedule = PLANLA). */
+  phrase?: string;
+}
+
+export interface ScheduleListResponse {
+  schedules: ScheduleView[];
+}
+
+export interface ScheduleCatchUpItem {
+  rule: ScheduleView;
+  missed: number;
+  message: string;
+}
+
+export interface ScheduleCatchUpResponse {
+  catchUp: ScheduleCatchUpItem[];
+}
+
+export interface ScheduleHistoryResponse {
+  runs: ScheduleRun[];
+}
 
 // ---------------------------------------------------------------------------
 // Ortam / PATH plani (yazili TEMIZLE onayi ister)

@@ -23,7 +23,8 @@ export type ApprovalKind =
   | 'quarantine'
   | 'vaultPurge'
   | 'projectRestore'
-  | 'envClean';
+  | 'envClean'
+  | 'schedule';
 
 const PHRASES = {
   /** Kalici silme (yalniz purge). */
@@ -37,6 +38,8 @@ const PHRASES = {
   projectRestore: 'KUR',
   /** PATH / ortam degiskeni duzenlemesi (yedek alinir). */
   envClean: 'TEMIZLE',
+  /** Otomatik/zamanlanmis plan kurali olusturma. */
+  schedule: 'PLANLA',
 } as const satisfies Record<ApprovalKind, string>;
 
 export class ApprovalRules {

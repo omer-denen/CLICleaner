@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { ApprovalRules } from '../core/approval.ts';
 import {
   dueNow,
   missedRuns,
@@ -6,11 +7,14 @@ import {
   previewRule,
   selectClusters,
   type PlanPreview,
-  type ScheduleFrequency,
   type ScheduleRule,
   type ScheduleRun,
   type ScheduleSelector,
 } from '../core/plan-engine.ts';
+import type {
+  ScheduleCreateRequest,
+  ScheduleView,
+} from '../core/contract.ts';
 import {
   acquireRunLock,
   addRun,
@@ -35,24 +39,11 @@ import type { DeleteService, ExecuteJob } from './delete-service.ts';
  *  - Ayni anda tek plan calisir (dosya kilidi).
  */
 
-export interface ScheduleView extends ScheduleRule {
-  nextRunAt: number | null;
-  due: boolean;
-  missed: number;
-  lastRun: ScheduleRun | null;
-}
-
-export interface ScheduleInput {
-  name: string;
-  frequency: ScheduleFrequency;
-  hour?: number;
-  minute?: number;
-  weekday?: number;
-  runAt?: number;
-  selector?: ScheduleSelector;
-  enabled?: boolean;
-  compensateMissed?: boolean;
-}
+export type {
+  ScheduleCreateRequest,
+  ScheduleView,
+} from '../core/contract.ts';
+export type ScheduleInput = ScheduleCreateRequest;
 
 const MAX_JOBS_WAIT_MS = 30 * 60_000;
 
@@ -77,7 +68,16 @@ export class ScheduleService {
       .sort((a, b) => (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity));
   }
 
-  async create(input: ScheduleInput): Promise<ScheduleView> {
+  async create(
+    input: ScheduleCreateRequest,
+    approval?: { phrase?: string; require?: boolean },
+  ): Promise<ScheduleView> {
+    if (approval?.require && !ApprovalRules.matches('schedule', approval.phrase)) {
+      throw new ServiceError(
+        400,
+        `Onay ifadesi hatali (${ApprovalRules.phrase('schedule')} bekleniyordu)`,
+      );
+    }
     const name = String(input.name ?? '').trim();
     if (name.length < 2 || name.length > 80) {
       throw new ServiceError(400, 'Plan adi 2-80 karakter olmali');

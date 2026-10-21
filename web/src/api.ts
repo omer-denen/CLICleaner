@@ -16,6 +16,7 @@ import type {
   GraphViewResponse,
   GraphWhatIfResponse,
   MetaResponse,
+  PlanPreview,
   PlanResponse,
   ProjectAnalysisResponse,
   ProjectListResponse,
@@ -24,6 +25,15 @@ import type {
   ProjectTab,
   ScanStartResponse,
   ScanStatusResponse,
+  ScheduleCatchUpResponse,
+  ScheduleCreateRequest,
+  ScheduleHistoryResponse,
+  ScheduleListResponse,
+  ScheduleRun,
+  ScheduleView,
+  SettingsResponse,
+  SettingsUpdateRequest,
+  UpdateCheckView,
   VaultListResponse,
   VaultPurgeResponse,
   VaultRestoreResponse,
@@ -177,6 +187,40 @@ export const api = {
 
   graphWhatIf: (query: string): Promise<GraphWhatIfResponse> =>
     post<GraphWhatIfResponse>('/api/graph/what-if', { query }),
+
+  schedules: (): Promise<ScheduleListResponse> =>
+    request<ScheduleListResponse>('/api/schedules'),
+
+  createSchedule: (body: ScheduleCreateRequest): Promise<ScheduleView> =>
+    post<ScheduleView>('/api/schedules', body),
+
+  removeSchedule: (id: string): Promise<{ ok: boolean }> =>
+    request<{ ok: boolean }>(`/api/schedules/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  previewSchedule: (id: string): Promise<PlanPreview> =>
+    post<PlanPreview>(`/api/schedules/${encodeURIComponent(id)}/preview`, {}),
+
+  runSchedule: (id: string): Promise<ScheduleRun> =>
+    post<ScheduleRun>(`/api/schedules/${encodeURIComponent(id)}/run`, {}),
+
+  scheduleCatchUp: (): Promise<ScheduleCatchUpResponse> =>
+    request<ScheduleCatchUpResponse>('/api/schedules/catchup'),
+
+  scheduleHistory: (): Promise<ScheduleHistoryResponse> =>
+    request<ScheduleHistoryResponse>('/api/schedules/history'),
+
+  settings: (): Promise<SettingsResponse> => request<SettingsResponse>('/api/settings'),
+
+  saveSettings: (body: SettingsUpdateRequest): Promise<SettingsResponse> =>
+    request<SettingsResponse>('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  updateCheck: (force = false): Promise<UpdateCheckView> =>
+    request<UpdateCheckView>(`/api/update${force ? '?force=1' : ''}`),
 
   startScan: (body: {
     envs?: string[];

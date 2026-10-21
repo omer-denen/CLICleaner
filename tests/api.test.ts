@@ -83,6 +83,80 @@ test('bilinmeyen plan kimligi 404', async () => {
   assert.ok(body.error);
 });
 
+test('plan kurali PLANLA onayi ister; onayla olusturulur ve silinir', async () => {
+  const payload = {
+    name: 'api test plani',
+    frequency: 'daily',
+    hour: 3,
+    minute: 0,
+    selector: { maxRisk: 'safe', maxItems: 5 },
+  };
+  const denied = await fetch(`${base}/api/schedules`, {
+    method: 'POST',
+    headers: { 'x-residue-token': token, 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(denied.status, 400);
+
+  const created = await fetch(`${base}/api/schedules`, {
+    method: 'POST',
+    headers: { 'x-residue-token': token, 'content-type': 'application/json' },
+    body: JSON.stringify({ ...payload, phrase: 'PLANLA' }),
+  });
+  assert.equal(created.status, 201);
+  const rule = (await created.json()) as {
+    id?: string;
+    mode?: string;
+    requiresPhrase?: boolean;
+    selector?: { maxRisk?: string };
+  };
+  assert.equal(typeof rule.id, 'string');
+  assert.equal(rule.mode, 'vault');
+  assert.equal(rule.selector?.maxRisk, 'safe');
+
+  const list = await fetch(`${base}/api/schedules`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(list.status, 200);
+  const body = (await list.json()) as { schedules?: Array<{ id: string }> };
+  assert.ok(body.schedules?.some((r) => r.id === rule.id));
+
+  const removed = await fetch(`${base}/api/schedules/${rule.id}`, {
+    method: 'DELETE',
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(removed.status, 200);
+});
+
+test('ayarlar kaydedilir; kapali guncelleme kontrolu ag istegi yapmaz', async () => {
+  const put = await fetch(`${base}/api/settings`, {
+    method: 'PUT',
+    headers: { 'x-residue-token': token, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      scanCacheHours: 12,
+      vaultRetentionDays: 14,
+      updateCheck: 'off',
+    }),
+  });
+  assert.equal(put.status, 200);
+  const saved = (await put.json()) as {
+    scanCacheHours?: number;
+    vaultRetentionDays?: number;
+    updateCheck?: string;
+  };
+  assert.equal(saved.scanCacheHours, 12);
+  assert.equal(saved.vaultRetentionDays, 14);
+  assert.equal(saved.updateCheck, 'off');
+
+  const update = await fetch(`${base}/api/update`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(update.status, 200);
+  const view = (await update.json()) as { checked?: boolean; mode?: string };
+  assert.equal(view.checked, false);
+  assert.equal(view.mode, 'off');
+});
+
 test('dashboard ve proje kesfi uclari yanit verir', async () => {
   const d = await fetch(`${base}/api/dashboard`, { headers: { 'x-residue-token': token } });
   assert.equal(d.status, 200);

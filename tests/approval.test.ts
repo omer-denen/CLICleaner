@@ -45,6 +45,13 @@ test('ortam temizligi TEMIZLE ister', () => {
   assert.equal(ApprovalRules.matches('envClean', 'SIL'), false);
 });
 
+test('zamanlanmis plan kurali PLANLA ister', () => {
+  assert.equal(ApprovalRules.phrase('schedule'), 'PLANLA');
+  assert.equal(ApprovalRules.matches('schedule', ' PLANLA '), true);
+  assert.equal(ApprovalRules.matches('schedule', 'planla'), false);
+  assert.equal(ApprovalRules.matches('schedule', 'TEMIZLE'), false);
+});
+
 test('plan ifadesi MODA bagli: recycle=TASI, purge=SIL', () => {
   const svc = new DeleteService(() => {});
   const safe = scan([cluster({ key: 'safe' })]);

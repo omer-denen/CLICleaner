@@ -121,6 +121,15 @@ Ekranlar: **Araçlar** (SSE envanter, durum/kanal, detay, kaldırma planı),
 yazılı `TEMIZLE`), **Graf** (düğüm/kenar, kök neden, what-if engeli).
 Graf/Env ekranlarında yazma yalnız plandan sonra ve yazılı onayla yapılır.
 
+**M4 tamam (21.10.2026):** `ScheduleView` / `ScheduleCreateRequest` ve
+list/catchup/history sözleşmeleri; `POST /api/schedules` yazılı **`PLANLA`**
+ister (`ApprovalRules.schedule`), CLI `schedule add --phrase PLANLA` aynı
+kuralı kullanır. **Planlar** ekranı: seçici, frekans, kategori, risk/limit,
+önizleme, iki adımlı çalıştırma/silme, kaçırılan çalışma önerileri, geçmiş.
+**Ayarlar** ekranı: tarama önbelleği, kasa saklama, güncelleme modu
+(`off/daily/weekly`), kaydetme ve `force` kontrolü; kapalıyken ağ isteği
+yapılmaz. Planlı işlem yalnız kasaya taşır.
+
 ---
 
 ## 5. Açık işler

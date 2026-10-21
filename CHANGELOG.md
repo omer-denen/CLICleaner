@@ -32,6 +32,12 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
   bağımlılık grafiği, kök nedenler ve gerekçeli what-if engeli. Filtre,
   sıralama ve sayımlar `core/cli-view.ts` motorundan gelir. Onay
   kurallarına `envClean` (`TEMIZLE`) eklendi.
+- **Planlar + Ayarlar + Güncelleme (T44 / M4):** zamanlanmış kural
+  oluşturma yazılı **`PLANLA`** onayı ister; kural seçici saklar ve
+  yalnız kasaya taşır. Planlar ekranında önizleme, iki adımlı çalıştırma
+  ve silme, kaçırılan çalışma önerileri ve geçmiş; Ayarlar ekranında
+  tarama önbelleği, kasa saklama, güncelleme modu ve isteğe bağlı sürüm
+  kontrolü. Güncelleme kontrolü kapalıyken ağ isteği yapılmaz.
 - **Disk görünümü motoru** (`core/disk-view.ts`) ve `GET /api/disk` /
   `GET /api/cluster`: filtre, sıralama, kategori sayımı ve seçim özeti
   motorda; arayüz yalnız gösterir. Plan ve kasa onay ifadeleri
@@ -47,7 +53,7 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - **Kabuk sınırı testi:** `web/src` Node builtin'i, servis/aksiyon katmanını
   veya çekirdek karar sınıflarını import edemez; yalnız sözleşme tipleri ve
   saf `ApprovalRules` paylaşılır.
-- Test: `npm test` 89 test.
+- Test: `npm test` 92 test.
 
 ### Düzeltildi
 

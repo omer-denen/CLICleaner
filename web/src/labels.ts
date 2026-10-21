@@ -124,3 +124,28 @@ export const GRAPH_LEVEL_LABEL: Record<string, MessageKey> = {
   high: 'graph.level.high',
   critical: 'graph.level.critical',
 };
+
+export const SCHEDULE_STATUS_LABEL: Record<string, MessageKey> = {
+  pending: 'schedules.status.pending',
+  running: 'schedules.status.running',
+  done: 'schedules.status.done',
+  missed: 'schedules.status.missed',
+  failed: 'schedules.status.failed',
+  cancelled: 'schedules.status.cancelled',
+};
+
+export const SCHEDULE_FREQ_LABEL: Record<string, MessageKey> = {
+  once: 'schedules.freq.once',
+  daily: 'schedules.freq.daily',
+  weekly: 'schedules.freq.weekly',
+};
+
+export const SCHEDULE_WEEKDAY_LABEL: MessageKey[] = [
+  'schedules.weekday.0',
+  'schedules.weekday.1',
+  'schedules.weekday.2',
+  'schedules.weekday.3',
+  'schedules.weekday.4',
+  'schedules.weekday.5',
+  'schedules.weekday.6',
+];

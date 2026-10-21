@@ -1564,3 +1564,124 @@ code,
     display: none;
   }
 }
+
+/* -------------------------------------------------- M4: planlar/ayarlar */
+
+.schedules {
+  max-width: 1180px;
+}
+
+.schedule-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 12px 0;
+}
+
+.schedule-form .control-label {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.schedule-form .control {
+  width: 100%;
+}
+
+.schedule-categories {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+
+.schedule-checks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 10px 0;
+}
+
+.schedule-approval {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schedule-approval .approval-row {
+  flex: 1;
+  min-width: 220px;
+}
+
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-card {
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+
+.schedule-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schedule-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.settings {
+  max-width: 920px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-row .dim {
+  flex: 1;
+  min-width: 200px;
+  font-size: 12px;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.settings-update {
+  margin-top: 10px;
+}
+
+@media (max-width: 820px) {
+  .schedule-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -682,7 +682,9 @@ async function handleRequest(
   if (route === 'POST /api/schedules') {
     const body = await readJson<Record<string, unknown>>(req);
     const input = body as unknown as Parameters<typeof ctx.schedules.create>[0];
-    sendJson(res, 201, await ctx.schedules.create(input));
+    const phrase = typeof body.phrase === 'string' ? body.phrase : '';
+    // Otomatik plan kurali yazili PLANLA onayi ister (ikinci savunma hatti).
+    sendJson(res, 201, await ctx.schedules.create(input, { require: true, phrase }));
     return;
   }
 
