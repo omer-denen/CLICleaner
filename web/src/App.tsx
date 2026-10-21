@@ -105,7 +105,7 @@ export function App() {
       </header>
 
       <div className="shell">
-        <nav className="rail" aria-label="Bölümler">
+        <nav className="rail" aria-label={t('nav.sections')}>
           {NAV.map((item) => (
             <button
               key={item.id}
@@ -171,11 +171,16 @@ export function App() {
         {dashboard ? (
           <>
             <span>
-              <strong className="mono">{dashboard.totals.clusters}</strong>{' '}
+              <strong className="mono">
+                {dashboard.totals.clusters.toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
+              </strong>{' '}
               {t('status.clusters')}
             </span>
             <span>
-              <strong className="mono">{dashboard.totals.files}</strong> {t('status.files')}
+              <strong className="mono">
+                {dashboard.totals.files.toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
+              </strong>{' '}
+              {t('status.files')}
             </span>
             <span>
               {t('ledger.reclaimable')}:{' '}

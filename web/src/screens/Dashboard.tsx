@@ -87,7 +87,7 @@ export function Dashboard({ data, lang }: { data: DashboardResponse; lang: Lang 
         </span>
       </header>
 
-      <section className="ledgers" aria-label="Defterler">
+      <section className="ledgers" aria-label={t('dash.ledgers')}>
         {data.ledgers.map((ledger) => (
           <article key={ledger.id} className={`ledger ledger-${ledger.id}`}>
             <span className="ledger-label">{t(LEDGER_LABEL[ledger.id])}</span>
@@ -104,7 +104,7 @@ export function Dashboard({ data, lang }: { data: DashboardResponse; lang: Lang 
       )}
 
       {data.cards.length > 0 && (
-        <section className="cards" aria-label="Risk kartları">
+        <section className="cards" aria-label={t('dash.cards')}>
           {data.cards.map((card) => (
             <article key={`${card.id}-${card.target}`} className={`card card-${card.tone}`}>
               <span className="card-label">{t(CARD_LABEL[card.id])}</span>
@@ -123,10 +123,10 @@ export function Dashboard({ data, lang }: { data: DashboardResponse; lang: Lang 
           <table className="table">
             <thead>
               <tr>
-                <th>Cluster</th>
-                <th>Category</th>
-                <th className="num">Size</th>
-                <th>Why</th>
+                <th>{t('table.cluster')}</th>
+                <th>{t('table.category')}</th>
+                <th className="num">{t('table.size')}</th>
+                <th>{t('table.why')}</th>
               </tr>
             </thead>
             <tbody>
