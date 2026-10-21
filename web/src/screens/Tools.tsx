@@ -181,6 +181,11 @@ export function Tools({ lang }: Props) {
       });
       setPlan(next);
       setPhrase('');
+      setTimeout(() => {
+        document
+          .querySelector('.tools-detail')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
     } catch (err) {
       setPlanError(err instanceof ApiError ? err.message : String(err));
     }

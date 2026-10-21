@@ -62,6 +62,11 @@ export function Env({ lang }: Props) {
       const next = await api.envPlan({ scope, removeMissing, removeDuplicates });
       setPlan(next);
       setPhrase('');
+      setTimeout(() => {
+        document
+          .querySelector('.env-detail')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -344,7 +349,7 @@ export function Env({ lang }: Props) {
               </button>
               <button
                 type="button"
-                className="primary"
+                className="danger-button"
                 disabled={!canApply || plan.plan.empty}
                 onClick={() => void apply()}
               >
