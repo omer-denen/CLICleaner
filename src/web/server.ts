@@ -653,11 +653,13 @@ async function handleRequest(
   if (route === 'POST /api/graph/what-if') {
     const body = await readJson<Record<string, unknown>>(req);
     const query = typeof body.query === 'string' ? body.query.trim() : '';
-    if (!query) {
-      sendJson(res, 400, { error: 'query gerekli' });
+    const nodeId = typeof body.nodeId === 'string' ? body.nodeId.trim() : '';
+    if (!query && !nodeId) {
+      sendJson(res, 400, { error: 'query veya nodeId gerekli' });
       return;
     }
-    sendJson(res, 200, await ctx.graph.whatIf(query));
+    // Satir eylemi KESIN kimlikle calisir; serbest arama alt dizi eslestirir.
+    sendJson(res, 200, nodeId ? await ctx.graph.whatIfNode(nodeId) : await ctx.graph.whatIf(query));
     return;
   }
 

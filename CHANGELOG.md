@@ -3,6 +3,16 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
+## [Unreleased]
+
+### Eklendi
+
+- **Graf: satırdan simülasyon.** Düğüm ve kök neden satırlarındaki
+  **Simüle** düğmesi, serbest arama yerine düğümün **kesin kimliğiyle**
+  what-if çalıştırır. Böylece “browser” gibi bir ad birden fazla düğümle
+  eşleşse bile yalnızca seçilen satır değerlendirilir; sonuç paneli seçili
+  düğümü gösterir.
+
 ## [2.2.0] - 2026-10-21
 
 ### Eklendi

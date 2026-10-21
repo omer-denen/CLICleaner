@@ -78,4 +78,16 @@ export class GraphService {
       .map((n) => n.id);
     return { nodeIds, result: g.whatIf(nodeIds) };
   }
+
+  /**
+   * Tek dugumun KESIN kimligiyle simulasyon (arayuzdeki satir eylemi).
+   * Serbest arama alt dizi eslestirdigi icin satir eylemi kimlik kullanir;
+   * bilinmeyen kimlik bos sonuc doner (sessizce yok sayilir).
+   */
+  async whatIfNode(nodeId: string): Promise<GraphWhatIfResponse> {
+    const g = await this.graph();
+    const node = g.node(nodeId);
+    const nodeIds = node ? [node.id] : [];
+    return { nodeIds, result: g.whatIf(nodeIds) };
+  }
 }

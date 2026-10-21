@@ -512,6 +512,13 @@ export interface GraphViewResponse {
   };
 }
 
+export interface GraphWhatIfRequest {
+  /** Serbest metin: kimlik, etiket veya yol alt dizisi. */
+  query?: string;
+  /** Tek dugumun KESIN kimligi (satir eylemi). Varsa `query`den onceliklidir. */
+  nodeId?: string;
+}
+
 export interface GraphWhatIfResponse {
   nodeIds: string[];
   result: WhatIfResult;

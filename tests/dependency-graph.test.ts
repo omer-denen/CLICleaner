@@ -53,6 +53,14 @@ test('kopuk kenar kok nedeni hedefe gore gruplanir', () => {
   assert.equal(causes[0]!.count, 1);
 });
 
+test('bilinmeyen kimlik what-if sonucunu kirletmez', () => {
+  const g = graph();
+  const r = g.whatIf(['boyle-bir-dugum-yok']);
+  assert.deepEqual(r.allowed, []);
+  assert.equal(r.blocked.length, 0);
+  assert.equal(r.brokenEdges.length, 0);
+});
+
 test('rol ve seviye', () => {
   const g = graph();
   const roles = g.roles();

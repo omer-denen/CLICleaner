@@ -36,6 +36,7 @@ export function Graph({ lang }: Props) {
   const [running, setRunning] = useState(false);
   const [whatIf, setWhatIf] = useState<GraphWhatIfResponse | null>(null);
   const [whatIfError, setWhatIfError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,10 +68,38 @@ export function Graph({ lang }: Props) {
     setRunning(true);
     setWhatIfError(null);
     setWhatIf(null);
+    setSelectedId(null);
     try {
       setWhatIf(await api.graphWhatIf(q));
     } catch (err) {
       setWhatIfError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  /**
+   * Satir eylemi: serbest arama yerine dugumun KESIN kimligiyle simule eder.
+   * Kimlik ve sonuc MOTORDAN gelir; arayuz yalnizca istek gonderir.
+   */
+  const simulateNode = async (node: { id: string; label: string }): Promise<void> => {
+    setQuery(node.label);
+    setRunning(true);
+    setWhatIfError(null);
+    setWhatIf(null);
+    setSelectedId(node.id);
+    try {
+      const out = await api.graphWhatIfNode(node.id);
+      setWhatIf(out);
+      if (out.nodeIds.length === 0) setSelectedId(null);
+      if (window.matchMedia('(max-width: 1240px)').matches) {
+        document
+          .getElementById('graph-whatif')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } catch (err) {
+      setWhatIfError(err instanceof ApiError ? err.message : String(err));
+      setSelectedId(null);
     } finally {
       setRunning(false);
     }
@@ -132,12 +161,23 @@ export function Graph({ lang }: Props) {
               ) : (
                 <ul className="detail-list">
                   {view.rootCauses.map((root) => (
-                    <li key={root.root}>
-                      <span className="mono">{root.label}</span>
-                      <span className="dim">
-                        {t(GRAPH_NODE_LABEL[root.kind] ?? 'graph.node.unknown')} ·{' '}
-                        {root.count} {t('graph.summary.edges')}
+                    <li key={root.root} className="graph-root-row">
+                      <span className="graph-root-main">
+                        <span className="mono">{root.label}</span>
+                        <span className="dim">
+                          {t(GRAPH_NODE_LABEL[root.kind] ?? 'graph.node.unknown')} ·{' '}
+                          {root.count} {t('graph.summary.edges')}
+                        </span>
                       </span>
+                      <button
+                        type="button"
+                        className="ghost graph-sim"
+                        disabled={running}
+                        aria-label={t('graph.whatIf.simulateNode', { name: root.label })}
+                        onClick={() => void simulateNode({ id: root.root, label: root.label })}
+                      >
+                        {t('graph.whatIf.simulate')}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -166,9 +206,14 @@ export function Graph({ lang }: Props) {
                   <span>{t('graph.role')}</span>
                   <span>{t('graph.level')}</span>
                   <span>{t('graph.path')}</span>
+                  <span />
+                  <span>{t('graph.action')}</span>
                 </div>
                 {view.nodes.map((node) => (
-                  <div className="graph-node-row" key={node.id}>
+                  <div
+                    className={`graph-node-row${selectedId === node.id ? ' active' : ''}`}
+                    key={node.id}
+                  >
                     <span className="mono graph-label" title={node.id}>
                       {node.label}
                     </span>
@@ -194,6 +239,15 @@ export function Graph({ lang }: Props) {
                         <span className="badge">{t('graph.node.protected')}</span>
                       )}
                     </span>
+                    <button
+                      type="button"
+                      className="ghost graph-sim"
+                      disabled={running}
+                      aria-label={t('graph.whatIf.simulateNode', { name: node.label })}
+                      onClick={() => void simulateNode(node)}
+                    >
+                      {t('graph.whatIf.simulate')}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -243,6 +297,13 @@ export function Graph({ lang }: Props) {
       <aside className="graph-detail" id="graph-whatif">
         <h2>{t('graph.whatIf.title')}</h2>
         <p className="dim">{t('graph.whatIf.hint')}</p>
+
+        {selectedId && (
+          <p className="dim">
+            {t('graph.whatIf.selected')}:{' '}
+            <span className="mono">{labelOf(selectedId)}</span>
+          </p>
+        )}
 
         <div className="graph-whatif-form">
           <input

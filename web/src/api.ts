@@ -188,6 +188,9 @@ export const api = {
   graphWhatIf: (query: string): Promise<GraphWhatIfResponse> =>
     post<GraphWhatIfResponse>('/api/graph/what-if', { query }),
 
+  graphWhatIfNode: (nodeId: string): Promise<GraphWhatIfResponse> =>
+    post<GraphWhatIfResponse>('/api/graph/what-if', { nodeId }),
+
   schedules: (): Promise<ScheduleListResponse> =>
     request<ScheduleListResponse>('/api/schedules'),
 

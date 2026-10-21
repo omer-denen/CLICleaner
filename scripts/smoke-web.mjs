@@ -183,6 +183,7 @@ async function main() {
     };
 
     check('plan (bos secim) 400', (await post('/api/plan', {})) === 400);
+    check('graf what-if bos 400', (await post('/api/graph/what-if', {})) === 400);
     check('schedule onaysiz 400', (await post('/api/schedules', {})) === 400);
     check('kasaya kalici silme onaysiz 400', (await post('/api/vault/purge', { phrase: 'yanlis' })) === 400);
     check('env uygulama plansiz 404', (await post('/api/env/apply', {})) === 404);
