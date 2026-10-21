@@ -272,6 +272,7 @@ residue schedule            # planlı kasa temizliği (günlük/haftalık)
 residue vault               # kasa envanteri / saklama / kalıcı silme
 residue recover             # yarım kalan işlemleri raporla
 residue ui                  # terminal arayüzü (Ink; gerçek terminal gerekir)
+residue ui --web            # tarayıcı arayüzü (dist/web; 127.0.0.1)
 residue api                 # başsız HTTP/SSE API (arayüz yok; 127.0.0.1)
 ```
 

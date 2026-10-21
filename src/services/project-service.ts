@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { resolve } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { isAbsolute, resolve } from 'node:path';
 import {
   analyzeProject,
   planProjectCleanup,
@@ -10,6 +11,8 @@ import {
   type ProjectRecipe,
   type RestoreResult,
 } from '../core/project-deps.ts';
+import { discoverProjects, type ProjectDiscoveryOptions } from '../core/project-discovery.ts';
+import type { ProjectDiscoverResponse } from '../core/contract.ts';
 import { ServiceError } from './errors.ts';
 
 /**
@@ -47,6 +50,28 @@ export interface ProjectRestoreResponse {
 
 export class ProjectService {
   private readonly plans = new Map<string, StoredProjectPlan>();
+
+  /**
+   * Kokler altinda proje depolarini bulur. SALT OKUNUR; hicbir hedef
+   * uretmez. Gecersiz/yok kokler sessizce elenir, en fazla 5 kok.
+   */
+  async discover(
+    roots: string[],
+    opts: ProjectDiscoveryOptions = {},
+  ): Promise<ProjectDiscoverResponse> {
+    const clean: string[] = [];
+    for (const raw of roots.slice(0, 5)) {
+      if (typeof raw !== 'string' || raw.trim().length === 0) continue;
+      const abs = resolve(raw.trim());
+      if (!isAbsolute(abs)) continue;
+      const s = await stat(abs).catch(() => null);
+      if (s?.isDirectory()) clean.push(abs);
+    }
+    if (clean.length === 0) {
+      throw new ServiceError(400, 'Gecerli bir kok dizin gerekli');
+    }
+    return discoverProjects(clean, opts);
+  }
 
   async analyze(dir: string): Promise<ProjectAnalysisResponse> {
     const root = resolve(dir);

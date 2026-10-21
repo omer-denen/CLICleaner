@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
@@ -68,4 +68,33 @@ test('bilinmeyen plan kimligi 404', async () => {
   const body = (await r.json()) as { type?: string; error?: string };
   assert.equal(body.type, 'fatal');
   assert.ok(body.error);
+});
+
+test('dashboard ve proje kesfi uclari yanit verir', async () => {
+  const d = await fetch(`${base}/api/dashboard`, { headers: { 'x-residue-token': token } });
+  assert.equal(d.status, 200);
+  const body = (await d.json()) as {
+    ledgers?: Array<{ id: string }>;
+    cards?: unknown[];
+    safeWins?: unknown[];
+  };
+  assert.ok(body.ledgers?.some((l) => l.id === 'protected'));
+  assert.ok(Array.isArray(body.cards));
+  assert.ok(Array.isArray(body.safeWins));
+
+  const projRoot = join(root, 'proj');
+  await mkdir(join(projRoot, '.git'), { recursive: true });
+  await writeFile(join(projRoot, 'package.json'), '{}', 'utf8');
+  const p = await fetch(
+    `${base}/api/projects/discover?roots=${encodeURIComponent(projRoot)}`,
+    { headers: { 'x-residue-token': token } },
+  );
+  assert.equal(p.status, 200);
+  const pb = (await p.json()) as { projects?: Array<{ name: string }> };
+  assert.ok(pb.projects?.some((x) => x.name === 'proj'));
+
+  const bad = await fetch(`${base}/api/projects/discover`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(bad.status, 400);
 });

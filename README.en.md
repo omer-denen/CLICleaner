@@ -274,6 +274,7 @@ residue schedule            # scheduled vault cleanup (daily/weekly)
 residue vault               # vault inventory / retention / permanent delete
 residue recover             # report interrupted operations
 residue ui                  # terminal UI (Ink; needs a real terminal)
+residue ui --web            # browser UI (dist/web; 127.0.0.1)
 residue api                 # headless HTTP/SSE API (no UI; 127.0.0.1)
 ```
 

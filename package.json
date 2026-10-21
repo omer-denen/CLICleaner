@@ -42,6 +42,7 @@
   "files": [
     "bin/",
     "src/",
+    "dist/",
     "README.md",
     "README.en.md",
     "CHANGELOG.md",
@@ -61,8 +62,10 @@
     "rules": "tsx src/cli.ts rules",
     "doctor": "tsx src/cli.ts doctor",
     "undo": "tsx src/cli.ts undo",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p web/tsconfig.json --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
+    "build:web": "vite build",
+    "prepublishOnly": "npm run build:web && npm run typecheck",
     "preversion": "npm run typecheck",
     "release:patch": "npm version patch -m \"surum: v%s\"",
     "release:minor": "npm version minor -m \"surum: v%s\"",
@@ -75,7 +78,10 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^19.3.0",
-    "typescript": "^5.7.2"
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.7"
   },
   "engines": {
     "node": ">=22.6"
@@ -83,6 +89,7 @@
   "dependencies": {
     "ink": "^8.0.0",
     "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tsx": "^4.23.15"
   }
 }

@@ -5,6 +5,20 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ## [Unreleased]
 
+### Eklendi
+
+- **Arayüz temeli (T44 / M0):** `web/` (React 19 + Vite + TypeScript),
+  `residue ui --web`, `dist/web` pakete girer. Arayüz yalnızca istek
+  gönderir; kararlar motordan gelir. Token, `HttpOnly + SameSite=Strict`
+  çerezle taşınır (URL'de token yok). TR/EN, 3 sütunlu koyu tema.
+- **Başlangıç özeti motoru** (`core/dashboard-summary.ts`) ve
+  `GET /api/dashboard`: korunan/geri kazanılabilir defterleri, risk
+  kartları, güvenli kazanımlar ve karar sayıları. Ağır tarama tetiklemez.
+- **Proje keşfi motoru** (`core/project-discovery.ts`) ve
+  `GET /api/projects/discover`: `.git`/manifest/artifact kanıtıyla repo
+  listesi; salt okunur, silme hedefi üretmez.
+- Test: `npm test` 65 test.
+
 ## [2.1.0] - 2026-10-21
 
 Motor genişlemesi: kanıt ağacı, bağımlılık grafı, ortam değişkeni, proje

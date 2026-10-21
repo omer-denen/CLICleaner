@@ -5,8 +5,11 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readdir, stat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { extname, dirname, join, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { closeRecycle } from '../actions/delete.ts';
 import {
   findVaultEntry,
@@ -35,6 +38,7 @@ import { EnvService } from '../services/env-service.ts';
 import { ProjectService } from '../services/project-service.ts';
 import { GraphService } from '../services/graph-service.ts';
 import { ScheduleService } from '../services/schedule-service.ts';
+import { DashboardService } from '../services/dashboard-service.ts';
 import { interruptedOperations } from '../core/operation-journal.ts';
 import { info as logInfo } from '../util/log.ts';
 import { ServiceError, describeError } from '../services/errors.ts';
@@ -112,6 +116,10 @@ export interface WebOptions {
    * Testler false verir; kismi tarama kullanicinin onbellegini ezmesin.
    */
   persistScan?: boolean;
+  /** Statik arayuzu (dist/web) sun. `residue ui --web` true verir. */
+  serveUi?: boolean;
+  /** Baslatinca varsayilan tarayiciyi ac (yalniz serveUi ile). */
+  openBrowser?: boolean;
 }
 
 interface WebContext {
@@ -127,6 +135,7 @@ interface WebContext {
   projects: ProjectService;
   graph: GraphService;
   schedules: ScheduleService;
+  dashboard: DashboardService;
   /** jobId -> SSE istemcileri (HTTP adaptorune ait gecici durum). */
   streams: Map<string, Set<ServerResponse>>;
 }
@@ -162,6 +171,7 @@ export function createApiServer(opts: WebOptions = {}): { server: Server; token:
   const projects = new ProjectService();
   const graph = new GraphService(inventory);
   const schedules = new ScheduleService(scan, remove);
+  const dashboard = new DashboardService(scan, env, graph, schedules, inventory);
 
   const ctx: WebContext = {
     token,
@@ -176,6 +186,7 @@ export function createApiServer(opts: WebOptions = {}): { server: Server; token:
     projects,
     graph,
     schedules,
+    dashboard,
     streams,
   };
 
@@ -229,17 +240,32 @@ export async function runApi(opts: WebOptions = {}): Promise<void> {
   const addr = server.address();
   const actualPort = typeof addr === 'object' && addr ? addr.port : port;
   const openHost = host === '::1' ? '127.0.0.1' : host;
+  const rootUrl = `http://${openHost}:${actualPort}/`;
   const url = `http://${openHost}:${actualPort}/api/meta?token=${token}`;
+  const hasUi = opts.serveUi && (await stat(WEB_DIST_INDEX).catch(() => null)) !== null;
 
   console.log('');
-  console.log('  Residue API hazir (arayuz yok; basit bir HTTP/SSE API).');
-  console.log('');
-  console.log(`  Adres:        ${url}`);
+  if (opts.serveUi) {
+    console.log('  Residue arayuz hazir.');
+    console.log('');
+    console.log(`  Arayuz:       ${rootUrl}`);
+    console.log(`  API:          ${url}`);
+    if (!hasUi) {
+      console.log('');
+      console.log('  UYARI: dist/web yok. Once arayuzu derle:  npm run build:web');
+    }
+  } else {
+    console.log('  Residue API hazir (arayuz yok; basit bir HTTP/SSE API).');
+    console.log('');
+    console.log(`  Adres:        ${url}`);
+  }
   console.log('  Yalnizca bu bilgisayarda calisir (127.0.0.1).');
   console.log('  Her baslatmada yeni bir guvenlik token\'i uretilir.');
   console.log('');
   console.log('  Kapatmak icin Ctrl+C.');
   console.log('');
+
+  if (hasUi && opts.openBrowser) openInBrowser(rootUrl);
 
   await new Promise<void>((ok) => {
     const stop = () => {
@@ -259,6 +285,75 @@ export async function runApi(opts: WebOptions = {}): Promise<void> {
 // Yonlendirme
 // ---------------------------------------------------------------------------
 
+/** Derlenmis arayuz (vite build -> dist/web). Kaynak agacina yazilmaz. */
+const WEB_DIST = fileURLToPath(new URL('../../dist/web/', import.meta.url));
+const WEB_DIST_INDEX = join(WEB_DIST, 'index.html');
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
+
+/**
+ * Statik arayuzu sunar. Yalnizca GET/HEAD; dizin disina cikis engellenir.
+ * `index.html` yanitinda HttpOnly token cerezi verilir (URL'de token yok).
+ */
+async function serveWebUi(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+  token: string,
+): Promise<boolean> {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return false;
+  }
+  const isAsset = extname(decoded) !== '';
+  const target = isAsset ? decoded : '/index.html';
+  const file = resolve(WEB_DIST, `.${target}`);
+  const root = resolve(WEB_DIST) + sep;
+  if (!file.toLowerCase().startsWith(root.toLowerCase())) return false;
+
+  const data = await readFile(file).catch(() => null);
+  if (!data) return false;
+
+  res.setHeader('Content-Type', MIME[extname(file).toLowerCase()] ?? 'application/octet-stream');
+  res.setHeader(
+    'Cache-Control',
+    target === '/index.html' ? 'no-store' : 'public, max-age=3600',
+  );
+  if (target === '/index.html') {
+    res.setHeader('Set-Cookie', `residue_token=${token}; HttpOnly; SameSite=Strict; Path=/`);
+  }
+  res.statusCode = 200;
+  res.end(req.method === 'HEAD' ? undefined : data);
+  return true;
+}
+
+function openInBrowser(url: string): void {
+  try {
+    if (process.platform === 'win32') {
+      execFile('cmd', ['/c', 'start', '', url], { windowsHide: true });
+    } else if (process.platform === 'darwin') {
+      execFile('open', [url]);
+    } else {
+      execFile('xdg-open', [url]);
+    }
+  } catch {
+    /* tarayici acilamazsa kullanici URL'yi elle acabilir */
+  }
+}
+
 async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -273,28 +368,38 @@ async function handleRequest(
     return;
   }
 
-  // Arayuz yok (2.0.0): kok yol API bilgisi doner. Statik dosya yoktur.
+  // Arayuz: `ui --web` ise derlenmis kabuk sunulur. `api` modunda kok yol
+  // API bilgisi doner; statik dosya sunulmaz.
   if (!pathname.startsWith('/api/')) {
-    sendJson(res, 200, {
-      name: 'residue',
-      version: currentVersion(),
-      ui: 'none',
-      note: 'Tarayici arayuzu 2.0.0 ile kaldirildi; bu sunucu BASSSIZ bir HTTP/SSE API\'dir.',
-      hint: 'API cagrilari token ister. Ornek: /api/meta?token=<token>',
-      endpoints: [
-        'GET  /api/meta',
-        'GET  /api/latest',
-        'GET  /api/scan/status',
-        'GET  /api/findings',
-        'GET  /api/settings',
-        'GET  /api/vault',
-        'GET  /api/cli/inventory',
-        'GET  /api/env',
-        'GET  /api/graph',
-        'GET  /api/schedules',
-        'GET  /api/recover',
-      ],
-    });
+    if (ctx.opts.serveUi && (await serveWebUi(req, res, pathname, ctx.token))) return;
+    if (pathname === '/' || pathname === '/index.html') {
+      sendJson(res, 200, {
+        name: 'residue',
+        version: currentVersion(),
+        ui: ctx.opts.serveUi ? 'missing' : 'none',
+        note: ctx.opts.serveUi
+          ? 'dist/web bulunamadi. Arayuzu derleyin: npm run build:web'
+          : 'Bu sunucu BASSSIZ bir HTTP/SSE API\'dir; arayuz icin: residue ui --web',
+        hint: 'API cagrilari token ister. Ornek: /api/meta?token=<token>',
+        endpoints: [
+          'GET  /api/meta',
+          'GET  /api/dashboard',
+          'GET  /api/latest',
+          'GET  /api/scan/status',
+          'GET  /api/findings',
+          'GET  /api/settings',
+          'GET  /api/vault',
+          'GET  /api/cli/inventory',
+          'GET  /api/env',
+          'GET  /api/graph',
+          'GET  /api/projects/discover',
+          'GET  /api/schedules',
+          'GET  /api/recover',
+        ],
+      });
+      return;
+    }
+    sendJson(res, 404, { error: 'Bulunamadi' });
     return;
   }
 
@@ -317,6 +422,11 @@ async function handleRequest(
 
   if (route === 'GET /api/meta') {
     sendJson(res, 200, metaResponse(ctx));
+    return;
+  }
+
+  if (route === 'GET /api/dashboard') {
+    sendJson(res, 200, await ctx.dashboard.view());
     return;
   }
 
@@ -439,6 +549,23 @@ async function handleRequest(
       return;
     }
     sendJson(res, 200, await ctx.projects.analyze(dir));
+    return;
+  }
+
+  // SALT OKUNUR proje kesfi. Kokler istemciden gelir; hedef uretilmez.
+  if (route === 'GET /api/projects/discover') {
+    const roots = url.searchParams
+      .getAll('roots')
+      .flatMap((v) => v.split(/[;,]/))
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const maxDepth = Number(url.searchParams.get('maxDepth') ?? '3');
+    const maxProjects = Number(url.searchParams.get('maxProjects') ?? '200');
+    const view = await ctx.projects.discover(roots, {
+      maxDepth: Number.isFinite(maxDepth) ? maxDepth : 3,
+      maxProjects: Number.isFinite(maxProjects) ? maxProjects : 200,
+    });
+    sendJson(res, 200, view);
     return;
   }
 
@@ -1080,6 +1207,10 @@ function metaResponse(ctx: WebContext): MetaResponse {
       exclude: ctx.opts.exclude ?? [],
       minAgeDays: ctx.opts.minAgeDays ?? 0,
     },
+    cwd: process.cwd(),
+    home: homedir(),
+    ui: !!ctx.opts.serveUi,
+    version: currentVersion(),
   };
 }
 
@@ -1104,13 +1235,25 @@ function sameOrigin(req: IncomingMessage): boolean {
 function authorized(req: IncomingMessage, url: URL, token: string): boolean {
   const header = req.headers['x-residue-token'];
   const raw = Array.isArray(header) ? header[0] : header;
-  const provided = raw ?? url.searchParams.get('token') ?? '';
+  const provided = raw ?? url.searchParams.get('token') ?? cookieValue(req, 'residue_token') ?? '';
   if (provided.length !== token.length) return false;
   try {
     return timingSafeEqual(Buffer.from(provided), Buffer.from(token));
   } catch {
     return false;
   }
+}
+
+/** `Cookie` basligindan tek bir degeri okur (arayuz icin HttpOnly token). */
+function cookieValue(req: IncomingMessage, name: string): string | null {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    if (part.slice(0, idx).trim() === name) return part.slice(idx + 1).trim();
+  }
+  return null;
 }
 
 function sanitizeEnvs(envs: unknown): Env[] | null {

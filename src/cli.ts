@@ -29,6 +29,7 @@ ${C.bold}Baslamak icin${C.reset}
 
 ${C.bold}Gelismis${C.reset}
   residue ui                  Terminal arayuzu (Ink; gercek terminal gerekir)
+  residue ui --web            Tarayici arayuzu (dist/web; 127.0.0.1)
   residue clean                Iki asamali onay + kasa (geri alinabilir)
   residue inventory [...]      Kurulu CLI envanteri (salt okunur)
   residue repair [--only <ad>] Bozuk / yarim kurulumlari onar (ONAR onayi)
@@ -200,12 +201,16 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'ui') {
-    // 2.0.0: tarayici arayuzu kaldirildi; `ui` artik terminal (Ink)
-    // arayuzunu acar. `--tui` geriye uyumluluk icin kabul edilir.
+    // `ui` varsayilan olarak terminal (Ink) arayuzunu acar. `--web` ise
+    // derlenmis tarayici kabugunu sunar (dist/web) ve varsayilan
+    // tarayiciyi acar. Arayuz yalnizca ISTEK gonderir; karar motorda.
     const envs: Env[] = [];
     const exclude: string[] = [];
     let profile: string | undefined;
     let purge = false;
+    let web = false;
+    let noBrowser = false;
+    let port = 0;
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
@@ -213,6 +218,25 @@ async function main(): Promise<void> {
       else if (a === '--profile') profile = rest[++i];
       else if (a === '--exclude') exclude.push(rest[++i]!);
       else if (a === '--purge') purge = true;
+      else if (a === '--web') web = true;
+      else if (a === '--no-browser') noBrowser = true;
+      else if (a === '--port') {
+        const n = Number(rest[++i]);
+        if (Number.isInteger(n) && n >= 0 && n <= 65535) port = n;
+      }
+    }
+
+    if (web) {
+      const { runApi } = await import('./web/server.ts');
+      await runApi({
+        envs,
+        profile,
+        exclude,
+        port,
+        serveUi: true,
+        openBrowser: !noBrowser,
+      });
+      return;
     }
 
     const { runTui } = await import('./commands/tui.ts');

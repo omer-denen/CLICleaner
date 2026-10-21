@@ -23,6 +23,7 @@ export interface GraphView {
     nodes: number;
     edges: number;
     broken: number;
+    shadowed: number;
     cycles: number;
     critical: number;
   };
@@ -35,15 +36,25 @@ export class GraphService {
     this.inventory = inventory;
   }
 
-  private async graph(): Promise<DependencyGraph> {
-    const inv = this.inventory.getLast() ?? (await this.inventory.ensure());
+  private async graph(force = true): Promise<DependencyGraph> {
+    const inv = force
+      ? (this.inventory.getLast() ?? (await this.inventory.ensure()))
+      : this.inventory.getLast();
+    if (!inv) throw new Error('envanter onbellegi yok');
     const g = buildInventoryGraph(inv);
     g.validate();
     return g;
   }
 
-  async view(): Promise<GraphView> {
-    const g = await this.graph();
+  /** Onbellekte envanter yoksa `null` doner; AGIR tarama tetiklemez. */
+  async viewCached(): Promise<GraphView | null> {
+    const inv = this.inventory.getLast();
+    if (!inv) return null;
+    const g = await this.graph(false);
+    return this.toView(g);
+  }
+
+  private toView(g: DependencyGraph): GraphView {
     const roles = g.roles();
     const levels = g.levels();
     const cycles = g.cycles();
@@ -60,10 +71,15 @@ export class GraphService {
         nodes: g.nodes().length,
         edges: g.edges().length,
         broken: g.edges().filter((e) => e.state === 'broken' || e.state === 'missing-chain').length,
+        shadowed: g.edges().filter((e) => e.state === 'shadowed').length,
         cycles: cycles.length,
         critical: [...levels.values()].filter((l) => l === 'critical').length,
       },
     };
+  }
+
+  async view(): Promise<GraphView> {
+    return this.toView(await this.graph());
   }
 
   async whatIf(query: string): Promise<{ nodeIds: string[]; result: WhatIfResult }> {

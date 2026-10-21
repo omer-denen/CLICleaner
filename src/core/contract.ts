@@ -1,4 +1,12 @@
-import type { Cluster, ScanResult, SkippedEntry } from './types.ts';
+import type {
+  Cluster,
+  Confidence,
+  Regenerability,
+  ScanResult,
+  SkippedEntry,
+  VerdictKind,
+} from './types.ts';
+import type { CategoryKey } from './categories.ts';
 import type { CliInventory, CliTool } from './cli-inventory-types.ts';
 
 /**
@@ -344,6 +352,14 @@ export interface MetaResponse {
     exclude: string[];
     minAgeDays: number;
   };
+  /** Sunucunun calisma dizini; proje kesfi icin onerilen kok. */
+  cwd?: string;
+  /** Kullanici profili; proje kesfi icin onerilen kok. */
+  home?: string;
+  /** Statik arayuz sunuluyor mu? */
+  ui?: boolean;
+  /** Paket surumu (arayuz alt bilgisi). */
+  version?: string;
 }
 
 export interface ApiErrorBody {
@@ -573,4 +589,103 @@ export interface CliQuarantineResultView {
 
 export interface CliQuarantineExecuteResponse {
   results: CliQuarantineResultView[];
+}
+
+// ---------------------------------------------------------------------------
+// Baslangic ozeti (dashboard) — yalniz KIMLIK + sayi; metin arayuzde.
+// ---------------------------------------------------------------------------
+
+export type DashboardCardId =
+  | 'scan-missing'
+  | 'scan-stale'
+  | 'path-issues'
+  | 'orphan-vars'
+  | 'broken-installs'
+  | 'broken-dependencies'
+  | 'shadowed-commands'
+  | 'interrupted'
+  | 'vault-expired'
+  | 'schedule-missed'
+  | 'schedule-due';
+
+/** Kartin goturdugu ekran; arayuz yalnizca bunu kullanir. */
+export type DashboardTarget =
+  | 'disk'
+  | 'projects'
+  | 'tools'
+  | 'env'
+  | 'graph'
+  | 'vault'
+  | 'schedules'
+  | 'recover';
+
+export type DashboardTone = 'info' | 'warn' | 'danger';
+
+export interface DashboardCardView {
+  id: DashboardCardId;
+  tone: DashboardTone;
+  count: number;
+  target: DashboardTarget;
+}
+
+export type DashboardLedgerId = 'protected' | 'reclaimable' | 'vault' | 'cli';
+
+export interface DashboardLedgerView {
+  id: DashboardLedgerId;
+  bytes: number;
+}
+
+/** Varsayilan secim kuralini gecen kume; "neden" kimlikle gelir. */
+export interface DashboardSafeWinView {
+  clusterKey: string;
+  category: CategoryKey;
+  bytes: number;
+  regenerability: Regenerability;
+  confidence: Confidence;
+}
+
+export interface DashboardScanView {
+  state: 'never' | 'current' | 'stale' | 'scanning';
+  at: number | null;
+  ageMs: number | null;
+  scanning: boolean;
+  clusters: number;
+  files: number;
+}
+
+export interface DashboardTotalsView {
+  clusters: number;
+  files: number;
+  verdicts: Record<VerdictKind, number>;
+}
+
+export interface DashboardResponse {
+  generatedAt: number;
+  scan: DashboardScanView;
+  ledgers: DashboardLedgerView[];
+  cards: DashboardCardView[];
+  safeWins: DashboardSafeWinView[];
+  totals: DashboardTotalsView;
+}
+
+// ---------------------------------------------------------------------------
+// Proje kesfi (SALT OKUNUR; silme hedefi uretmez)
+// ---------------------------------------------------------------------------
+
+export interface ProjectCandidateView {
+  root: string;
+  name: string;
+  markers: string[];
+  git: boolean;
+  agentWorkspace: boolean;
+  artifacts: string[];
+  lockfile: string | null;
+  lastActivityAt: number | null;
+}
+
+export interface ProjectDiscoverResponse {
+  roots: string[];
+  projects: ProjectCandidateView[];
+  truncated: boolean;
+  skipped: number;
 }
