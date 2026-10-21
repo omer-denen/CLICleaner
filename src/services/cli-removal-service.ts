@@ -5,6 +5,7 @@ import {
   type CliRemovalPlan,
 } from '../actions/cli-remove.ts';
 import { ApprovalRules } from '../core/approval.ts';
+import { buildInventoryGraph } from '../core/dependency-graph.ts';
 import { info } from '../util/log.ts';
 import { ServiceError } from './errors.ts';
 import type { CliInventoryService } from './cli-inventory-service.ts';
@@ -51,6 +52,33 @@ export class CliRemovalService {
       throw new ServiceError(400, 'Korunan araclar kaldirilamaz');
     }
 
+    // Bagimlilik grafigi: sert/aktif bir bagimlilik kopuyorsa o arac
+    // plana ALINMAZ. Secim birlikte degerlendirilir (grup ici shim'ler
+    // engel sayilmaz).
+    const graph = buildInventoryGraph(inv);
+    const nodeOf = (t: (typeof removable)[number]) =>
+      `tool:${t.source}:${t.packageName.toLowerCase()}`;
+    const sim = graph.whatIf(removable.map(nodeOf));
+    const blockedIds = new Set(sim.blocked.map((b) => b.id));
+    const blocked = sim.blocked.map((b) => {
+      const tool = removable.find((t) => nodeOf(t) === b.id);
+      return {
+        id: tool?.id ?? b.id,
+        command: tool?.command ?? b.label,
+        reason: b.reason,
+        dependents: b.dependents.map((d) => d.label),
+      };
+    });
+    const allowed = removable.filter((t) => !blockedIds.has(nodeOf(t)));
+    if (allowed.length === 0) {
+      throw new ServiceError(
+        400,
+        `Secilen araclar bagimlilik nedeniyle kaldirilamaz: ${blocked
+          .map((b) => `${b.command} (${b.dependents.join(', ')})`)
+          .join('; ')}`,
+      );
+    }
+
     // Golgede kalan bir paket secildiyse kaldirma sonrasi aktif paketi
     // yeniden baglayacak onarim komutunu plana ekle.
     const repairs = new Map<string, UninstallSpec>();
@@ -62,7 +90,7 @@ export class CliRemovalService {
       for (const id of d.removeIds) repairs.set(id, spec);
     }
 
-    const plan = await planCliRemoval(removable, backup, repairs);
+    const plan = await planCliRemoval(allowed, backup, repairs);
     const items: CliPlanItemView[] = plan.items.map((it) => ({
       id: it.tool.id,
       command: it.tool.command,
@@ -103,6 +131,7 @@ export class CliRemovalService {
       backupBytes: plan.backupBytes,
       requiresPhrase: true,
       expiresAt: plan.expiresAt,
+      ...(blocked.length > 0 ? { blocked } : {}),
     };
   }
 

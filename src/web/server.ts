@@ -12,6 +12,7 @@ import {
   findVaultEntry,
   listVaultEntries,
   purgeVault,
+  purgeVaultItems,
   restoreAllVault,
   restoreVaultEntry,
 } from '../actions/vault.ts';
@@ -30,8 +31,15 @@ import { CliInventoryService } from '../services/cli-inventory-service.ts';
 import { CliRemovalService } from '../services/cli-removal-service.ts';
 import { CliRepairService } from '../services/cli-repair-service.ts';
 import { CliQuarantineService } from '../services/cli-quarantine-service.ts';
+import { EnvService } from '../services/env-service.ts';
+import { ProjectService } from '../services/project-service.ts';
+import { GraphService } from '../services/graph-service.ts';
+import { ScheduleService } from '../services/schedule-service.ts';
+import { interruptedOperations } from '../core/operation-journal.ts';
+import { info as logInfo } from '../util/log.ts';
 import { ServiceError, describeError } from '../services/errors.ts';
-import { readJson, sendJson, sseSend, sseSetup } from './http.ts';
+import { AppError } from '../core/app-error.ts';
+import { readJson, sendJson, sseComment, sseSend, sseSetup } from './http.ts';
 import type { Env } from '../core/types.ts';
 import type {
   CliInventoryCancelResponse,
@@ -115,6 +123,10 @@ interface WebContext {
   removal: CliRemovalService;
   repair: CliRepairService;
   quarantine: CliQuarantineService;
+  env: EnvService;
+  projects: ProjectService;
+  graph: GraphService;
+  schedules: ScheduleService;
   /** jobId -> SSE istemcileri (HTTP adaptorune ait gecici durum). */
   streams: Map<string, Set<ServerResponse>>;
 }
@@ -146,6 +158,10 @@ export function createApiServer(opts: WebOptions = {}): { server: Server; token:
   const removal = new CliRemovalService(inventory);
   const repair = new CliRepairService(inventory);
   const quarantine = new CliQuarantineService(inventory);
+  const env = new EnvService();
+  const projects = new ProjectService();
+  const graph = new GraphService(inventory);
+  const schedules = new ScheduleService(scan, remove);
 
   const ctx: WebContext = {
     token,
@@ -156,14 +172,25 @@ export function createApiServer(opts: WebOptions = {}): { server: Server; token:
     removal,
     repair,
     quarantine,
+    env,
+    projects,
+    graph,
+    schedules,
     streams,
   };
 
   const server = createServer((req, res) => {
     handleRequest(req, res, ctx).catch((err) => {
       try {
-        const status = err instanceof ServiceError ? err.status : 500;
-        sendJson(res, status, { error: describeError(err) });
+        const status =
+          err instanceof ServiceError
+            ? err.status
+            : AppError.from(err).code === 'validation'
+              ? 400
+              : 500;
+        // Sozlesme: error (geriye uyumlu) + AppError govdesi.
+        const body = AppError.from(err).toBody();
+        sendJson(res, status, { error: describeError(err), ...body });
       } catch {
         /* yanit zaten yazilmis olabilir */
       }
@@ -181,6 +208,18 @@ export async function runApi(opts: WebOptions = {}): Promise<void> {
   }
 
   const { server, token } = createApiServer(opts);
+
+  // Acilista journal taramasi: yarim kalan islemler varsa YALNIZCA
+  // raporlanir; otomatik tamamlama/rollback kullanici kararina birakilir.
+  const interrupted = await interruptedOperations().catch(() => []);
+  if (interrupted.length > 0) {
+    logInfo('yarim kalan islem bulundu', {
+      sayi: interrupted.length,
+      ornek: interrupted[0]?.file,
+      komut: 'residue recover',
+    });
+  }
+
   const port = opts.port ?? 0;
   await new Promise<void>((ok, fail) => {
     server.once('error', fail);
@@ -250,6 +289,10 @@ async function handleRequest(
         'GET  /api/settings',
         'GET  /api/vault',
         'GET  /api/cli/inventory',
+        'GET  /api/env',
+        'GET  /api/graph',
+        'GET  /api/schedules',
+        'GET  /api/recover',
       ],
     });
     return;
@@ -338,8 +381,152 @@ async function handleRequest(
 
   if (route === 'PUT /api/settings' || route === 'POST /api/settings') {
     const body = await readJson<SettingsUpdateRequest>(req);
-    const out = await ctx.scan.updateSettings({ scanCacheHours: Number(body.scanCacheHours) });
+    // Gecerli tum alanlar servise aktarilir; onceden yalnizca
+    // scanCacheHours geciliyor, kasa suresi/surum kontrolu sessizce
+    // yok sayiliyordu.
+    const out = await ctx.scan.updateSettings({
+      ...(body.scanCacheHours !== undefined
+        ? { scanCacheHours: Number(body.scanCacheHours) }
+        : {}),
+      ...(body.vaultRetentionDays !== undefined
+        ? { vaultRetentionDays: Number(body.vaultRetentionDays) }
+        : {}),
+      ...(body.updateCheck !== undefined ? { updateCheck: body.updateCheck } : {}),
+    });
     sendJson(res, 200, out);
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Ortam degiskenleri / PATH (yeni motor)
+  // -------------------------------------------------------------------------
+  if (route === 'GET /api/env') {
+    sendJson(res, 200, await ctx.env.analyze());
+    return;
+  }
+
+  if (route === 'POST /api/env/plan') {
+    const body = await readJson<Record<string, unknown>>(req);
+    const scope = body.scope === 'machine' || body.scope === 'both' ? body.scope : 'user';
+    sendJson(
+      res,
+      200,
+      await ctx.env.plan({
+        scope,
+        removeMissing: body.removeMissing !== false,
+        removeDuplicates: body.removeDuplicates !== false,
+      }),
+    );
+    return;
+  }
+
+  if (route === 'POST /api/env/apply') {
+    const body = await readJson<Record<string, unknown>>(req);
+    const planId = typeof body.planId === 'string' ? body.planId : '';
+    const phrase = typeof body.phrase === 'string' ? body.phrase : '';
+    const out = await ctx.env.apply(planId, phrase);
+    sendJson(res, out.ok ? 200 : 409, out);
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Proje bagimliliklari (yeni motor)
+  // -------------------------------------------------------------------------
+  if (req.method === 'GET' && pathname === '/api/projects') {
+    const dir = url.searchParams.get('path');
+    if (!dir) {
+      sendJson(res, 400, { error: 'path parametresi gerekli' });
+      return;
+    }
+    sendJson(res, 200, await ctx.projects.analyze(dir));
+    return;
+  }
+
+  if (route === 'POST /api/projects/plan') {
+    const body = await readJson<Record<string, unknown>>(req);
+    const dir = typeof body.path === 'string' ? body.path : '';
+    if (!dir) {
+      sendJson(res, 400, { error: 'path gerekli' });
+      return;
+    }
+    const mode = body.mode === 'vault' || body.mode === 'cache-only' ? body.mode : 'recipe';
+    sendJson(res, 200, await ctx.projects.plan(dir, mode));
+    return;
+  }
+
+  if (route === 'POST /api/projects/restore') {
+    const body = await readJson<Record<string, unknown>>(req);
+    const planId = typeof body.planId === 'string' ? body.planId : '';
+    const phrase = typeof body.phrase === 'string' ? body.phrase : '';
+    sendJson(res, 200, await ctx.projects.restore(planId, phrase));
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Bagimlilik grafigi (yeni motor)
+  // -------------------------------------------------------------------------
+  if (route === 'GET /api/graph') {
+    sendJson(res, 200, await ctx.graph.view());
+    return;
+  }
+
+  if (route === 'POST /api/graph/what-if') {
+    const body = await readJson<Record<string, unknown>>(req);
+    const query = typeof body.query === 'string' ? body.query.trim() : '';
+    if (!query) {
+      sendJson(res, 400, { error: 'query gerekli' });
+      return;
+    }
+    sendJson(res, 200, await ctx.graph.whatIf(query));
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Zamanlanmis planlar (yeni motor)
+  // -------------------------------------------------------------------------
+  if (route === 'GET /api/schedules') {
+    sendJson(res, 200, { schedules: await ctx.schedules.list() });
+    return;
+  }
+
+  if (route === 'GET /api/schedules/catchup') {
+    sendJson(res, 200, { catchUp: await ctx.schedules.catchUp() });
+    return;
+  }
+
+  if (route === 'GET /api/schedules/history') {
+    sendJson(res, 200, { runs: await ctx.schedules.history() });
+    return;
+  }
+
+  if (route === 'POST /api/schedules') {
+    const body = await readJson<Record<string, unknown>>(req);
+    const input = body as unknown as Parameters<typeof ctx.schedules.create>[0];
+    sendJson(res, 201, await ctx.schedules.create(input));
+    return;
+  }
+
+  if (req.method === 'DELETE' && pathname.startsWith('/api/schedules/')) {
+    const id = pathname.split('/')[3] ?? '';
+    await ctx.schedules.remove(id);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname.startsWith('/api/schedules/') && pathname.endsWith('/preview')) {
+    const id = pathname.split('/')[3] ?? '';
+    sendJson(res, 200, await ctx.schedules.preview(id));
+    return;
+  }
+
+  if (req.method === 'POST' && pathname.startsWith('/api/schedules/') && pathname.endsWith('/run')) {
+    const id = pathname.split('/')[3] ?? '';
+    sendJson(res, 200, await ctx.schedules.run(id));
+    return;
+  }
+
+  if (route === 'GET /api/recover') {
+    sendJson(res, 200, { interrupted: await interruptedOperations() });
     return;
   }
 
@@ -356,6 +543,20 @@ async function handleRequest(
   if (req.method === 'POST' && pathname.startsWith('/api/scan/') && pathname.endsWith('/cancel')) {
     const id = pathname.split('/')[3] ?? '';
     ctx.scan.cancel(id);
+    sendJson(res, 202, { ok: true });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname.startsWith('/api/scan/') && pathname.endsWith('/pause')) {
+    const id = pathname.split('/')[3] ?? '';
+    ctx.scan.pause(id);
+    sendJson(res, 202, { ok: true });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname.startsWith('/api/scan/') && pathname.endsWith('/resume')) {
+    const id = pathname.split('/')[3] ?? '';
+    ctx.scan.resume(id);
     sendJson(res, 202, { ok: true });
     return;
   }
@@ -497,11 +698,16 @@ async function handleRequest(
       sendJson(res, 404, { error: 'Kasa kaydi bulunamadi' });
       return;
     }
-    const r = await restoreVaultEntry(entry);
+    const r = await restoreVaultEntry(entry, {
+      ...(body.mode ? { mode: body.mode } : {}),
+      ...(body.conflict ? { conflict: body.conflict } : {}),
+    });
     const out: VaultRestoreResponse = {
       ok: r.restored,
       to: r.to,
       conflict: r.conflict,
+      mode: r.mode,
+      verified: r.verified,
       ...(r.reason ? { error: r.reason } : {}),
     };
     sendJson(res, r.restored ? 200 : 409, out);
@@ -515,6 +721,7 @@ async function handleRequest(
       restored: r.restored,
       conflict: r.conflict,
       failed: r.failed,
+      unverified: r.unverified,
     };
     sendJson(res, 200, out);
     return;
@@ -527,6 +734,22 @@ async function handleRequest(
       sendJson(res, 400, {
         error: `Onay ifadesi hatali (${ApprovalRules.phrase('vaultPurge')})`,
       });
+      return;
+    }
+    // Yeni davranis: `ids` verilirse YALNIZCA o ogeler kalici silinir.
+    // `ids` yoksa eski "tum partiler" davranisi korunur; CLI yedekleri
+    // artik purgeVault tarafindan korunur.
+    if (Array.isArray(body.ids) && body.ids.length > 0) {
+      const ids = body.ids.filter((x): x is string => typeof x === 'string' && x.length > 0);
+      const r = await purgeVaultItems(ids);
+      const out: VaultPurgeResponse = {
+        ok: r.ok,
+        batches: 0,
+        bytes: r.bytes,
+        failed: r.failed,
+        items: r.items,
+      };
+      sendJson(res, 200, out);
       return;
     }
     const r = await purgeVault();
@@ -600,9 +823,14 @@ async function handleStartScan(
   // normalize edilir. Bos/gecersiz deger yok sayilir.
   const rawRoot = typeof body.root === 'string' ? body.root.trim() : '';
   const root = rawRoot.length > 0 ? resolve(rawRoot) : undefined;
+  const roots = Array.isArray(body.roots)
+    ? body.roots
+        .filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+        .map((r) => resolve(r))
+    : undefined;
 
   try {
-    const job = ctx.scan.start({ envs, profile, exclude, minAgeDays, root });
+    const job = ctx.scan.start({ envs, profile, exclude, minAgeDays, root, roots });
     const out: ScanStartResponse = { scanId: job.id };
     sendJson(res, 202, out);
   } catch (err) {
@@ -644,7 +872,13 @@ function openScanStream(
       if (e.id > lastId) sseSend(res, e.event, e.id);
     }
     // Biten tarama: son olay (done/cancelled/error) de gonderildi.
-    if (job.status !== 'running') res.end();
+    if (job.status !== 'running') {
+      res.end();
+      return;
+    }
+    // ONEMLI: calisan taramada replay'den sonra abone olunmali; aksi
+    // halde yeniden baglanan istemci bundan sonraki olaylari ALMAZ.
+    subscribe(ctx, id, req, res);
     return;
   }
 
@@ -817,10 +1051,15 @@ function subscribe(
     ctx.streams.set(jobId, clients);
   }
   clients.add(res);
-  req.on('close', () => {
+  // Kalp atisi: uzun suren tarama/isleme sirasinda baglanti bos kalmasin.
+  const ping = setInterval(() => sseComment(res), 15_000);
+  const cleanup = () => {
+    clearInterval(ping);
     clients!.delete(res);
     if (clients!.size === 0) ctx.streams.delete(jobId);
-  });
+  };
+  res.once('close', cleanup);
+  req.on('close', cleanup);
 }
 
 // ---------------------------------------------------------------------------

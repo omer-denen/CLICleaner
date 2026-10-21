@@ -35,6 +35,12 @@ ${C.bold}Gelismis${C.reset}
   residue quarantine <ad>     Bagimsiz araci kasaya tasi (KARANTINA onayi, geri alinabilir)
   residue explain <ad>         Bir kumenin karar gerekcesi
   residue undo [--restore]     Son silmeyi geri al
+  residue vault                Kasa envanteri / saklama / kalici silme
+  residue recover              Yarim kalan islemleri raporla (journal)
+  residue env                  Ortam degiskenleri / PATH analizi (salt okunur)
+  residue project [dir]        Proje bagimliliklari ve yeniden kurulum tarifi
+  residue graph                CLI bagimlilik grafigi + what-if
+  residue schedule             Planli kasa temizligi (gunluk/haftalik)
   residue api [--port <n>]     BASSSIZ HTTP/SSE API (arayuz yok; 127.0.0.1)
   residue log [--summary]      Gunluk
   residue doctor               Ortam kontrolu
@@ -53,7 +59,7 @@ ${C.bold}Secenekler${C.reset}
   --min-age <gun>    Bu yastan eskiyse sadece raporla
   --exclude <ad>     Haric tut (nokta klasoru veya AppData adi)
   --root <dir>       Proje ici artiklar: yalnizca bu dizinin alt klasorleri
-                     taranir; sonuclar report-only olur (silme hedefi yok)
+                     taranir; tekrar edilebilir; sonuclar report-only olur
   --all              Tum kumeleri goster (varsayilan ilk 25)
   --json             Makine okunur JSON
   --quiet            Ilerleme cubugu gosterme
@@ -123,6 +129,7 @@ async function main(): Promise<void> {
     let quiet = false;
     const exclude: string[] = [];
     let root: string | undefined;
+    const roots: string[] = [];
 
     for (let i = 0; i < rest.length; i++) {
       const a = rest[i];
@@ -137,13 +144,24 @@ async function main(): Promise<void> {
         if (!v || v.startsWith('-')) {
           throw new Error('--root bir dizin yolu ister. Ornek: residue scan --root C:\\proje');
         }
+        roots.push(v);
         root = v;
       } else if (a === '--json') json = true;
       else if (a === '--all') showAll = true;
       else if (a === '--quiet') quiet = true;
     }
 
-    const result = await runScan({ envs, profile, minAgeDays, json, includeBytes: true, exclude, quiet, root });
+    const result = await runScan({
+      envs,
+      profile,
+      minAgeDays,
+      json,
+      includeBytes: true,
+      exclude,
+      quiet,
+      root,
+      roots,
+    });
 
     if (json) {
       console.log(JSON.stringify(toJson(result), null, 2));
@@ -266,7 +284,43 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'undo') {
-    await runUndo(rest.includes('--restore'));
+    await runUndo(rest);
+    return;
+  }
+
+  if (cmd === 'recover') {
+    const { runRecover } = await import('./commands/recover.ts');
+    await runRecover(rest);
+    return;
+  }
+
+  if (cmd === 'vault') {
+    const { runVault } = await import('./commands/vault.ts');
+    await runVault(rest);
+    return;
+  }
+
+  if (cmd === 'env') {
+    const { runEnv } = await import('./commands/env.ts');
+    await runEnv(rest);
+    return;
+  }
+
+  if (cmd === 'project') {
+    const { runProject } = await import('./commands/project.ts');
+    await runProject(rest);
+    return;
+  }
+
+  if (cmd === 'graph') {
+    const { runGraph } = await import('./commands/graph.ts');
+    await runGraph(rest);
+    return;
+  }
+
+  if (cmd === 'schedule') {
+    const { runSchedule } = await import('./commands/schedule.ts');
+    await runSchedule(rest);
     return;
   }
 

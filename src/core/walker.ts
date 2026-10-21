@@ -70,6 +70,15 @@ export async function walk(opts: WalkOptions): Promise<WalkResult> {
   const visited = new Set<string>();
   const stack: string[] = [root];
 
+  // Kokun kendisini ziyaret edilmis say: bir junction kokun ustune
+  // donerse sonsuz dolasmasin.
+  try {
+    const st = await stat(longPath(root));
+    if (st.isDirectory()) visited.add(seenKey(BigInt(st.dev), BigInt(st.ino)));
+  } catch {
+    /* kok okunamadi: opendir hatayi raporlar */
+  }
+
   while (stack.length > 0) {
     if (signal?.aborted) break;
     const dir = stack.pop()!;
@@ -83,6 +92,7 @@ export async function walk(opts: WalkOptions): Promise<WalkResult> {
     }
 
     for await (const entry of entries) {
+      if (signal?.aborted) break;
       const full = `${dir}\\${entry.name}`;
 
       let isDir = entry.isDirectory();

@@ -26,7 +26,7 @@ olacağını ve kararın gerekçesini gösterir.
 
 | Yapmaz | Neden |
 |---|---|
-| Kayıt defteri / PATH / "Program ekle-kaldır" girdilerine dokunmaz | Genel Windows bakımı değildir; geliştirici ve AI artıklarına odaklanır |
+| Kayıt defteri / PATH / "Program ekle-kaldır" girdilerine **varsayılan olarak** dokunmaz | Genel Windows bakımı değildir; ancak `residue env` ile **açık onay + yedek** alınarak PATH temizliği yapılabilir |
 | Belgelerini, fotoğraflarını, projelerini "yer açmak için" silmez | Bu klasörler karar kapsamına girmez |
 | Tanımadığı klasörü adına bakarak silmez | Kanıt yoksa "tanımlanamayan" der ve **yalnızca raporlar** |
 | Model, ajan oturumu ve becerileri silmez | Senin verindir; silme hedefi üretilmez |
@@ -160,6 +160,10 @@ Bu modda:
   araç "tanımlanamayan" der ve yalnızca raporlar.
 - **İki aşama:** önce plan, sonra yazılı `SIL` onayı. `--yes` bunu atlayamaz.
 - **Kasa:** varsayılan mod; silinenler aracın kendi kasasına taşınır ve geri alınabilir.
+- **Journal:** her yıkıcı adım önce yazılır; yarım kalan işlem `residue recover` ile raporlanır.
+- **Kanıt ağacı:** her öneri gözlem → kanıt → iddia zinciriyle açıklanır.
+- **Bağımlılık grafiği:** sert/aktif bir bağımlılık kopacaksa CLI kaldırma planı engellenir.
+- **Ortam değişkenleri:** hassas değerler maskelenir; yazma yalnız `env --clean --apply` + yedek + yazılı onayla yapılır.
 - **Hedefli silme:** klasörün tamamı değil, yalnız güvenli kısım silinir.
 - **Git farkındalığı:** tracked dosya hedef olamaz; proje taramaları salt rapordur.
 - **Son savunma hattı:** silme katmanı, korunan bir yolun üstünü veya aracın
@@ -260,6 +264,13 @@ residue undo --restore      # kasadan geri al
 residue repair --dry-run    # bozuk / yarım kurulumları göster
 residue repair              # onar (ONAR onayı; çıktı canlı akar)
 residue quarantine <ad>     # bağımsız aracı silmeden kasaya taşı (KARANTINA onayı)
+residue env                 # PATH / ortam değişkeni analizi (salt okunur)
+residue env --clean         # PATH temizlik planı (yazmaz)
+residue project [dir]       # proje bağımlılıkları + yeniden kurulum tarifi
+residue graph               # CLI bağımlılık grafiği; --what-if <ad>
+residue schedule            # planlı kasa temizliği (günlük/haftalık)
+residue vault               # kasa envanteri / saklama / kalıcı silme
+residue recover             # yarım kalan işlemleri raporla
 residue ui                  # terminal arayüzü (Ink; gerçek terminal gerekir)
 residue api                 # başsız HTTP/SSE API (arayüz yok; 127.0.0.1)
 ```

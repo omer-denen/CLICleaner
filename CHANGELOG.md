@@ -5,6 +5,60 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-21
+
+Motor genişlemesi: kanıt ağacı, bağımlılık grafı, ortam değişkeni, proje
+bağımlılık ve plan/zamanlama motorları eklendi. Arayüz değişmedi; yeni
+yetenekler CLI ve yerel API üzerinden kullanılır.
+
+### Eklendi
+
+- **Kanıt ağacı** (`core/evidence-tree.ts`): gözlem → kanıt → iddia →
+  aday → araç; `supports/protects/unknown` duruşları ve tekilleştirilmiş
+  `obsId` referansları. `Cluster.evidenceTree` alanına bağlandı.
+- **Bağımlılık grafı** (`core/dependency-graph.ts`): düğüm/kenar türleri,
+  roller, seviyeler, Tarjan döngü tespiti, kök neden gruplaması ve
+  `whatIf()` simülasyonu. CLI kaldırma planı artık sert/aktif bağımlılık
+  varsa aracı engelliyor (`blocked` alanı).
+- **Ortam değişkeni motoru** (`core/env-engine.ts`): HKCU/HKLM PATH
+  analizi, eksik/tekrar/gölgelenen girdiler, yetim `*_HOME`/`*_PATH`,
+  hassas değer maskeleme, plan → yedek → kayıt defteri → WM_SETTINGCHANGE.
+  `residue env` komutu ve `/api/env*` uçları.
+- **Proje bağımlılık motoru** (`core/project-deps.ts`): npm/pnpm/yarn/bun,
+  Python, .NET, Rust; lockfile hash'li tarif, yeniden üretilebilirlik
+  kontrolleri, `npm ci`/`--frozen-lockfile` komutları, toplu geri kurulum.
+  `residue project` komutu ve `/api/projects*` uçları.
+- **Plan/zamanlama motoru** (`core/plan-engine.ts`, `services/schedule-service.ts`):
+  seçici tabanlı günlük/haftalık planlar, kaçırılan çalışma telafisi,
+  kilit ve çalışma geçmişi. Planlı işlem yalnız kasaya taşır.
+  `residue schedule` komutu ve `/api/schedules*` uçları.
+- **Vault iyileştirmeleri:** kararlı öğe kimliği, `meta.json`, atomik
+  manifest, `index.json` yeniden oluşturma, seçili öğe boşaltma
+  (`purgeVaultItems`), çakışma politikası (`rename/overwrite/cancel`) ve
+  geri yükleme doğrulaması. `residue vault` komutu.
+- **Operation journal** (`core/operation-journal.ts`): `pending →
+  in-progress → done/failed/skipped`; `residue recover` ve `/api/recover`.
+- **AppError modeli** (`core/app-error.ts`): normalize edilmiş hata türleri,
+  `retryable`, `dataSafe`, `operationId/itemId`; API hata gövdesi.
+- **Tarama:** erişilemeyen yollar `skipped` olayına akıyor, hedef içi canlı
+  ilerleme, duraklat/devam uçları, `--root` dışlamaları, atomik/sürümlü
+  tarama önbelleği.
+- **Kategoriler:** protected / duplicate / old-version / orphan / unused /
+  ai-debris / ghost-envs / unknown ve sahip durumu (active/orphaned/shared/unknown).
+- `npm test` (node:test) ve 56 test.
+
+### Düzeltildi
+
+- Sürücü kökü koruması: `D:\` artık reddediliyor (önceki regex yalnız `d:` yakalıyordu).
+- Kasa geri yüklemede çakışma hatası orijinal yola düşmüyor; `cancel`
+  seçeneği veri kaybı olmadan duruyor.
+- Başarısız kalıcı silme artık "yer kazanıldı" sayılmıyor.
+- `purgeVault` CLI yedek/karantina klasörlerini silmiyor.
+- SSE yeniden bağlanmada çalışan tarama aboneliği kopmuyor.
+- Ayarlarda `vaultRetentionDays` ve `updateCheck` sessizce yok sayılmıyor.
+- Onay sorusunda `h` artık "evet" sayılmıyor (Türkçe "hayır").
+- Varsayılan seçim yalnızca `risk=safe` öğeleri kapsıyor.
+
 ## [2.0.1] - 2026-10-21
 
 ### Düzeltildi

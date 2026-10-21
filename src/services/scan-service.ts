@@ -35,6 +35,8 @@ import type {
 export interface ScanJob {
   id: string;
   status: 'running' | 'done' | 'error' | 'cancelled';
+  /** Duraklatildi mi? Is bitene kadar paused=true kalabilir. */
+  paused: boolean;
   progress: { done: number; total: number; bytes: number };
   /** Taranacak alanlarin tam listesi (sol sutun). */
   targets: string[];
@@ -56,11 +58,13 @@ export interface ScanArgs {
   exclude: string[];
   minAgeDays: number;
   root?: string;
+  roots?: string[];
 }
 
 export class ScanService {
   private readonly scans = new Map<string, ScanJob>();
   private readonly controllers = new Map<string, AbortController>();
+  private readonly pauseWaiters = new Map<string, Set<() => void>>();
   private active: ScanJob | null = null;
   private lastScan: { scan: ScanResult; at: number } | null = null;
   private cacheLoaded = false;
@@ -86,6 +90,7 @@ export class ScanService {
     const job: ScanJob = {
       id: newId(),
       status: 'running',
+      paused: false,
       progress: { done: 0, total: 0, bytes: 0 },
       targets: [],
       found: [],
@@ -194,6 +199,7 @@ export class ScanService {
       nextRecommendedAt: at !== null ? at + this.ttlMs : null,
       dirty,
       scanning: !!this.active,
+      paused: this.active?.paused ?? false,
       clusters: this.lastScan?.scan.clusters.length ?? null,
       // Surucu dolulugu: salt okunur tek sistem cagrisi (P4 gostergesi).
       disk: diskUsage(),
@@ -215,6 +221,7 @@ export class ScanService {
   async updateSettings(patch: {
     scanCacheHours?: number;
     vaultRetentionDays?: number;
+    updateCheck?: 'off' | 'daily' | 'weekly';
   }): Promise<SettingsResponse> {
     const saved = await saveSettings(patch);
     this.ttlMs = saved.scanCacheHours * 3_600_000;
@@ -234,9 +241,59 @@ export class ScanService {
     if (!job) throw new ServiceError(404, 'Tarama bulunamadi');
     if (job.status !== 'running') throw new ServiceError(409, 'Tarama zaten bitti');
     this.controllers.get(id)?.abort();
+    // Duraklatilmis tarama iptal edilirse bekleyen is bolumleri uyandirilir.
+    this.wakePaused(id);
     info('tarama iptal istendi', {
       scanId: job.id,
       ilerleme: `${job.progress.done}/${job.progress.total}`,
+    });
+  }
+
+  /** Taramayi hedef sinirinda duraklatir (aktif is bolumu bitirir). */
+  pause(id: string): void {
+    const job = this.scans.get(id);
+    if (!job) throw new ServiceError(404, 'Tarama bulunamadi');
+    if (job.status !== 'running') throw new ServiceError(409, 'Tarama zaten bitti');
+    if (job.paused) return;
+    job.paused = true;
+    this.pushEvent(job, { type: 'paused' });
+    info('tarama duraklatildi', { scanId: job.id, ilerleme: `${job.progress.done}/${job.progress.total}` });
+  }
+
+  /** Duraklatilmis taramayi devam ettirir. */
+  resume(id: string): void {
+    const job = this.scans.get(id);
+    if (!job) throw new ServiceError(404, 'Tarama bulunamadi');
+    if (job.status !== 'running') throw new ServiceError(409, 'Tarama zaten bitti');
+    if (!job.paused) return;
+    job.paused = false;
+    this.pushEvent(job, { type: 'resumed' });
+    this.wakePaused(id);
+    info('tarama devam ediyor', { scanId: job.id });
+  }
+
+  private wakePaused(id: string): void {
+    const waiters = this.pauseWaiters.get(id);
+    if (!waiters) return;
+    for (const wake of [...waiters]) wake();
+    this.pauseWaiters.delete(id);
+  }
+
+  private waitIfPaused(job: ScanJob, signal: AbortSignal): Promise<void> {
+    if (!job.paused) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      let waiters = this.pauseWaiters.get(job.id);
+      if (!waiters) {
+        waiters = new Set();
+        this.pauseWaiters.set(job.id, waiters);
+      }
+      const wake = () => {
+        waiters!.delete(wake);
+        signal.removeEventListener('abort', wake);
+        resolve();
+      };
+      waiters.add(wake);
+      signal.addEventListener('abort', wake, { once: true });
     });
   }
 
@@ -258,11 +315,14 @@ export class ScanService {
         profile: args.profile,
         minAgeDays: args.minAgeDays,
         root: args.root,
+        roots: args.roots,
         json: true,
         includeBytes: true,
         exclude: args.exclude,
         quiet: true,
         signal: controller.signal,
+        beforeTarget: () => this.waitIfPaused(job, controller.signal),
+        onSkipped: (skipped) => this.pushEvent(job, { type: 'skipped', skipped }),
         onProgress: (done, total, bytes) => {
           job.progress = { done, total, bytes };
           this.pushEvent(job, { type: 'progress', done, total, bytes });
@@ -311,7 +371,7 @@ export class ScanService {
       // ne son tarama olarak saklanir ne de 24 saatlik diske yazilir.
       // Aksi halde 27 kumelik kismi bir proje taramasi "son tam
       // tarama" gibi gorunurdu.
-      if (!args.root) {
+      if (!args.root && !(args.roots && args.roots.length > 0)) {
         this.lastScan = { scan: result, at: Date.now() };
         // Sonraki sunucu baslangicinda / sayfa yenilemesinde kullanilir.
         // Testler kismi taramalari onbellege yazmasin (persistScan: false).
@@ -330,6 +390,8 @@ export class ScanService {
     } finally {
       this.active = null;
       this.controllers.delete(job.id);
+      this.wakePaused(job.id);
+      job.paused = false;
     }
   }
 }

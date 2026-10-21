@@ -113,7 +113,7 @@ ve tarayıcıyı doğrudan arayüze yönlendirsin.
       işareti doğrulanır).
 - [ ] Tek örnek: ikinci çalıştırma yeni port/tarayıcı açmak yerine uyarır
       (token diske yazılmaz; istenirse yalnız "zaten çalışıyor" denir).
-- [ ] Test: `CLICLEANER_DESKTOP` ile sentetik masaüstü; oluştur/oku/sil;
+- [ ] Test: `RESIDUE_DESKTOP` ile sentetik masaüstü; oluştur/oku/sil;
       boşluklu ve Türkçe karakterli yol; `.lnk` içinde token yok.
 - Not: konsol penceresi kapanırsa sunucu da kapanır (bilinçli: kullanıcı
   durdurabilsin). Simge/ikon ayrı iştir; ilk sürüm Node ikonunu kullanır.
@@ -161,7 +161,7 @@ güvenlik riski); yalnız komut gösterilir.
 - [ ] Ayar: `updateCheck: 'off' | 'daily' | 'weekly'`, varsayılan `off`.
 - [ ] Üst bar rozeti + ayar satırı + komut kopyalama.
 - [ ] CLI: `residue update` (yalnız kontrol) ve `--no-update-check`.
-- [ ] Test: `CLICLEANER_UPDATE_URL` ile sentetik kayıt; TTL, çevrimdışı,
+- [ ] Test: `RESIDUE_UPDATE_URL` ile sentetik kayıt; TTL, çevrimdışı,
       kapalıyken istek yok.
 - [ ] README veri politikası cümlesini netleştir (otomatik kontrol eklenince).
 

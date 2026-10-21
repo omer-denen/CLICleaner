@@ -57,8 +57,9 @@ export function protectedPaths(): string[] {
 export function unsafeTargetReason(target: string): string | null {
   const t = norm(target);
 
-  // Surucu koku (C:\, D:\) hicbir zaman silinmez.
-  if (/^[a-z]:$/.test(t)) return 'surucu koku hedeflenemez';
+  // Surucu koku (C:\, D:\) hicbir zaman silinmez. `norm` surucu
+  // kokunde sondaki ayiriciyi KORUR; bu yuzden iki bicim de kontrol edilir.
+  if (/^[a-z]:(?:[\\/])?$/.test(t)) return 'surucu koku hedeflenemez';
 
   // Aracin KENDI veri dizini (kasa, gunluk, karantina) ve ALTINDAKI
   // her sey korunur: kullanicinin geri donus adimlari orada yasar.

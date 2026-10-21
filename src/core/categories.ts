@@ -1,38 +1,68 @@
 import type { Cluster } from './types.ts';
 
 /**
- * Kategori tureti — TEK kaynak (T42 / D3 P0 + P5).
+ * Kategori tureti — TEK kaynak.
  *
  * Kategoriler UYGULAMA ADINDAN degil, KANITTAN turetilir: mimari tip
- * (archetype) ve dosya turu (fileKind) sinyallerine bakilir. Cekirdekte
- * yeni bir siniflandirma kurali eklenince burasi da guncellenir; arayuz
- * AYRI bir liste tutmaz.
+ * (archetype), dosya turu (fileKind), karar ve sahiplik sinyalleri.
+ * Sirasi onemlidir: korunan bir oge "unused" sayilmaz.
  *
  * Bu modul yalnizca SINIFLANDIRIR: hicbir yolu silmez, hedef uretmez.
  */
 
-export type CategoryKey = 'ai-debris' | 'orphaned-cli' | 'ghost-envs' | 'other';
+export type CategoryKey =
+  | 'protected'
+  | 'duplicate'
+  | 'old-version'
+  | 'orphan'
+  | 'unused'
+  | 'ai-debris'
+  | 'ghost-envs'
+  | 'unknown';
 
-/** Kategori sirasi (kararli). */
-export const CATEGORY_ORDER: CategoryKey[] = ['ai-debris', 'orphaned-cli', 'ghost-envs', 'other'];
+/** Kategori sirasi (kararli; arayuz bunu kullanir). */
+export const CATEGORY_ORDER: CategoryKey[] = [
+  'protected',
+  'duplicate',
+  'old-version',
+  'orphan',
+  'unused',
+  'ai-debris',
+  'ghost-envs',
+  'unknown',
+];
 
-/** Kullaniciya gosterilen adlar (arayuz bunu cevirir). */
 export const CATEGORY_LABEL: Record<CategoryKey, string> = {
-  'ai-debris': 'AI Debris',
-  'orphaned-cli': 'Orphaned CLI',
-  'ghost-envs': 'Ghost Envs',
-  other: 'Diğer',
+  protected: 'Korumalı',
+  duplicate: 'Çift kurulum',
+  'old-version': 'Eski sürüm',
+  orphan: 'Yetim kalıntı',
+  unused: 'Kullanılmayan',
+  'ai-debris': 'AI artığı',
+  'ghost-envs': 'Hayalet ortam',
+  unknown: 'Belirsiz',
 };
 
 /** AI artiklari: model depolari, ajan calisma alanlari, GPU/vektor runtime. */
 const AI_ARCHETYPES = new Set(['model-store', 'agent-workspace', 'accelerator-runtime']);
 const AI_FILE_KINDS = new Set(['onnx-model', 'embedding-index', 'cuda-runtime']);
 
-/** Global CLI kurulumlari (shim tabanli). */
+/** Global CLI kurulumlari (shim tabanli) = sahibi bilinmeyen yetim kalinti. */
 const CLI_ARCHETYPES = new Set(['global-packages']);
 
 /** Derlenmis yorumlayici ortamlari ve proje ici bagimliliklar. */
-const ENV_ARCHETYPES = new Set(['runtime-pool', 'project-artifact']);
+const ENV_ARCHETYPES = new Set(['runtime-pool', 'project-artifact', 'project-workspace']);
+
+/** Yeniden uretilebilir / atil kalmis onbellekler. */
+const UNUSED_ARCHETYPES = new Set([
+  'pkg-manager-cache',
+  'updater-staging',
+  'temp-scratch',
+  'crash-artifacts',
+  'editor-extension-store',
+  'editor-workspace',
+  'electron-app-data',
+]);
 
 export interface CategoryStat {
   key: CategoryKey;
@@ -44,15 +74,57 @@ export interface CategoryStat {
   reclaimable: number;
 }
 
-/** Tek bir kumenin kategorisi. Kanit yoksa "other" (yalniz rapor). */
+/**
+ * Tek bir kumenin kategorisi. Kararli bir oncelik sirasi vardir:
+ * protected > duplicate > old-version > orphan > unused > AI > env > unknown.
+ */
 export function categoryOf(c: Cluster): CategoryKey {
   const archetype = c.evidence.archetype ?? c.archetype;
   const kinds = c.evidence.fileKinds ?? [];
+  const markers = new Set((c.evidence.markers ?? []).map((m) => m.toLowerCase()));
+
+  // 1) Korunan: kullanici verisi, kural/oturum, acik "keep" karari.
+  if (
+    c.verdict.kind === 'keep' ||
+    c.verdict.regenerability === 'user-data' ||
+    markers.has('chat-history') ||
+    markers.has('rules-files') ||
+    markers.has('identity')
+  ) {
+    return 'protected';
+  }
+
+  // 2) Cift kurulum: ayni komut/paket birden fazla yerde.
+  if (markers.has('duplicate') || markers.has('shadowed-install') || markers.has('multi-owner')) {
+    return 'duplicate';
+  }
+
+  // 3) Eski surum: surumlu uygulama deposu / editor uzanti eski surumu.
+  if (
+    archetype === 'versioned-app-store' ||
+    markers.has('old-version') ||
+    markers.has('stale-version') ||
+    markers.has('obsolete-extension')
+  ) {
+    return 'old-version';
+  }
+
+  // 4) Yetim kalinti: sahibi olmayan global paket/shim deposu.
+  if (CLI_ARCHETYPES.has(archetype) || markers.has('orphan') || markers.has('orphan-shim')) {
+    return 'orphan';
+  }
+
+  // 5) Kullanilmayan / yeniden uretilebilir onbellek.
+  if (UNUSED_ARCHETYPES.has(archetype)) return 'unused';
+
+  // 6) AI artigi.
   if (AI_ARCHETYPES.has(archetype)) return 'ai-debris';
   if (kinds.some((k) => AI_FILE_KINDS.has(k))) return 'ai-debris';
-  if (CLI_ARCHETYPES.has(archetype)) return 'orphaned-cli';
+
+  // 7) Hayalet ortam (derlenmis runtime / proje ici bagimlilik).
   if (ENV_ARCHETYPES.has(archetype)) return 'ghost-envs';
-  return 'other';
+
+  return 'unknown';
 }
 
 /** Kategori bazli ozet. */

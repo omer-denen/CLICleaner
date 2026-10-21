@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { longPath } from '../util/longpath.ts';
 import { dataDir } from '../core/data-dir.ts';
@@ -47,7 +47,14 @@ export async function saveScanCache(result: ScanResult): Promise<void> {
   const file = scanCachePath();
   try {
     await mkdir(longPath(dirname(file)), { recursive: true });
-    await writeFile(longPath(file), JSON.stringify(result), 'utf8');
+    const tmp = `${file}.${process.pid}.tmp`;
+    // Surumlu zarf: ileride alan eklense bile eski kayit okunabilir.
+    await writeFile(
+      longPath(tmp),
+      JSON.stringify({ version: 2, savedAt: Date.now(), scan: result }),
+      'utf8',
+    );
+    await rename(longPath(tmp), longPath(file));
   } catch {
     /* onbellek yazilamadi; tarama yine de gecerli */
   }
@@ -66,13 +73,18 @@ export async function loadScanCache(
 ): Promise<{ scan: ScanResult; at: number } | null> {
   try {
     const txt = await readFile(longPath(scanCachePath()), 'utf8');
-    const parsed = JSON.parse(txt) as Partial<ScanResult>;
-    if (!Array.isArray(parsed.clusters)) return null;
-    const at = typeof parsed.finishedAt === 'number' ? parsed.finishedAt : 0;
+    const parsed = JSON.parse(txt) as Partial<ScanResult> & {
+      version?: number;
+      scan?: Partial<ScanResult>;
+    };
+    // v2 zarf veya eski (dogrudan ScanResult) bicim.
+    const scan = parsed.scan && Array.isArray(parsed.scan.clusters) ? parsed.scan : parsed;
+    if (!Array.isArray(scan.clusters)) return null;
+    const at = typeof scan.finishedAt === 'number' ? scan.finishedAt : 0;
     // Gelecekteki tarih (saat kaymasi) 60 sn'ye kadar tolere edilir.
     if (!at || now < at - 60_000) return null;
     if (Number.isFinite(ttlMs) && now - at > ttlMs) return null;
-    return { scan: parsed as ScanResult, at };
+    return { scan: scan as ScanResult, at };
   } catch {
     return null;
   }

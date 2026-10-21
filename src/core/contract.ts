@@ -1,4 +1,4 @@
-import type { Cluster, ScanResult } from './types.ts';
+import type { Cluster, ScanResult, SkippedEntry } from './types.ts';
 import type { CliInventory, CliTool } from './cli-inventory-types.ts';
 
 /**
@@ -54,6 +54,8 @@ export interface ScanRequest {
   minAgeDays?: number;
   exclude?: string[];
   root?: string;
+  /** Birden fazla proje koku (root ile birlesir). */
+  roots?: string[];
 }
 
 export interface ScanStartResponse {
@@ -92,6 +94,11 @@ export type ScanStreamEvent =
       total: number;
     }
   | { type: 'progress'; done: number; total: number; bytes: number }
+  /** Erisilemeyen yollar: tarama durmaz, kanit olarak akar. */
+  | { type: 'skipped'; skipped: SkippedEntry[] }
+  /** Kullanici taramayi duraklatti / devam ettirdi. */
+  | { type: 'paused' }
+  | { type: 'resumed' }
   | { type: 'done'; result: ScanResult }
   | { type: 'cancelled' }
   | { type: 'error'; message: string };
@@ -116,6 +123,8 @@ export interface ScanStatusResponse {
   /** Silme/ayar sonrasi disk degisti mi? */
   dirty: boolean;
   scanning: boolean;
+  /** Tarama duraklatildi mi? (scanning true iken anlamli) */
+  paused?: boolean;
   clusters: number | null;
   /** Surucu dolulugu (salt okunur sistem olcumu). */
   disk: DiskUsageView | null;
@@ -148,6 +157,10 @@ export interface FindingView {
   evidence: string[];
   targets: number;
   ref?: string;
+  /** Sahip durumu: aktif / yetim / paylasilan / bilinmiyor. */
+  ownerStatus?: 'active' | 'orphaned' | 'shared' | 'unknown';
+  /** Varsayilan secim yalnizca safe + kanitli ogeleri kapsar. */
+  defaultSelected?: boolean;
 }
 
 export interface FindingsResponse {
@@ -211,12 +224,18 @@ export interface VaultListResponse {
 
 export interface VaultRestoreRequest {
   id: string;
+  /** files (varsayilan) | repair | side-by-side */
+  mode?: 'files' | 'repair' | 'side-by-side';
+  /** rename (varsayilan) | overwrite | cancel */
+  conflict?: 'rename' | 'overwrite' | 'cancel';
 }
 
 export interface VaultRestoreResponse {
   ok: boolean;
   to: string;
   conflict: boolean;
+  mode?: string;
+  verified?: boolean;
   error?: string;
 }
 
@@ -226,12 +245,15 @@ export interface VaultRestoreAllResponse {
   restored: number;
   conflict: number;
   failed: number;
+  unverified?: number;
 }
 
 /** Kasayi bosaltma: kalici, yazili onay ister. */
 export interface VaultPurgeRequest {
   /** Sunucunun bekledigi ifade: BOŞALT */
   phrase: string;
+  /** Opsiyonel: yalnizca bu kasa oge kimlikleri. Bos/verilmezse tum partiler. */
+  ids?: string[];
 }
 
 export interface VaultPurgeResponse {
@@ -239,6 +261,7 @@ export interface VaultPurgeResponse {
   batches: number;
   bytes: number;
   failed: number;
+  items?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +322,14 @@ export type ExecuteEvent =
       journalPath: string;
       mode: DeleteMode;
     }
-  | { type: 'error'; message: string };
+  | {
+      type: 'error';
+      message: string;
+      /** AppError kodu; istemci "yeniden dene" kararini buna gore verir. */
+      code?: string;
+      retryable?: boolean;
+      dataSafe?: boolean;
+    };
 
 // ---------------------------------------------------------------------------
 // Meta
@@ -320,6 +350,44 @@ export interface ApiErrorBody {
   error: string;
   scanId?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Yeni motor sozlesmeleri (tip-only; tarayici da kullanabilir)
+// ---------------------------------------------------------------------------
+
+export type {
+  EnvAnalysis,
+  EnvChange,
+  EnvFinding,
+  EnvPlan,
+  EnvVariable,
+  PathEntry,
+} from './env-engine.ts';
+export type {
+  DependencyLevel,
+  EdgeKind,
+  EdgeState,
+  EdgeStrength,
+  GraphEdge,
+  GraphNode,
+  GraphNodeKind,
+  NodeRole,
+  WhatIfResult,
+} from './dependency-graph.ts';
+export type {
+  Ecosystem,
+  ProjectArtifact,
+  ProjectCleanupMode,
+  ProjectPlan,
+  ProjectRecipe,
+} from './project-deps.ts';
+export type {
+  PlanPreview,
+  ScheduleFrequency,
+  ScheduleRule,
+  ScheduleRun,
+  ScheduleSelector,
+} from './plan-engine.ts';
 
 // ---------------------------------------------------------------------------
 // CLI envanteri (SALT OKUNUR) + kaldirma plani
@@ -389,6 +457,8 @@ export interface CliPlanResponse {
   /** CLI kaldirma her zaman yazili onay ister */
   requiresPhrase: true;
   expiresAt: number;
+  /** Bagimlilik grafigi nedeniyle plana ALINMAYAN araclar. */
+  blocked?: Array<{ id: string; command: string; reason: string; dependents: string[] }>;
 }
 
 export interface CliExecuteRequest {

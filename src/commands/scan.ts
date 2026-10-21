@@ -20,6 +20,8 @@ export interface ScanArgs {
   quiet: boolean;
   /** Proje ici artiklar icin ayri kok (T10). Verilen dizinin cocuklari taranir. */
   root?: string;
+  /** Birden fazla proje koku; `root` ile birlesir. */
+  roots?: string[];
   /** TUI icin canli ilerleme bildirimi */
   onProgress?: (done: number, total: number, bytes: number) => void;
   /** Kesif bitince taranacak alanlarin tam listesi (web: sol sutun). */
@@ -32,6 +34,10 @@ export interface ScanArgs {
   signal?: AbortSignal;
   /** T28: hassas siniflarin (gecmis/model/kural) acik izni. */
   allow?: SensitiveAllow;
+  /** Her hedeften ONCE cagrilir; duraklatma kapisi burada bekletir. */
+  beforeTarget?: (path: string) => Promise<void>;
+  /** Erisilemeyen yollar (denied/long-path/gone) tarama sonucuna akar. */
+  onSkipped?: (skipped: SkippedEntry[]) => void;
 }
 
 /** Tarama: kesif -> olcum -> kanit -> kumelestirme. */
@@ -62,34 +68,50 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
   setGpuState(gpu);
   debug('gpu durumu', gpu);
 
-  // T10: --root verildiyse yalnizca o kokun cocuklari taranir. Varsayilan
-  // kesif atlanir; proje ici artiklar (node_modules, .venv, dist) icin.
-  // Yol once normalize edilir: ayirici ve son egik cizgi farki sorun olmaz.
-  const root = args.root ? resolve(args.root) : undefined;
+  // T10: --root verildiyse yalnizca o koklerin cocuklari taranir. Birden
+  // fazla kok desteklenir; varsayilan kesif atlanir.
+  const rootList = [
+    ...(args.roots ?? []),
+    ...(args.root ? [args.root] : []),
+  ].map((r) => resolve(r));
+  const roots = [...new Set(rootList.map((r) => r.toLowerCase()))].map(
+    (r) => rootList.find((x) => x.toLowerCase() === r)!,
+  );
   let targets: Array<{ path: string; origin: Part['origin'] }>;
   let dStats: { dotDirs: number; localDirs: number; roamingDirs: number; denied: number };
-  if (root) {
-    const st = await stat(longPath(root)).catch(() => null);
-    if (!st || !st.isDirectory()) {
-      throw new Error(`--root dizini bulunamadi veya klasor degil: ${root}`);
+  if (roots.length > 0) {
+    targets = [];
+    const skippedRoots: string[] = [];
+    for (const root of roots) {
+      const st = await stat(longPath(root)).catch(() => null);
+      if (!st || !st.isDirectory()) {
+        skippedRoots.push(root);
+        continue;
+      }
+      const ents = await readdir(longPath(root), { withFileTypes: true }).catch(() => []);
+      const children = ents
+        .filter((e) => {
+          // .git bir artik degil, deponun kendisidir; hic taranmaz.
+          if (e.name.toLowerCase() === '.git') return false;
+          // --root modunda da kullanici haric listesi uygulanir.
+          if (exclude.some((x) => x.toLowerCase() === e.name.toLowerCase())) return false;
+          // Aracin kendi veri dizini (kasa/gunluk) hedef olamaz.
+          if (isOwnDataPath(join(root, e.name))) return false;
+          try {
+            return e.isDirectory();
+          } catch {
+            return false;
+          }
+        })
+        .map((e) => ({ path: join(root, e.name), origin: 'custom' as Part['origin'] }));
+      if (children.length === 0) targets.push({ path: root, origin: 'custom' });
+      else targets.push(...children);
     }
-    const ents = await readdir(longPath(root), { withFileTypes: true });
-    targets = ents
-      .filter((e) => {
-        // .git bir artik degil, deponun kendisidir; hic taranmaz.
-        if (e.name.toLowerCase() === '.git') return false;
-        // Aracin kendi veri dizini (kasa/gunluk) hedef olamaz.
-        if (isOwnDataPath(join(root, e.name))) return false;
-        try {
-          return e.isDirectory();
-        } catch {
-          return false;
-        }
-      })
-      .map((e) => ({ path: join(root, e.name), origin: 'custom' as Part['origin'] }));
-    if (targets.length === 0) targets = [{ path: root, origin: 'custom' as Part['origin'] }];
+    if (targets.length === 0) {
+      throw new Error(`--root dizini bulunamadi veya klasor degil: ${skippedRoots.join(', ')}`);
+    }
     dStats = { dotDirs: 0, localDirs: targets.length, roamingDirs: 0, denied: 0 };
-    info('root taramasi', { root, hedef: targets.length });
+    info('root taramasi', { roots, hedef: targets.length });
   } else {
     const discovered = await discover(envs, { exclude });
     targets = discovered.targets;
@@ -109,7 +131,9 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
     : (msg: string) => process.stderr.write(msg);
 
   log(`\n  Residue taramasi\n`);
-  log(`  Ortam      : ${root ? `proje: ${root}` : envs.join(', ')}`);
+  log(
+    `  Ortam      : ${roots.length > 0 ? `proje: ${roots.join(', ')}` : envs.join(', ')}`,
+  );
   if (args.profile) log(`  Profil     : ${args.profile}`);
   log(`  Dizinler   : ${targets.length} aday`);
   log(`  GPU        : ${gpu.hasNvidia ? 'NVIDIA bulundu' : 'NVIDIA yok'}\n`);
@@ -126,6 +150,13 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
       if (args.signal?.aborted) return;
       const t = queue.shift();
       if (!t) return;
+      // Duraklatma: is bolumunde beklenir; iptal edilirse kuyruk bosalir.
+      try {
+        await args.beforeTarget?.(t.path);
+      } catch {
+        return;
+      }
+      if (args.signal?.aborted) return;
       args.onTargetStart?.(t.path, done, targets.length);
       let found: Cluster | null = null;
       try {
@@ -133,6 +164,9 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
           minAgeDays: args.minAgeDays,
           signal: args.signal,
           allow: args.allow,
+          onSkipped: args.onSkipped,
+          onProgress: (_dirs, bytes) =>
+            args.onProgress?.(done, targets.length, bytesSeen + bytes),
         });
         if (args.signal?.aborted) return;
         if (found) {
@@ -161,7 +195,7 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
   // otomatik silinmez; kullanici elle karar verir. 'keep' karari
   // korunur: "korunuyor" bilgisi kaybolmasin. Risk DEGISTIRILMEZ;
   // risk yapisaldir, karar yalnizca kullaniciya kalir.
-  if (root) {
+  if (roots.length > 0) {
     for (const c of merged) {
       if (c.verdict.kind !== 'keep') c.verdict.kind = 'report-only';
       c.deleteTargets = [];

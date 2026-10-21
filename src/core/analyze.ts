@@ -7,6 +7,7 @@ import { probeDir, ownerFromName, type Probe } from './classifier.ts';
 import { isOwnDataPath } from './discover.ts';
 import { isGitTracked } from './git.ts';
 import { walk } from './walker.ts';
+import { buildClusterEvidence } from './evidence-tree.ts';
 import type {
   Archetype,
   Cluster,
@@ -18,6 +19,7 @@ import type {
   Regenerability,
   Risk,
   SensitiveAllow,
+  SkippedEntry,
   Verdict,
 } from './types.ts';
 import { daysSince, formatAge } from '../util/format.ts';
@@ -38,6 +40,13 @@ export interface ClassifyOptions {
   signal?: AbortSignal;
   /** T28: hassas siniflarin (gecmis/model/kural) acik izni. */
   allow?: SensitiveAllow;
+  /**
+   * Erisilemeyen/atlanan yollar. Tarama sonucundaki `skipped` listesine
+   * akar; "sessizce eksik sayma" yerine kanit olur.
+   */
+  onSkipped?: (skipped: SkippedEntry[]) => void;
+  /** Alt dizin ilerlemesi: buyuk tek hedefte de canli geri bildirim. */
+  onProgress?: (dirs: number, bytes: number) => void;
 }
 
 /** Ortam tespiti: makinede GPU var mi? */
@@ -71,7 +80,9 @@ export async function classifyPath(
     largeThreshold: 32 * 1024 * 1024,
     maxLarge: 12,
     signal: opts.signal,
+    onProgress: opts.onProgress,
   });
+  if (w.skipped.length > 0) opts.onSkipped?.(w.skipped);
 
   // Iptal edildiyse yarim olcumle kume uretme.
   if (opts.signal?.aborted) return null;
@@ -278,6 +289,19 @@ export async function classifyPath(
     reclaimableBytes: reclaimable,
     lastTouched: w.lastTouched,
     evidence: ev,
+    evidenceTree: buildClusterEvidence({
+      key,
+      title: verdict.title,
+      archetype,
+      parts: [part],
+      subparts: sub,
+      deleteTargets: finalTargets,
+      totalBytes: w.bytes,
+      reclaimableBytes: reclaimable,
+      lastTouched: w.lastTouched,
+      evidence: ev,
+      verdict,
+    }),
     verdict,
   };
 }

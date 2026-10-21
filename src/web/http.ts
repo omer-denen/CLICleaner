@@ -58,3 +58,13 @@ export function sseSend(res: ServerResponse, data: unknown, id?: number): void {
     /* istemci koptu */
   }
 }
+
+/** SSE yorum satiri: bazi proxy'lerin bos baglantiyi kapatmasini engeller. */
+export function sseComment(res: ServerResponse, text = 'ping'): void {
+  if (res.writableEnded) return;
+  try {
+    res.write(`: ${text}\n\n`);
+  } catch {
+    /* istemci koptu */
+  }
+}

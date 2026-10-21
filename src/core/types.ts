@@ -169,6 +169,8 @@ export interface Cluster {
   reclaimableBytes: number;
   lastTouched: number;
   evidence: Evidence;
+  /** Yapisal kanit agaci: Arac -> Aday -> Iddia -> Kanit -> Gozlem. */
+  evidenceTree?: import('./evidence-tree.ts').ToolEvidenceNode;
   verdict: Verdict;
 }
 

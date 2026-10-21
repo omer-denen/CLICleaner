@@ -1,6 +1,6 @@
 {
   "name": "residue-cleaner",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Residue — CLI cleaner and evidence-first auditor for developer caches, CLI installs and AI runtime leftovers; shows what each folder is before anything is deleted",
   "type": "module",
   "license": "MIT",
@@ -62,6 +62,7 @@
     "doctor": "tsx src/cli.ts doctor",
     "undo": "tsx src/cli.ts undo",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
     "preversion": "npm run typecheck",
     "release:patch": "npm version patch -m \"surum: v%s\"",
     "release:minor": "npm version minor -m \"surum: v%s\"",

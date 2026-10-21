@@ -256,6 +256,27 @@ function sourcePriority(s: CliSource): number {
 // npm global
 // ---------------------------------------------------------------------------
 
+async function npmGlobalPrefix(env: NodeJS.ProcessEnv): Promise<string> {
+  const configured = env.NPM_CONFIG_PREFIX ?? env.npm_config_prefix;
+  if (configured) return configured;
+  const fallback = env.APPDATA ? join(env.APPDATA, 'npm') : '';
+  // `npm prefix -g` kullanici tanimli prefix'i (or. D:\npm) yakalar.
+  // Basarisiz olursa APPDATA varsayimina donulur; envanter bloklanmaz.
+  try {
+    const run = promisify(execFile);
+    const { stdout } = await run('npm.cmd', ['prefix', '-g'], {
+      timeout: 5000,
+      windowsHide: true,
+      encoding: 'utf8',
+    });
+    const value = stdout.trim().split(/\r?\n/).pop()?.trim() ?? '';
+    if (value && !value.includes('%')) return value;
+  } catch {
+    /* npm PATH'te yok: APPDATA */
+  }
+  return fallback;
+}
+
 async function scanNpmGlobal(
   now: number,
   unusedDays: number,
@@ -266,7 +287,7 @@ async function scanNpmGlobal(
   hooks: ScanHooks,
 ): Promise<{ tools: CliTool[]; issues: ShimIssue[] }> {
   const env = process.env;
-  const prefix = env.APPDATA ? join(env.APPDATA, 'npm') : '';
+  const prefix = await npmGlobalPrefix(env);
   if (!prefix) return { tools: [], issues: [] };
   const modules = join(prefix, 'node_modules');
   if (!(await isDirectory(modules))) return { tools: [], issues: [] };
@@ -996,11 +1017,18 @@ async function scanStandaloneShims(
 ): Promise<CliTool[]> {
   const home = process.env.USERPROFILE;
   if (!home) return [];
+  const local = process.env.LOCALAPPDATA;
+  const programData = process.env.ProgramData;
   const dirs = [
     join(home, '.local', 'bin'),
     join(home, '.cargo', 'bin'),
     join(home, 'go', 'bin'),
     join(home, '.bun', 'bin'),
+    // Paket yoneticisi shim'leri: winget / scoop / chocolatey / volta.
+    ...(local ? [join(local, 'Microsoft', 'WinGet', 'Links')] : []),
+    join(home, 'scoop', 'shims'),
+    ...(programData ? [join(programData, 'chocolatey', 'bin')] : []),
+    join(home, '.volta', 'bin'),
   ];
 
   const out: CliTool[] = [];

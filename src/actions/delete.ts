@@ -1,4 +1,5 @@
 import { lstat, rename, rm, stat, readdir } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { longPath, isDenied, isLongPathError } from '../util/longpath.ts';
 import { debug, error as logError, info, warn } from '../util/log.ts';
@@ -144,6 +145,32 @@ async function isReparsePoint(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Hedefe giden yolun herhangi bir ust klasoru junction/symlink mi?
+ *
+ * Lexical guard bir junction uzerinden BASKA bir dizini hedefleyebilir.
+ * Boyle bir yolda silme yapmak, kullanicinin gormedigi bir yeri siler;
+ * bu yuzden ust zincirde reparse point varsa hedef atlanir.
+ */
+async function reparseAncestor(path: string): Promise<string | null> {
+  let cur = dirname(resolve(path));
+  for (let i = 0; i < 64; i++) {
+    const up = dirname(cur);
+    if (up === cur) return null;
+    try {
+      if ((await lstat(longPath(cur))).isSymbolicLink()) return cur;
+    } catch (err) {
+      // Ust klasor yoksa hedef de yoktur: silme asamasinda "yok" olarak
+      // raporlanir. Erisim hatasinda ise "reparse degil" varsayimi
+      // yapmamak icin atlanir.
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      return cur;
+    }
+    cur = up;
+  }
+  return null;
+}
+
 /** Klasor kilit mi? Atomik rename dener (dosya sistemi bunu garantiler). */
 export async function isLocked(path: string): Promise<boolean> {
   const tmp = `${path}.residue-locktest-${Date.now()}`;
@@ -179,6 +206,36 @@ export async function deleteTarget(
   // Savunma katmani: buildPlan'i atlayan dogrudan cagrilar da korunur.
   assertSafeTarget(target);
 
+  try {
+    await lstat(longPath(target.path));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {
+        target,
+        removed: 0,
+        bytesFreed: 0,
+        skipped: [{ path: target.path, reason: 'yol artik yok (plan bayat)' }],
+        failed: [],
+      };
+    }
+  }
+
+  const ancestor = await reparseAncestor(target.path);
+  if (ancestor) {
+    return {
+      target,
+      removed: 0,
+      bytesFreed: 0,
+      skipped: [
+        {
+          path: target.path,
+          reason: `ust klasor junction/symlink: ${ancestor} (hedef korunur)`,
+        },
+      ],
+      failed: [],
+    };
+  }
+
   const res: DeleteResult = { target, removed: 0, bytesFreed: 0, skipped: [], failed: [] };
 
   // Git farkindaligi (T27): tek depo cozumu + bellekteki kume.
@@ -198,9 +255,8 @@ export async function deleteTarget(
   }
 
   if (target.kind === 'whole') {
-    const w = await measure(target.path);
-    res.bytesFreed = w;
-    res.removed = 1;
+    const measured = await measureTree(target.path);
+    const w = measured.bytes;
 
     info('hedef isleniyor', {
       path: target.path,
@@ -211,6 +267,10 @@ export async function deleteTarget(
     if (mode === 'purge') {
       try {
         await rm(longPath(target.path), { recursive: true, force: true, maxRetries: 3 });
+        // Sayaclar YALNIZCA basarili rm'den sonra guncellenir. Aksi
+        // halde basarisiz bir silme "yer kazanildi" gibi raporlanirdi.
+        res.bytesFreed = w;
+        res.removed = 1;
         info('kalici silindi', { path: target.path, bytes: w });
       } catch (err) {
         logError('kalici silme basarisiz', { path: target.path, err: describe(err) });
@@ -219,10 +279,12 @@ export async function deleteTarget(
       return res;
     }
 
-    // Kendi kasamiz: klasorun tamami tek atomik rename ile tasinir.
+    // Kasa modu: sayaclar tasima basarili olduktan sonra artar.
     try {
       const batch = await newVaultBatch();
-      await moveIntoVault(batch, target.path, w, 1);
+      await moveIntoVault(batch, target.path, w, measured.files || 1);
+      res.bytesFreed = w;
+      res.removed = 1;
       info('kasaya tasindi', { path: target.path, bytes: w, batch: batch.id });
     } catch (err) {
       const msg = describe(err);
@@ -569,8 +631,9 @@ Write-Output ('FREE=' + [Math]::Round($free))
   }
 }
 
-async function measure(path: string): Promise<number> {
+async function measureTree(path: string): Promise<{ bytes: number; files: number }> {
   let total = 0;
+  let files = 0;
   const stack = [path];
   while (stack.length) {
     const dir = stack.pop()!;
@@ -587,13 +650,14 @@ async function measure(path: string): Promise<number> {
         try {
           const st = await stat(longPath(full));
           total += st.size;
+          files++;
         } catch {
           /* atla */
         }
       }
     }
   }
-  return total;
+  return { bytes: total, files };
 }
 
 /**

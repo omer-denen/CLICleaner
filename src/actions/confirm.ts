@@ -119,7 +119,8 @@ export async function confirmPlan(
 }
 
 function isYes(s: string): boolean {
-  return /^(evet|e|yes|y|ev|h)$/i.test(s.trim());
+  // NOT: `h` Turkce'de "hayir" demektir; onay olarak kabul edilmez.
+  return /^(evet|e|yes|y|ev)$/i.test(s.trim());
 }
 
 function format(n: number): string {

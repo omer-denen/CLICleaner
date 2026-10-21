@@ -1,5 +1,7 @@
 import type { CliInventory, CliTool } from './cli-inventory-types.ts';
 import { categoryOf, type CategoryKey } from './categories.ts';
+import { DefaultSelection } from './selection.ts';
+import { ownerStatusOfCluster, ownerStatusOfTool, type OwnerStatus } from './owner-status.ts';
 import { SelectionScope } from './selection-scope.ts';
 import type { Cluster, Risk, ScanResult } from './types.ts';
 
@@ -41,6 +43,10 @@ export interface Finding {
   targets: number;
   /** Kaynak tarafi icin ek kimlik (ornegin komut adi) */
   ref?: string;
+  /** Sahip durumu: aktif / yetim / paylasilan / bilinmiyor. */
+  ownerStatus?: OwnerStatus;
+  /** Varsayilan olarak secili mi? (yalnizca safe + kanitli) */
+  defaultSelected?: boolean;
 }
 
 /** Disk kumelerinden bulgular. */
@@ -59,13 +65,16 @@ export function diskFindings(clusters: Cluster[]): Finding[] {
       path: root,
       category: categoryOf(c),
       bytes: c.totalBytes,
-      idleDays: null,
+      idleDays:
+        c.lastTouched > 0 ? Math.max(0, Math.floor((Date.now() - c.lastTouched) / 86_400_000)) : null,
       risk: c.verdict.risk,
       verdict: c.verdict.kind,
       selectable,
       reason: c.verdict.consequence,
       evidence,
       targets: (c.deleteTargets?.length ?? 0),
+      ownerStatus: ownerStatusOfCluster(c),
+      defaultSelected: DefaultSelection.selected(c),
     });
   }
   return out;
@@ -81,7 +90,7 @@ export function cliFindings(inventory: CliInventory | null): Finding[] {
       source: 'cli',
       title: t.command,
       path: t.installPath,
-      category: 'orphaned-cli',
+      category: cliCategory(t),
       bytes: t.totalBytes,
       idleDays: Number.isFinite(t.idleDays) ? t.idleDays : null,
       risk: cliRisk(t),
@@ -92,9 +101,24 @@ export function cliFindings(inventory: CliInventory | null): Finding[] {
       evidence: (t.evidence ?? []).slice(0, 5),
       targets: (t.shims?.length ?? 0) + (t.stateDirs?.length ?? 0),
       ref: t.command,
+      ownerStatus: ownerStatusOfTool(t),
     });
   }
   return out;
+}
+
+function cliCategory(t: CliTool): CategoryKey {
+  switch (t.status) {
+    case 'protected':
+      return 'protected';
+    case 'unused':
+      return 'unused';
+    case 'recent':
+      return 'unknown';
+    case 'unknown':
+    default:
+      return 'unknown';
+  }
 }
 
 function cliRisk(t: CliTool): Risk {

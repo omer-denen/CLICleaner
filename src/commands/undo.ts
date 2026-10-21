@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { formatBytes, formatDateTime } from '../util/format.ts';
 import { prettyPath } from '../util/longpath.ts';
-import { listVaultEntries, restoreAllVault } from '../actions/vault.ts';
+import { findVaultEntry, listVaultEntries, restoreAllVault, restoreVaultEntry } from '../actions/vault.ts';
 
 const C = {
   reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m',
@@ -16,7 +16,27 @@ const C = {
  * Kaynak: `%LOCALAPPDATA%\residue\vault\<batch>\manifest.json`.
  * Kalici silinen (purge) kayitlar geri getirilemez.
  */
-export async function runUndo(allowPurge: boolean): Promise<void> {
+export async function runUndo(args: string[]): Promise<void> {
+  const allowRestore = args.includes('--restore');
+  const idIdx = args.indexOf('--id');
+  const id = idIdx >= 0 ? args[idIdx + 1] : undefined;
+  if (allowRestore && id) {
+    const entry = await findVaultEntry(id);
+    if (!entry) {
+      console.log(`${C.red}Kasa kaydi bulunamadi:${C.reset} ${id}\n`);
+      return;
+    }
+    const r = await restoreVaultEntry(entry);
+    if (r.restored) {
+      console.log(`\n${C.green}Geri yuklendi:${C.reset} ${prettyPath(r.to)}`);
+      if (r.conflict) console.log(`${C.yellow}Cakisma: yan ada geri kondu.${C.reset}`);
+      if (!r.verified) console.log(`${C.red}Dogrulama basarisiz; dosyalari kontrol edin.${C.reset}`);
+    } else {
+      console.log(`${C.red}Geri yuklenemedi:${C.reset} ${r.reason ?? 'bilinmeyen hata'}`);
+    }
+    console.log('');
+    return;
+  }
   const entries = await listVaultEntries();
 
   console.log(`\n${C.bold}Residue — kasa / geri alma${C.reset}\n`);
@@ -40,7 +60,7 @@ export async function runUndo(allowPurge: boolean): Promise<void> {
     console.log(`  ${C.dim}... +${entries.length - 12} kayit daha${C.reset}`);
   }
 
-  if (!allowPurge) {
+  if (!allowRestore) {
     console.log(`\n${C.gray}Geri yuklemek icin:${C.reset} ${C.cyan}residue undo --restore${C.reset}\n`);
     return;
   }
@@ -62,5 +82,8 @@ export async function runUndo(allowPurge: boolean): Promise<void> {
     );
   }
   if (r.failed > 0) console.log(`${C.red}Basarisiz: ${r.failed}${C.reset}`);
+  if (r.unverified > 0) {
+    console.log(`${C.yellow}Dogrulanamayan: ${r.unverified} (dosya sayisi/boyutu eslesmedi)${C.reset}`);
+  }
   console.log('');
 }

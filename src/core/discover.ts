@@ -1,5 +1,5 @@
 import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { longPath } from '../util/longpath.ts';
 import { DATA_DIR_NAME, LEGACY_DATA_DIR_NAME } from './data-dir.ts';
 import type { Env, EnvDef, Part } from './types.ts';
@@ -187,6 +187,37 @@ export async function discover(envs: Env[], opts: { exclude?: string[] } = {}): 
       targets.push({ path: join(roaming, name), origin: 'roamingappdata' });
     }
   }
+
+  // --- Acikca bilinen paket yoneticisi / runtime kokleri ---
+  // Bunlar AppData'nin korunan cocuklari (Microsoft, .local vb.) altinda
+  // kaldigi icin genel taramada gorunmez; --env secimine gore eklenir.
+  const seen = new Set(targets.map((t) => resolve(t.path).toLowerCase()));
+  const addExtra = async (paths: Array<string | undefined>, origin: Part['origin']) => {
+    for (const p of paths) {
+      if (!p) continue;
+      const abs = resolve(p);
+      const key = abs.toLowerCase();
+      if (seen.has(key) || isOwnDataPath(abs)) continue;
+      if (excluded.has(abs.split(/[\\/]/).pop()?.toLowerCase() ?? '')) continue;
+      try {
+        if (!(await stat(longPath(abs))).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      seen.add(key);
+      targets.push({ path: abs, origin });
+    }
+  };
+
+  if (want('temp') && env.TEMP) {
+    // PROTECTED_ROOTS 'temp'i genel taramada atlar; acikca istenince
+    // yalnizca %TEMP% koku eklenir (tum AppData taranmaz).
+    await addExtra([env.TEMP], 'custom');
+  }
+
+  // NOT: winget/scoop/choco/pipx gibi KURULUM kokleri burada diske
+  // taranmaz; CLI envanteri onlari salt okunur listeler. Boylece
+  // "kurulu arac" yanlislikla "artik" sayilmaz.
 
   return { targets, stats };
 }

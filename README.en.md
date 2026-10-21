@@ -25,7 +25,7 @@ folder is, what exactly deletion would cost, and why it decided that way.
 
 | It does not | Why |
 |---|---|
-| Touch the registry, PATH or uninstall entries | It is not general Windows maintenance; it focuses on developer and AI leftovers |
+| Touch the registry, PATH or uninstall entries **by default** | It is not general Windows maintenance; `residue env` can clean PATH only after explicit approval + backup |
 | Delete your documents, photos or projects "to free space" | Those folders are never decisions |
 | Delete a folder just because of its name | Without evidence it says "unidentified" and **reports only** |
 | Delete models, agent sessions or skills | That is your data; they never become delete targets |
@@ -159,6 +159,10 @@ In this mode:
 - **Two steps:** a plan first, then a written `SIL` approval. `--yes` cannot
   bypass it.
 - **Vault:** default mode; deleted items move to the tool's vault and can be restored.
+- **Journal:** every destructive step is written first; interrupted work is reported by `residue recover`.
+- **Evidence tree:** every recommendation is explained as observation → evidence → claim.
+- **Dependency graph:** CLI removal is blocked when a hard/active dependency would break.
+- **Environment variables:** secrets are masked; writes only happen via `env --clean --apply` with a backup and typed approval.
 - **Targeted deletion:** not the whole folder — only the safe part.
 - **Git awareness:** tracked files can never be targeted; project scans are
   report-only.
@@ -262,6 +266,13 @@ residue undo --restore      # restore from the vault
 residue repair --dry-run    # show broken / partial installations
 residue repair              # repair (ONAR confirmation; live output)
 residue quarantine <ad>     # move a standalone tool to the vault (KARANTINA confirmation)
+residue env                 # PATH / environment analysis (read-only)
+residue env --clean         # PATH cleanup plan (writes nothing)
+residue project [dir]       # project dependencies + reproducible recipe
+residue graph               # CLI dependency graph; --what-if <name>
+residue schedule            # scheduled vault cleanup (daily/weekly)
+residue vault               # vault inventory / retention / permanent delete
+residue recover             # report interrupted operations
 residue ui                  # terminal UI (Ink; needs a real terminal)
 residue api                 # headless HTTP/SSE API (no UI; 127.0.0.1)
 ```

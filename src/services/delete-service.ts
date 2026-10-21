@@ -1,19 +1,17 @@
-import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import {
   buildPlan,
   closeRecycle,
   deleteTarget,
-  Journal,
   type DeletePlan,
   type DeleteResult,
 } from '../actions/delete.ts';
-import { longPath } from '../util/longpath.ts';
 import { ApprovalRules } from '../core/approval.ts';
 import { newId } from './ids.ts';
 import { ServiceError, describeError } from './errors.ts';
 import type { ScanResult } from '../core/types.ts';
-import { dataDir } from '../core/data-dir.ts';
+import { OperationJournal } from '../core/operation-journal.ts';
+import { AppError } from '../core/app-error.ts';
+import { audit } from '../util/audit.ts';
 import type {
   ExecuteEvent,
   ExecuteStartResponse,
@@ -113,6 +111,15 @@ export class DeleteService {
     if (stored.requiresHighAck && acknowledgeHigh !== true) {
       throw new ServiceError(400, 'Yuksek risk onayi eksik');
     }
+    if (stored.requiresHighAck) {
+      // Override denetimi: hangi plan, hangi yuksek riskli kumeler.
+      void audit('delete.high-ack', {
+        planId: stored.planId,
+        clusters: stored.plan.clusters
+          .filter((c) => c.risk === 'high')
+          .map((c) => ({ key: c.key, title: c.title, targets: c.targets.length })),
+      });
+    }
 
     // Plan tek kullanimlik: ayni planla ikinci kez silme baslatilamaz.
     this.plans.delete(stored.planId);
@@ -134,11 +141,33 @@ export class DeleteService {
 
   private async runExecuteJob(job: ExecuteJob, stored: StoredPlan): Promise<void> {
     const plan = stored.plan;
-    const journal = new Journal();
+    let journal: OperationJournal;
+    try {
+      // JOURNAL-FIRST: gunluk yazilamiyorsa HICBIR SEY silinmez.
+      journal = await OperationJournal.create(job.id, {
+        mode: plan.mode,
+        planId: stored.planId,
+      });
+    } catch (err) {
+      job.status = 'error';
+      const ae = AppError.from(err);
+      this.emit(job.id, {
+        type: 'error',
+        message: `Islem gunlugu yazilamadi; guvenlik icin silme yapilmadi: ${ae.message}`,
+        code: ae.code,
+        retryable: ae.retryable,
+        dataSafe: true,
+      });
+      return;
+    }
+
     let freed = 0;
     let removed = 0;
     let skipped = 0;
     let failed = 0;
+    let consecutiveFailures = 0;
+    let processed = 0;
+    let circuitBroken = false;
 
     const emit = (ev: ExecuteEvent) => {
       job.last = ev;
@@ -150,6 +179,25 @@ export class DeleteService {
     try {
       for (let i = 0; i < plan.targets.length; i++) {
         const pt = plan.targets[i]!;
+        const itemId = `t-${i}`;
+
+        // Devre kesici: art arda 5 hata veya %20 hata orani asilirsa
+        // kalan hedefler silinmez; kullanici raporu gorur.
+        if (circuitBroken) {
+          await journal.skipped(itemId, 'devre kesici: onceki hatalar');
+          skipped++;
+          emit({
+            type: 'target-done',
+            index: i,
+            bytesFreed: 0,
+            removed: 0,
+            skipped: 1,
+            failed: 0,
+          });
+          continue;
+        }
+
+        await journal.pending(itemId, pt.target.path, pt.bytes);
         emit({
           type: 'target-start',
           index: i,
@@ -166,18 +214,14 @@ export class DeleteService {
         );
 
         let r: DeleteResult | null = null;
+        let targetFailed = false;
         try {
+          await journal.inProgress(itemId);
           r = await deleteTarget(pt.target, plan.mode);
         } catch (err) {
+          targetFailed = true;
           failed++;
-          journal.add({
-            at: Date.now(),
-            mode: plan.mode,
-            action: 'failed',
-            path: pt.target.path,
-            bytes: 0,
-            reason: describeError(err),
-          });
+          await journal.failed(itemId, describeError(err));
           emit({ type: 'target-done', index: i, bytesFreed: 0, removed: 0, skipped: 0, failed: 1 });
         } finally {
           clearInterval(heartbeat);
@@ -188,34 +232,18 @@ export class DeleteService {
           removed += r.removed;
           skipped += r.skipped.length;
           failed += r.failed.length;
+          targetFailed = r.failed.length > 0 || (r.removed === 0 && r.skipped.length === 0);
+
+          if (r.removed > 0) {
+            await journal.done(itemId, r.bytesFreed);
+          } else {
+            await journal.skipped(itemId, r.skipped[0]?.reason ?? 'silinecek uygun oge yok');
+          }
           for (const s of r.skipped) {
-            journal.add({
-              at: Date.now(),
-              mode: plan.mode,
-              action: 'skipped',
-              path: s.path,
-              bytes: 0,
-              reason: s.reason,
-            });
+            await journal.skipped(itemId, s.reason);
           }
           for (const f of r.failed) {
-            journal.add({
-              at: Date.now(),
-              mode: plan.mode,
-              action: 'failed',
-              path: f.path,
-              bytes: 0,
-              reason: f.reason,
-            });
-          }
-          if (r.removed > 0) {
-            journal.add({
-              at: Date.now(),
-              mode: plan.mode,
-              action: 'deleted',
-              path: pt.target.path,
-              bytes: r.bytesFreed,
-            });
+            await journal.failed(itemId, f.reason);
           }
           emit({
             type: 'target-done',
@@ -226,24 +254,60 @@ export class DeleteService {
             failed: r.failed.length,
           });
         }
-      }
 
-      let journalPath = '';
-      if (journal.all().length > 0) {
-        try {
-          const dir = join(dataDir(), 'journals');
-          await mkdir(longPath(dir), { recursive: true });
-          journalPath = await journal.save(dir);
-        } catch {
-          /* gunluk yazilamadi; silme zaten tamamlandi */
+        processed++;
+        consecutiveFailures = targetFailed ? consecutiveFailures + 1 : 0;
+        if (
+          consecutiveFailures >= 5 ||
+          (processed >= 10 && failed / processed > 0.2)
+        ) {
+          circuitBroken = true;
         }
       }
 
+      await journal.close('closed');
       job.status = 'done';
-      emit({ type: 'done', freed, removed, skipped, failed, journalPath, mode: plan.mode });
+      void audit('delete.done', {
+        jobId: job.id,
+        planId: stored.planId,
+        mode: plan.mode,
+        freed,
+        removed,
+        skipped,
+        failed,
+        journal: journal.file,
+      });
+      emit({
+        type: 'done',
+        freed,
+        removed,
+        skipped,
+        failed,
+        journalPath: journal.file,
+        mode: plan.mode,
+      });
     } catch (err) {
+      // Journal yazimi veya beklenmeyen hata: islem "crashed" isaretlenir.
+      try {
+        await journal.close('crashed', describeError(err));
+      } catch {
+        /* journal zaten yazilamiyor */
+      }
       job.status = 'error';
-      emit({ type: 'error', message: describeError(err) });
+      const ae = AppError.from(err);
+      void audit('delete.error', {
+        jobId: job.id,
+        planId: stored.planId,
+        error: ae.message,
+        code: ae.code,
+      });
+      emit({
+        type: 'error',
+        message: ae.message,
+        code: ae.code,
+        retryable: ae.retryable,
+        dataSafe: ae.dataSafe,
+      });
     } finally {
       closeRecycle();
     }

@@ -20,6 +20,9 @@ export class DefaultSelection {
   /** Tek kume varsayilan olarak isaretlenir mi? */
   static selected(c: Cluster): boolean {
     if (c.verdict.kind !== 'recommend') return false;
+    // Kesisen ilke: varsayilan secim YALNIZCA "safe" risklidir.
+    // low/medium/high kullaniciya acikca sorulur.
+    if (c.verdict.risk !== 'safe') return false;
     if ((c.deleteTargets?.length ?? 0) === 0) return false;
     const regen = c.verdict.regenerability;
     if (regen === 'user-data' || regen === 'unknown') return false;
