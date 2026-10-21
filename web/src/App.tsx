@@ -7,7 +7,7 @@ import type {
   ScanStatusResponse,
 } from '../../src/core/contract.ts';
 import { api, ApiError } from './api.ts';
-import { translate, type Lang, type MessageKey } from './i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from './i18n.ts';
 import { formatBytes } from './format.ts';
 import { Dashboard } from './screens/Dashboard.tsx';
 import { Disk } from './screens/Disk.tsx';
@@ -94,6 +94,10 @@ export function App() {
 
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const load = useCallback(async () => {
     setError(null);
@@ -375,13 +379,13 @@ export function App() {
         {!wide && (
           <aside className="context">
             <section className="context-block">
-              <h2>{t('safety.title')}</h2>
+              <h2>{tu('safety.title')}</h2>
               <p className="dim">{t('safety.body')}</p>
             </section>
 
             {meta && (
               <section className="context-block">
-                <h2>{t('context.meta')}</h2>
+                <h2>{tu('context.meta')}</h2>
                 <dl className="meta-list">
                   <dt>{t('context.ui')}</dt>
                   <dd className="mono">{meta.ui ? 'web' : 'api'}</dd>

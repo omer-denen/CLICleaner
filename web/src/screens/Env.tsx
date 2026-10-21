@@ -6,7 +6,7 @@ import type {
 } from '../../../src/core/contract.ts';
 import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { ENV_FINDING_LABEL, ENV_SCOPE_LABEL } from '../labels.ts';
 
 interface Props {
@@ -22,6 +22,10 @@ interface Props {
 export function Env({ lang }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [analysis, setAnalysis] = useState<EnvAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +174,7 @@ export function Env({ lang }: Props) {
             </div>
 
             <section className="panel">
-              <h2>{t('env.findings')}</h2>
+              <h2>{tu('env.findings')}</h2>
               {analysis.findings.length === 0 ? (
                 <p className="dim">{t('env.noFindings')}</p>
               ) : (
@@ -197,7 +201,7 @@ export function Env({ lang }: Props) {
             </section>
 
             <section className="panel">
-              <h2>{t('env.pathEntries')}</h2>
+              <h2>{tu('env.pathEntries')}</h2>
               <div className="path-scroll">
                 {analysis.pathEntries.map((entry) => {
                   const state = !entry.exists
@@ -230,7 +234,7 @@ export function Env({ lang }: Props) {
             </section>
 
             <section className="panel">
-              <h2>{t('env.orphans')}</h2>
+              <h2>{tu('env.orphans')}</h2>
               {analysis.orphanVariables.length === 0 ? (
                 <p className="dim">—</p>
               ) : (
@@ -250,7 +254,7 @@ export function Env({ lang }: Props) {
             </section>
 
             <section className="panel">
-              <h2>{t('env.shadows')}</h2>
+              <h2>{tu('env.shadows')}</h2>
               {analysis.commandShadows.length === 0 ? (
                 <p className="dim">—</p>
               ) : (
@@ -272,7 +276,7 @@ export function Env({ lang }: Props) {
       </section>
 
       <aside className="env-detail">
-        <h2>{t('env.plan.title')}</h2>
+        <h2>{tu('env.plan.title')}</h2>
         {actionError && <div className="banner danger" role="alert">{actionError}</div>}
 
         {!plan && !result && <p className="dim">{t('env.plan.empty')}</p>}
@@ -309,7 +313,7 @@ export function Env({ lang }: Props) {
 
             {plan.plan.warnings.length > 0 && (
               <>
-                <h4>{t('env.plan.warnings')}</h4>
+                <h4>{tu('env.plan.warnings')}</h4>
                 <ul className="detail-list">
                   {plan.plan.warnings.map((warning) => (
                     <li key={warning}>{warning}</li>
@@ -361,7 +365,7 @@ export function Env({ lang }: Props) {
 
         {result && (
           <section className="panel">
-            <h2>{t('env.plan.done')}</h2>
+            <h2>{tu('env.plan.done')}</h2>
             <dl className="meta-list">
               <dt>{t('env.plan.applied')}</dt>
               <dd className="mono">{result.applied}</dd>

@@ -3,7 +3,7 @@ import type { ExecuteEvent, PlanResponse } from '../../../src/core/contract.ts';
 import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
 import { openEvents } from '../sse.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatBytes } from '../format.ts';
 import { RISK_LABEL } from '../labels.ts';
 
@@ -33,6 +33,10 @@ interface JobState {
 export function PlanScreen({ plan, lang, onBack, onVault, onReplace, onExecuted }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [phrase, setPhrase] = useState('');
   const [ack, setAck] = useState(false);
@@ -133,15 +137,15 @@ export function PlanScreen({ plan, lang, onBack, onVault, onReplace, onExecuted 
 
       <section className="panel">
         <h2>
-          {t('plan.clusters')} · {plan.plan.clusters.length} · {t('plan.targets')}{' '}
+          {tu('plan.clusters')} · {plan.plan.clusters.length} · {tu('plan.targets')}{' '}
           {plan.plan.targets.length}
         </h2>
         <table className="table">
           <thead>
             <tr>
-              <th>{t('table.cluster')}</th>
-              <th>{t('plan.targets')}</th>
-              <th>{t('disk.detail.risk')}</th>
+              <th>{tu('table.cluster')}</th>
+              <th>{tu('plan.targets')}</th>
+              <th>{tu('disk.detail.risk')}</th>
               <th className="num">{t('table.size')}</th>
               <th />
             </tr>
@@ -177,7 +181,7 @@ export function PlanScreen({ plan, lang, onBack, onVault, onReplace, onExecuted 
       </section>
 
       <section className="panel approval">
-        <h2>{t('plan.approval')}</h2>
+        <h2>{tu('plan.approval')}</h2>
         {plan.requiresPhrase && (
           <label className="approval-row">
             <span>{t('plan.phraseHint', { phrase: plan.phrase })}</span>

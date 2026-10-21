@@ -11,7 +11,7 @@ import type {
 } from '../../../src/core/contract.ts';
 import { api, ApiError } from '../api.ts';
 import { openEvents } from '../sse.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
 import {
   CATEGORY_LABEL,
@@ -54,6 +54,10 @@ interface Props {
 export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [text, setText] = useState('');
   const [debouncedText, setDebouncedText] = useState('');
@@ -483,11 +487,11 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
         <div className="cluster-head">
           <span />
           <span />
-          <span>{t('table.cluster')}</span>
-          <span>{t('disk.filter.kind')}</span>
-          <span>{t('disk.filter.category')}</span>
-          <span className="num">{t('disk.sort.size')}</span>
-          <span className="num">{t('disk.detail.idle')}</span>
+          <span>{tu('table.cluster')}</span>
+          <span>{tu('disk.filter.kind')}</span>
+          <span>{tu('disk.filter.category')}</span>
+          <span className="num">{tu('disk.sort.size')}</span>
+          <span className="num">{tu('disk.detail.idle')}</span>
           <span />
         </div>
 
@@ -570,7 +574,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
       </section>
 
       <aside className="disk-detail">
-        <h2>{t('disk.detail')}</h2>
+        <h2>{tu('disk.detail')}</h2>
         {!detail ? (
           <p className="dim">{t('disk.detail.empty')}</p>
         ) : (
@@ -602,7 +606,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
               </dd>
             </dl>
 
-            <h4>{t('disk.detail.targets')}</h4>
+            <h4>{tu('disk.detail.targets')}</h4>
             {detailTargets.length === 0 ? (
               <p className="dim">—</p>
             ) : (
@@ -618,7 +622,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
               </ul>
             )}
 
-            <h4>{t('disk.detail.parts')}</h4>
+            <h4>{tu('disk.detail.parts')}</h4>
             <ul className="detail-list">
               {detail.cluster.parts.map((part) => (
                 <li key={part.path}>
@@ -632,7 +636,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
 
             {(detail.cluster.evidence.markers ?? []).length > 0 && (
               <>
-                <h4>{t('disk.detail.markers')}</h4>
+                <h4>{tu('disk.detail.markers')}</h4>
                 <div className="detail-badges">
                   {(detail.cluster.evidence.markers ?? []).map((marker) => (
                     <span key={marker} className="badge">
@@ -643,7 +647,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
               </>
             )}
 
-            <h4>{t('disk.detail.because')}</h4>
+            <h4>{tu('disk.detail.because')}</h4>
             <ul className="detail-list">
               {detail.cluster.verdict.because.map((line) => (
                 <li key={line}>{line}</li>
@@ -652,7 +656,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
 
             {detail.cluster.verdict.preconditions.length > 0 && (
               <>
-                <h4>{t('disk.detail.preconditions')}</h4>
+                <h4>{tu('disk.detail.preconditions')}</h4>
                 <ul className="detail-list">
                   {detail.cluster.verdict.preconditions.map((line) => (
                     <li key={line}>{line}</li>

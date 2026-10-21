@@ -7,7 +7,7 @@ import type {
   ProjectTab,
 } from '../../../src/core/contract.ts';
 import { api, ApiError } from '../api.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
 
 const TABS: Array<{ id: ProjectTab; label: MessageKey }> = [
@@ -46,6 +46,10 @@ interface Props {
 export function Projects({ lang }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [rootsInput, setRootsInput] = useState('');
   const [roots, setRoots] = useState<string[]>([]);
@@ -296,7 +300,7 @@ export function Projects({ lang }: Props) {
       </section>
 
       <aside className="disk-detail projects-detail">
-        <h2>{t('projects.detail')}</h2>
+        <h2>{tu('projects.detail')}</h2>
 
         {!selected && <p className="dim">{t('projects.detail.empty')}</p>}
         {selected && analyzing && <p className="dim">{t('projects.loading')}</p>}
@@ -351,7 +355,7 @@ export function Projects({ lang }: Props) {
               </div>
             </div>
 
-            <h4>{t('projects.plan.title')}</h4>
+            <h4>{tu('projects.plan.title')}</h4>
             <dl className="meta-list">
               <dt>{t('projects.plan.planned')}</dt>
               <dd className="mono">{analysis.plan.planned.length}</dd>
@@ -380,7 +384,7 @@ export function Projects({ lang }: Props) {
               </ul>
             )}
 
-            <h4>{t('projects.artifacts')}</h4>
+            <h4>{tu('projects.artifacts')}</h4>
             {analysis.artifacts.length === 0 ? (
               <p className="dim">{t('projects.noArtifacts')}</p>
             ) : (

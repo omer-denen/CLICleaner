@@ -12,7 +12,7 @@ import type {
 import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
 import { openEvents } from '../sse.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
 import { CLI_SOURCE_LABEL, CLI_STATUS_LABEL, CONFIDENCE_LABEL } from '../labels.ts';
 
@@ -39,6 +39,10 @@ interface Props {
 export function Tools({ lang }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [view, setView] = useState<CliViewResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -425,11 +429,11 @@ export function Tools({ lang }: Props) {
             {view.tools.length > 0 && (
               <div className="cli-head">
                 <span />
-                <span>{t('tools.command')}</span>
-                <span>{t('tools.source')}</span>
-                <span>{t('tools.status')}</span>
-                <span className="num">{t('tools.idle')}</span>
-                <span className="num">{t('tools.size')}</span>
+                <span>{tu('tools.command')}</span>
+                <span>{tu('tools.source')}</span>
+                <span>{tu('tools.status')}</span>
+                <span className="num">{tu('tools.idle')}</span>
+                <span className="num">{tu('tools.size')}</span>
                 <span />
               </div>
             )}
@@ -512,7 +516,7 @@ export function Tools({ lang }: Props) {
       <aside className="tools-detail">
         {plan ? (
           <section className="plan-panel">
-            <h2>{t('tools.plan.title')}</h2>
+            <h2>{tu('tools.plan.title')}</h2>
             <p className="dim">{t('tools.plan.phraseHint', { phrase: plan.phrase })}</p>
 
             <dl className="meta-list">
@@ -552,7 +556,7 @@ export function Tools({ lang }: Props) {
 
             {(plan.blocked ?? []).length > 0 && (
               <>
-                <h4>{t('tools.plan.blocked')}</h4>
+                <h4>{tu('tools.plan.blocked')}</h4>
                 <ul className="detail-list">
                   {(plan.blocked ?? []).map((blocked) => (
                     <li key={blocked.id}>
@@ -605,7 +609,7 @@ export function Tools({ lang }: Props) {
           </section>
         ) : (
           <>
-            <h2>{t('tools.detail')}</h2>
+            <h2>{tu('tools.detail')}</h2>
             {!detail ? (
               <p className="dim">{t('tools.detail.empty')}</p>
             ) : (
@@ -666,7 +670,7 @@ export function Tools({ lang }: Props) {
 
                 {detail.shims.length > 0 && (
                   <>
-                    <h4>{t('tools.shims')}</h4>
+                    <h4>{tu('tools.shims')}</h4>
                     <ul className="detail-list">
                       {detail.shims.map((shim) => (
                         <li key={shim} className="mono">
@@ -679,7 +683,7 @@ export function Tools({ lang }: Props) {
 
                 {detail.stateDirs.length > 0 && (
                   <>
-                    <h4>{t('tools.stateDirList')}</h4>
+                    <h4>{tu('tools.stateDirList')}</h4>
                     <ul className="detail-list">
                       {detail.stateDirs.map((dir) => (
                         <li key={dir} className="mono">
@@ -692,7 +696,7 @@ export function Tools({ lang }: Props) {
 
                 {detail.evidence.length > 0 && (
                   <>
-                    <h4>{t('tools.evidence')}</h4>
+                    <h4>{tu('tools.evidence')}</h4>
                     <ul className="detail-list">
                       {detail.evidence.map((line) => (
                         <li key={line}>{line}</li>
@@ -703,7 +707,7 @@ export function Tools({ lang }: Props) {
 
                 {(detail.references ?? []).length > 0 && (
                   <>
-                    <h4>{t('tools.references')}</h4>
+                    <h4>{tu('tools.references')}</h4>
                     <ul className="detail-list">
                       {(detail.references ?? []).map((ref) => (
                         <li key={`${ref.kind}:${ref.path}`}>
@@ -719,7 +723,7 @@ export function Tools({ lang }: Props) {
 
                 {duplicateOf(detail.id).length > 0 && (
                   <>
-                    <h4>{t('tools.duplicates')}</h4>
+                    <h4>{tu('tools.duplicates')}</h4>
                     <ul className="detail-list">
                       {duplicateOf(detail.id).map((dup) => (
                         <li key={dup.command}>
@@ -741,7 +745,7 @@ export function Tools({ lang }: Props) {
 
         {results && (
           <section className="plan-panel">
-            <h2>{t('tools.plan.done')}</h2>
+            <h2>{tu('tools.plan.done')}</h2>
             <ul className="detail-list">
               {results.results.map((result, index) => (
                 <li key={`${result.command}:${index}`}>

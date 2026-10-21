@@ -39,11 +39,22 @@ export class GraphService {
     const roles = g.roles();
     const levels = g.levels();
     const cycles = g.cycles();
+    const ref = (id: string, edge: GraphViewResponse['edges'][number]) => {
+      const node = g.node(id);
+      return {
+        id,
+        label: node?.label ?? id,
+        kind: node?.kind ?? ('unknown' as const),
+        edge,
+      };
+    };
     return {
       nodes: g.nodes().map((n) => ({
         ...n,
         role: roles.get(n.id) ?? 'isolated',
         level: levels.get(n.id) ?? 'low',
+        dependents: g.incoming(n.id).map((e) => ref(e.from, e)),
+        needs: g.outgoing(n.id).map((e) => ref(e.to, e)),
       })),
       edges: g.edges(),
       cycles,

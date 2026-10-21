@@ -7,7 +7,15 @@ import type {
   VerdictKind,
 } from './types.ts';
 import type { CategoryKey, CategoryStat } from './categories.ts';import type { CliInventory, CliSource, CliStatus, CliTool } from './cli-inventory-types.ts';
-import type { DependencyLevel, GraphEdge, GraphNode, NodeRole, RootCause, WhatIfResult } from './dependency-graph.ts';
+import type {
+  DependencyLevel,
+  GraphEdge,
+  GraphNode,
+  GraphNodeKind,
+  NodeRole,
+  RootCause,
+  WhatIfResult,
+} from './dependency-graph.ts';
 import type { EnvFinding, EnvPlan } from './env-engine.ts';
 import type {
   ScheduleFrequency,
@@ -492,9 +500,21 @@ export interface EnvPlanResponse {
 // Bagimlilik grafigi gorunumu
 // ---------------------------------------------------------------------------
 
+export interface GraphDependentView {
+  /** Karsi dugumun kimligi. */
+  id: string;
+  label: string;
+  kind: GraphNodeKind;
+  edge: GraphEdge;
+}
+
 export interface GraphNodeView extends GraphNode {
   role: NodeRole;
   level: DependencyLevel;
+  /** Gelen kenarlar: bu dugume ihtiyac duyan dugumler (SALT OKUNUR). */
+  dependents: GraphDependentView[];
+  /** Giden kenarlar: bu dugumun ihtiyac duydugu dugumler (SALT OKUNUR). */
+  needs: GraphDependentView[];
 }
 
 export interface GraphViewResponse {

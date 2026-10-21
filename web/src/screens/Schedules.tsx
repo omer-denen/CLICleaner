@@ -10,7 +10,7 @@ import type {
 } from '../../../src/core/contract.ts';
 import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatBytes } from '../format.ts';
 import {
   CATEGORY_LABEL,
@@ -55,6 +55,10 @@ function selectorSummary(rule: ScheduleView, t: (key: MessageKey, vars?: Record<
 export function Schedules({ lang }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [rules, setRules] = useState<ScheduleView[]>([]);
   const [catchUp, setCatchUp] = useState<ScheduleCatchUpItem[]>([]);
@@ -207,7 +211,7 @@ export function Schedules({ lang }: Props) {
       {!loading && (
         <>
           <section className="panel">
-            <h2>{t('schedules.new')}</h2>
+            <h2>{tu('schedules.new')}</h2>
             <p className="dim">{t('schedules.approvalNote')}</p>
 
             <div className="schedule-form">
@@ -388,7 +392,7 @@ export function Schedules({ lang }: Props) {
 
           {catchUp.length > 0 && (
             <section className="panel">
-              <h2>{t('schedules.catchUp')}</h2>
+              <h2>{tu('schedules.catchUp')}</h2>
               <p className="dim">{t('schedules.catchUpHint')}</p>
               <ul className="detail-list">
                 {catchUp.map((item) => (
@@ -431,7 +435,7 @@ export function Schedules({ lang }: Props) {
           )}
 
           <section className="panel">
-            <h2>{t('schedules.list')}</h2>
+            <h2>{tu('schedules.list')}</h2>
             {rules.length === 0 ? (
               <p className="dim">{t('schedules.empty')}</p>
             ) : (
@@ -562,7 +566,7 @@ export function Schedules({ lang }: Props) {
 
           {preview && (
             <section className="panel">
-              <h2>{t('schedules.previewTitle')}</h2>
+              <h2>{tu('schedules.previewTitle')}</h2>
               <p className="dim">
                 {preview.data.items.length} {t('schedules.previewItems')} ·{' '}
                 {t('schedules.previewTotal')}:{' '}
@@ -592,8 +596,8 @@ export function Schedules({ lang }: Props) {
             <section className="panel">
               <h2>
                 {runResult.status === 'done'
-                  ? t('schedules.runDone')
-                  : t('schedules.runFailed')}
+                  ? tu('schedules.runDone')
+                  : tu('schedules.runFailed')}
               </h2>
               <p className="dim">
                 <span className="badge">
@@ -607,7 +611,7 @@ export function Schedules({ lang }: Props) {
           )}
 
           <section className="panel">
-            <h2>{t('schedules.history')}</h2>
+            <h2>{tu('schedules.history')}</h2>
             {history.length === 0 ? (
               <p className="dim">{t('schedules.historyEmpty')}</p>
             ) : (

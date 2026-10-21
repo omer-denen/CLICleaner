@@ -4,7 +4,7 @@ import type {
   UpdateCheckView,
 } from '../../../src/core/contract.ts';
 import { api, ApiError } from '../api.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge } from '../format.ts';
 
 interface Props {
@@ -21,6 +21,10 @@ interface Props {
 export function Settings({ lang, version }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [scanCacheHours, setScanCacheHours] = useState(24);
@@ -104,7 +108,7 @@ export function Settings({ lang, version }: Props) {
       {settings && (
         <>
           <section className="panel">
-            <h2>{t('settings.scanCache')}</h2>
+            <h2>{tu('settings.scanCache')}</h2>
             <div className="settings-row">
               <input
                 className="control num"
@@ -129,7 +133,7 @@ export function Settings({ lang, version }: Props) {
           </section>
 
           <section className="panel">
-            <h2>{t('settings.vaultRetention')}</h2>
+            <h2>{tu('settings.vaultRetention')}</h2>
             <div className="settings-row">
               <input
                 className="control num"
@@ -147,7 +151,7 @@ export function Settings({ lang, version }: Props) {
           </section>
 
           <section className="panel">
-            <h2>{t('settings.updateCheck')}</h2>
+            <h2>{tu('settings.updateCheck')}</h2>
             <div className="settings-row">
               <select
                 className="control"
@@ -184,7 +188,7 @@ export function Settings({ lang, version }: Props) {
           </div>
 
           <section className="panel">
-            <h2>{t('settings.update.run')}</h2>
+            <h2>{tu('settings.update.run')}</h2>
             <div className="settings-row">
               <button
                 type="button"

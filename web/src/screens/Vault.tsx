@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { VaultListResponse } from '../../../src/core/contract.ts';
 import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
-import { translate, type Lang, type MessageKey } from '../i18n.ts';
+import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
 
 interface Props {
@@ -20,6 +20,10 @@ interface Props {
 export function Vault({ lang, onChanged }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
+
+  // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
+  const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translateUpper(lang, key, vars);
 
   const [data, setData] = useState<VaultListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +130,7 @@ export function Vault({ lang, onChanged }: Props) {
               <thead>
                 <tr>
                   <th />
-                  <th>{t('vault.original')}</th>
+                  <th>{tu('vault.original')}</th>
                   <th className="num">{t('vault.size')}</th>
                   <th className="num">{t('vault.age')}</th>
                   <th className="num">{t('vault.remaining')}</th>
@@ -172,7 +176,7 @@ export function Vault({ lang, onChanged }: Props) {
           </section>
 
           <section className="panel approval">
-            <h2>{t('vault.purge')}</h2>
+            <h2>{tu('vault.purge')}</h2>
             <label className="approval-row">
               <span>
                 {data.purgePhrase

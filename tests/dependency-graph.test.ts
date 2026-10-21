@@ -61,6 +61,23 @@ test('bilinmeyen kimlik what-if sonucunu kirletmez', () => {
   assert.equal(r.brokenEdges.length, 0);
 });
 
+test('dugum iliskileri gelen/giden kenarlarla okunur', () => {
+  const g = graph();
+  assert.deepEqual(
+    g.incoming('t2').map((e) => e.from),
+    ['cfg'],
+  );
+  assert.deepEqual(
+    g.outgoing('t2').map((e) => e.to),
+    ['missing'],
+  );
+  assert.deepEqual(
+    g.incoming('t1').map((e) => e.from),
+    ['s1'],
+  );
+  assert.equal(g.incoming('boyle-bir-dugum-yok').length, 0);
+});
+
 test('rol ve seviye', () => {
   const g = graph();
   const roles = g.roles();

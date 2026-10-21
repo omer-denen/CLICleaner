@@ -7,11 +7,22 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
 ### Eklendi
 
-- **Graf: satırdan simülasyon.** Düğüm ve kök neden satırlarındaki
-  **Simüle** düğmesi, serbest arama yerine düğümün **kesin kimliğiyle**
-  what-if çalıştırır. Böylece “browser” gibi bir ad birden fazla düğümle
-  eşleşse bile yalnızca seçilen satır değerlendirilir; sonuç paneli seçili
-  düğümü gösterir.
+- **Graf: rol bazlı bakış + satır içi ilişki ağacı.** İki bakış profili:
+  **Koruyan** (satırda “Bağımlılıklar”: bu düğüme kim bağlı, bu düğüm neye
+  bağlı) ve **Deneyen** (satırda “Simüle”: kaldırma etkisi). Sonuç artık
+  ayrı panele taşınmıyor; **satırın altında ağaç ve açıklama** olarak
+  açılıyor. Düğüm ve kenar tanımları ekranda; kenarların neden doğrudan
+  işlem almadığı yazıyor.
+- **Graf hazırlığında ilerleme.** İlk envanter taraması canlı araç sayısı ve
+  adım göstergesiyle (1/2 → 2/2) ilerliyor; düz metin yerine ilerleme
+  çubuğu gösteriliyor.
+
+### Düzeltildi
+
+- **Türkçe büyük harf.** Başlık ve etiketler artık dile göre büyütülüyor:
+  Türkçe seçiliyken `what-if` → **WHAT-İF** (noktalı İ), `disk` → **DİSK**.
+  Önceki CSS büyütmesi Türkçe i kuralını uygulamıyordu; tüm ekranlardaki
+  başlık, tablo başlığı ve kart etiketleri kapsandı.
 
 ## [2.2.0] - 2026-10-21
 
