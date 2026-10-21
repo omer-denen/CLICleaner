@@ -17,7 +17,11 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - **Proje keşfi motoru** (`core/project-discovery.ts`) ve
   `GET /api/projects/discover`: `.git`/manifest/artifact kanıtıyla repo
   listesi; salt okunur, silme hedefi üretmez.
-- Test: `npm test` 65 test.
+- **Disk görünümü motoru** (`core/disk-view.ts`) ve `GET /api/disk` /
+  `GET /api/cluster`: filtre, sıralama, kategori sayımı ve seçim özeti
+  motorda; arayüz yalnız gösterir. Plan ve kasa onay ifadeleri
+  `ApprovalRules`'tan gelir (`SIL`, `BOŞALT`).
+- Test: `npm test` 72 test.
 
 ## [2.1.0] - 2026-10-21
 

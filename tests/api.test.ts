@@ -98,3 +98,23 @@ test('dashboard ve proje kesfi uclari yanit verir', async () => {
   });
   assert.equal(bad.status, 400);
 });
+
+test('disk gorunumu ve bilinmeyen kume', async () => {
+  const d = await fetch(`${base}/api/disk`, { headers: { 'x-residue-token': token } });
+  assert.equal(d.status, 200);
+  const body = (await d.json()) as {
+    clusters?: unknown[];
+    counts?: Record<string, number>;
+    selection?: { clusterCount: number };
+    defaultSelectedKeys?: string[];
+  };
+  assert.equal(body.clusters?.length, 0);
+  assert.equal(body.counts?.all, 0);
+  assert.equal(body.selection?.clusterCount, 0);
+  assert.deepEqual(body.defaultSelectedKeys, []);
+
+  const c = await fetch(`${base}/api/cluster?key=yok`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(c.status, 404);
+});

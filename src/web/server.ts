@@ -21,6 +21,9 @@ import {
 } from '../actions/vault.ts';
 import { exists } from '../actions/restore.ts';
 import { BUILTIN_PROFILES, ENVS } from '../core/discover.ts';
+import { CATEGORY_ORDER } from '../core/categories.ts';
+import { DiskView, toClusterDetail } from '../core/disk-view.ts';
+import type { QueryCriteria } from '../core/cluster-query.ts';
 import { ApprovalRules } from '../core/approval.ts';
 import { buildFindings } from '../core/findings.ts';
 import { FindingsQuery } from '../core/findings-query.ts';
@@ -384,6 +387,8 @@ async function handleRequest(
         endpoints: [
           'GET  /api/meta',
           'GET  /api/dashboard',
+          'GET  /api/disk',
+          'GET  /api/cluster',
           'GET  /api/latest',
           'GET  /api/scan/status',
           'GET  /api/findings',
@@ -427,6 +432,33 @@ async function handleRequest(
 
   if (route === 'GET /api/dashboard') {
     sendJson(res, 200, await ctx.dashboard.view());
+    return;
+  }
+
+  // Disk listesi: filtre/siralama/secim ozeti KARAR MOTORUNDAN.
+  if (route === 'GET /api/disk') {
+    await ctx.scan.ensureCacheLoaded();
+    const clusters = ctx.scan.last()?.scan.clusters ?? [];
+    const selected = url.searchParams
+      .getAll('selected')
+      .flatMap((v) => v.split(','))
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const view = new DiskView(clusters, selected).view(parseCriteria(url), ctx.scan.last()?.at ?? null);
+    sendJson(res, 200, view);
+    return;
+  }
+
+  if (route === 'GET /api/cluster') {
+    await ctx.scan.ensureCacheLoaded();
+    const clusters = ctx.scan.last()?.scan.clusters ?? [];
+    const key = url.searchParams.get('key') ?? '';
+    const cluster = new DiskView(clusters).byKey(key);
+    if (!cluster) {
+      sendJson(res, 404, { error: 'Kume bulunamadi' });
+      return;
+    }
+    sendJson(res, 200, toClusterDetail(cluster));
     return;
   }
 
@@ -813,6 +845,7 @@ async function handleRequest(
       entries: views,
       totalBytes: views.reduce((a, e) => a + e.bytes, 0),
       retentionDays: settings.vaultRetentionDays,
+      purgePhrase: ApprovalRules.phrase('vaultPurge'),
     };
     sendJson(res, 200, body);
     return;
@@ -1217,6 +1250,39 @@ function metaResponse(ctx: WebContext): MetaResponse {
 function isLoopbackHost(host: string | undefined): boolean {
   if (!host) return true;
   return /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(host.trim());
+}
+
+/** Disk listesi sorgu parametreleri -> motor kriterleri. */
+function parseCriteria(url: URL): QueryCriteria {
+  const kindRaw = url.searchParams.get('kind') ?? 'all';
+  const kind = (['all', 'recommend', 'ask', 'report-only', 'keep', 'git'] as const).includes(
+    kindRaw as never,
+  )
+    ? (kindRaw as NonNullable<QueryCriteria['kind']>)
+    : 'all';
+
+  const categoryRaw = url.searchParams.get('category') ?? 'all';
+  const category =
+    categoryRaw === 'all' || (CATEGORY_ORDER as readonly string[]).includes(categoryRaw)
+      ? (categoryRaw as NonNullable<QueryCriteria['category']>)
+      : 'all';
+
+  const sortRaw = url.searchParams.get('sort') ?? 'size';
+  const sort = (['size', 'risk', 'recent', 'name'] as const).includes(sortRaw as never)
+    ? (sortRaw as NonNullable<QueryCriteria['sort']>)
+    : 'size';
+
+  return {
+    text: url.searchParams.get('text') ?? '',
+    kind,
+    category,
+    sort,
+    triage: {
+      big: url.searchParams.get('big') === '1',
+      risky: url.searchParams.get('risky') === '1',
+      zombie: url.searchParams.get('zombie') === '1',
+    },
+  };
 }
 
 function sameOrigin(req: IncomingMessage): boolean {

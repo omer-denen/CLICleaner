@@ -6,7 +6,7 @@ import type {
   SkippedEntry,
   VerdictKind,
 } from './types.ts';
-import type { CategoryKey } from './categories.ts';
+import type { CategoryKey, CategoryStat } from './categories.ts';
 import type { CliInventory, CliTool } from './cli-inventory-types.ts';
 
 /**
@@ -228,6 +228,8 @@ export interface VaultListResponse {
   entries: VaultEntryView[];
   totalBytes: number;
   retentionDays: number;
+  /** Kalici bosaltma icin beklenen yazili ifade (tek kaynak). */
+  purgePhrase: string;
 }
 
 export interface VaultRestoreRequest {
@@ -287,6 +289,8 @@ export interface PlanResponse {
   plan: PlanView;
   /** Orta/yuksek risk varsa "SIL" yazili onayi zorunlu */
   requiresPhrase: boolean;
+  /** Sunucunun bekledigi yazili ifade (tek kaynak: ApprovalRules). */
+  phrase: string;
   /** Yuksek risk varsa ayrica acik isaretleme zorunlu */
   requiresHighAck: boolean;
   expiresAt: number;
@@ -688,4 +692,71 @@ export interface ProjectDiscoverResponse {
   projects: ProjectCandidateView[];
   truncated: boolean;
   skipped: number;
+}
+
+// ---------------------------------------------------------------------------
+// Disk gorunumu (M1) — liste + secim ozeti KARAR MOTORUNDAN gelir.
+// ---------------------------------------------------------------------------
+
+export type ClusterKindFilter = 'all' | VerdictKind | 'git';
+
+export interface DiskClusterView {
+  key: string;
+  title: string;
+  category: CategoryKey;
+  risk: RiskLevel;
+  verdictKind: VerdictKind;
+  totalBytes: number;
+  reclaimableBytes: number;
+  lastTouched: number;
+  idleDays: number;
+  gitTracked: boolean;
+  selectable: boolean;
+  plannable: boolean;
+  defaultSelected: boolean;
+  targetCount: number;
+  primaryPath: string;
+  /** Siniflandiricidan gelen "bu ne" metni (veri; ceviri degil). */
+  what: string;
+  /** "Silersem ne olur" metni (veri). */
+  consequence: string;
+  regenerability: Regenerability;
+  confidence: Confidence;
+}
+
+export interface DiskSelectionView {
+  clusterCount: number;
+  bytes: number;
+  targetCount: number;
+}
+
+export interface DiskViewResponse {
+  scan: { at: number | null; clusters: number };
+  clusters: DiskClusterView[];
+  counts: Record<ClusterKindFilter, number>;
+  categories: CategoryStat[];
+  totals: {
+    clusters: number;
+    files: number;
+    totalBytes: number;
+    reclaimableBytes: number;
+  };
+  /** Filtrelenmis kumelerden secilebilir/planlanabilir anahtarlar. */
+  selectableKeys: string[];
+  plannableKeys: string[];
+  /** Varsayilan secim kuralini (T34) gecen TUM anahtarlar. */
+  defaultSelectedKeys: string[];
+  selection: DiskSelectionView;
+}
+
+export interface ClusterDetailView {
+  cluster: Cluster;
+  category: CategoryKey;
+  risk: RiskLevel;
+  verdictKind: VerdictKind;
+  idleDays: number;
+  gitTracked: boolean;
+  selectable: boolean;
+  plannable: boolean;
+  defaultSelected: boolean;
 }

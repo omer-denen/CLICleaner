@@ -92,7 +92,14 @@ export class DeleteService {
       targets: plan.targets,
       totalBytes: plan.totalBytes,
     };
-    return { planId, plan: view, requiresPhrase, requiresHighAck, expiresAt };
+    return {
+      planId,
+      plan: view,
+      requiresPhrase,
+      phrase: ApprovalRules.phrase('delete'),
+      requiresHighAck,
+      expiresAt,
+    };
   }
 
   execute(planId: string, phrase: string | undefined, acknowledgeHigh: boolean): ExecuteStartResponse {
