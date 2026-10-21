@@ -99,7 +99,8 @@ Bağlayıcı kurallar:
 4. `smoke-web.mjs --base=…` (aynı 34 kontrol)
 5. Sunucu kapatılır, geçici klasör silinir.
 
-Gerçek çıktı: **paket smoke temiz** (2.1.0 tarball; sürüm bump'ından önce).
+Gerçek çıktı: **paket smoke temiz** (2.2.0 tarball; 46 paket, `dist/web`
+dahil).
 
 ### 3.3 Mevcut testler
 
@@ -132,26 +133,28 @@ Gerçek çıktı: **paket smoke temiz** (2.1.0 tarball; sürüm bump'ından önc
 
 ## 5. Sürüm ve yayın
 
-- `package.json` + `package-lock.json`: **2.2.0**
-  (`npm version minor --no-git-tag-version`).
+- `package.json` + `package-lock.json`: **2.2.0**.
 - `CHANGELOG.md`: `## [2.2.0] - 2026-10-21`; M5 maddeleri eklendi.
-- `README.md`: 2.0.0'daki "yalnızca terminal" notu düzeltildi;
-  `residue ui --web` davranışı anlatıldı.
-- **Yapılmadı (onay bekliyor):** `git tag v2.2.0`, `npm publish`,
-  GitHub Release (elle; başlık = tag adı — AGENTS 17).
-
-Yayın komutları (onay sonrası):
-
-```powershell
-npm run typecheck
-npm test
-npm run build:web
-npm run smoke
-npm run smoke:package
-npm publish
-git push
-git push origin v2.2.0
-```
+- `README.md` + `README.en.md`: 2.0.0'daki "yalnızca terminal" notu
+  düzeltildi; **"Tarayıcı arayüzü (2.2.0)" / "Browser UI (2.2.0)"** bölümü
+  (ekranlar, çerez token, klavye, iki aşamalı onay, opt-in güncelleme) ve
+  yeni SSS maddeleri eklendi.
+- **Yayınlandı (21.10.2026):**
+  - `npm publish` → `residue-cleaner@2.2.0`, dist-tag `latest`.
+  - Yayınlanan paket ayrı klasöre kuruldu (46 paket); `dist/web` içinde.
+  - Paketlenmiş `ui --web` **:4411** üzerinde çalıştırıldı ve
+    `smoke-web --base` **34/34 temiz**.
+  - `npx residue-cleaner@2.2.0 --version` (temiz klasör) → `2.2.0`.
+  - `git tag v2.2.0`; `main` + tag GitHub'a gönderildi (commit `982ac77`).
+- **Kalan (elle):** GitHub Release sayfaları — `v2.2.0` ve daha önce
+  açılmamış `v2.1.0`. `gh` CLI kurulu değil; başlık = tag adı (AGENTS 17).
+- **Not:** `npm publish` çıktısı `bin[residue] ... was invalid` uyarısı
+  verdi; bu yalnızca `./bin/...` → `bin/...` normalizasyonudur, yayınlanan
+  manifestte `bin` **korunmuştur** (kurulumla doğrulandı). Bir sonraki
+  sürümde `package.json` doğrudan `bin/...` yazılarak uyarı susturulabilir.
+- Doğrudan tarball URL'i (`/-/residue-cleaner-2.2.0.tgz`) yayından sonraki
+  ilk dakikalarda 404 döndü; `npm install` ve `npx` paketi **normal indirdi**
+  (kayıt CDN kenarı gecikmesi). Bu oturumda ek işlem gerekmedi.
 
 ---
 
@@ -192,6 +195,7 @@ git push origin v2.2.0
 1. **Oku:** `AGENTS.md` → `SESSION_LOG.md` (en üst M5) → bu belge.
 2. **Doğrula:** `git status`, `npm run typecheck`, `npm test`,
    `npm run build:web`, `npm run smoke`.
-3. **Kullanıcı onayı varsa:** tag + publish + push; GitHub Release elle.
+3. **GitHub Release sayfalarını elle aç:** `v2.2.0` ve `v2.1.0`
+   (başlık = tag adı).
 4. **Sonra:** T30 (global AI artıkları) → T37 (yarım güncelleme artıkları)
    → T54 (eski CLICleaner kalıntıları, ayrı onay).
