@@ -1,6 +1,6 @@
 # T44 — Arayüz ürün planı (iki profilli konsol)
 
-> **Durum: PLAN + M0-M2 (21.10.2026).** Bu belge
+> **Durum: PLAN + M0-M5 tamam (21.10.2026, 2.2.0).** Bu belge
 > `docs/WEB-REBUILD-PLAN.md`'nin yerini alır; oradaki mimari kurallar
 > (motor/arayüz ayrımı) geçerlidir.
 >
@@ -129,6 +129,17 @@ kuralı kullanır. **Planlar** ekranı: seçici, frekans, kategori, risk/limit,
 **Ayarlar** ekranı: tarama önbelleği, kasa saklama, güncelleme modu
 (`off/daily/weekly`), kaydetme ve `force` kontrolü; kapalıyken ağ isteği
 yapılmaz. Planlı işlem yalnız kasaya taşır.
+
+**M5 tamam (21.10.2026, 2.2.0):** klavye-only tur — "İçeriğe geç" /
+"Listeye geç" bağlantıları, rail'de ok tuşları + roving tabindex, `/` ile
+aramaya odak, `?` kısayol penceresi (odak tuzağı, `Esc`, odağı geri verme),
+satır eylemleri gerçek düğme (Tab + Enter). a11y: görünür odak halkaları,
+canlı seçim duyurusu, `role="alert"` hata banner'ları, `aria-busy`,
+`progressbar`, kontrast artışı, `prefers-reduced-motion`. Headless smoke
+(`npm run smoke`, çerez/401/403/onay kapıları) ve paket smoke
+(`npm run smoke:package`: `npm pack` → boş klasöre kur → arayüz).
+Gerçek Edge turu: `scratch/ego-m5-01..09*.png`. Tag/publish kullanıcı onayına
+bağlıdır.
 
 ---
 

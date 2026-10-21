@@ -56,10 +56,13 @@ Aradığı şey tek bir sorunun kanıtlı cevabıdır: **"Bu klasör ne, silsem 
 Varsayılan mod **aracın kendi kasası**dır; yanlış karar verirsen geri
 alabilirsin (`residue undo --restore`).
 
+> **2.2.0 notu:** Tarayıcı arayüzü yeniden geldi: `residue ui --web`
+> (yalnızca `127.0.0.1`; token `HttpOnly + SameSite=Strict` çerezdedir,
+> URL'de görünmez). Arayüz karar vermez: listeler, toplamlar, onay ifadeleri
+> ve planlar motordan gelir. Silme yine iki aşamalıdır.
+>
 > **2.0.0 notu:** Proje yeniden adlandırıldı: **Residue** (npm paketi
-> `residue-cleaner`, komut `residue`). Tarayıcı arayüzü de bu sürümde
-> kaldırıldı; araç artık **yalnızca terminalden** çalışır. Arayüzün yeniden
-> yapımı planlanıyor: [docs/WEB-REBUILD-PLAN.md](docs/WEB-REBUILD-PLAN.md).
+> `residue-cleaner`, komut `residue`).
 >
 > Eski ad `clicleaner` idi. Verilerin (kasa, günlük) taşındığı yer:
 > `%LOCALAPPDATA%\residue`.

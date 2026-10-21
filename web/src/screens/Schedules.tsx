@@ -201,7 +201,7 @@ export function Schedules({ lang }: Props) {
         </button>
       </header>
 
-      {error && <div className="banner danger">{error}</div>}
+      {error && <div className="banner danger" role="alert">{error}</div>}
       {loading && <div className="state">{t('common.loading')}</div>}
 
       {!loading && (

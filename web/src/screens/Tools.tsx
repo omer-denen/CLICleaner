@@ -256,6 +256,10 @@ export function Tools({ lang }: Props) {
           )}
         </header>
 
+        <a className="skip-inline" href="#cli-list">
+          {t('a11y.skipList')}
+        </a>
+
         <div className="scan-controls">
           <label className="control-label">
             {t('tools.unusedDays')}
@@ -296,12 +300,12 @@ export function Tools({ lang }: Props) {
         )}
 
         {scanError && (
-          <div className="banner danger">
+          <div className="banner danger" role="alert">
             {t('tools.scanFailed')}: {scanError}
           </div>
         )}
-        {error && <div className="banner danger">{error}</div>}
-        {planError && <div className="banner danger">{planError}</div>}
+        {error && <div className="banner danger" role="alert">{error}</div>}
+        {planError && <div className="banner danger" role="alert">{planError}</div>}
 
         {!loaded && !error && <div className="state">{t('common.loading')}</div>}
 
@@ -315,6 +319,9 @@ export function Tools({ lang }: Props) {
         {view && (
           <>
             <div className="selection-bar" aria-label={t('tools.total')}>
+              <span className="sr-only" role="status" aria-live="polite">
+                {`${selected.size} ${t('tools.selected')}`}
+              </span>
               <span>
                 <strong className="mono">{view.summary.total}</strong> {t('tools.total')}
               </span>
@@ -344,6 +351,7 @@ export function Tools({ lang }: Props) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 aria-label={t('tools.search')}
+                data-search
               />
               <div className="kind-tabs">
                 {STATUS_TABS.map((item) => (
@@ -415,7 +423,7 @@ export function Tools({ lang }: Props) {
             )}
 
             {view.tools.length > 0 && (
-              <div className="cli-head" role="row">
+              <div className="cli-head">
                 <span />
                 <span>{t('tools.command')}</span>
                 <span>{t('tools.source')}</span>
@@ -427,22 +435,20 @@ export function Tools({ lang }: Props) {
             )}
 
             {view.tools.length > 0 && (
-              <div className="cli-scroll">
+              <div
+                className="cli-scroll"
+                id="cli-list"
+                tabIndex={-1}
+                role="group"
+                aria-label={t('a11y.toolList')}
+              >
                 {view.tools.map((tool) => (
                   <div
                     key={tool.id}
                     className={`cli-row${detailId === tool.id ? ' active' : ''}`}
-                    role="row"
-                    tabIndex={0}
                     onClick={() => {
                       setDetailId(tool.id);
                       setPlan(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        setDetailId(tool.id);
-                        setPlan(null);
-                      }
                     }}
                   >
                     <input
@@ -453,12 +459,22 @@ export function Tools({ lang }: Props) {
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`${t('tools.selected')}: ${tool.command}`}
                     />
-                    <span className="cli-name-wrap">
+                    <button
+                      type="button"
+                      className="cli-name-wrap row-open"
+                      aria-label={`${t('a11y.openDetail')}: ${tool.command}`}
+                      aria-current={detailId === tool.id ? 'true' : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailId(tool.id);
+                        setPlan(null);
+                      }}
+                    >
                       <span className="cli-command mono">{tool.command}</span>
                       <span className="cli-package dim mono">
                         {tool.packageName}@{tool.version}
                       </span>
-                    </span>
+                    </button>
                     <span className="badge">
                       {t(CLI_SOURCE_LABEL[tool.source] ?? 'cli.source.standalone')}
                     </span>

@@ -129,7 +129,7 @@ export function PlanScreen({ plan, lang, onBack, onVault, onReplace, onExecuted 
         <span className="ledger-value">{formatBytes(plan.plan.totalBytes)}</span>
       </header>
 
-      {error && <div className="banner danger">{error}</div>}
+      {error && <div className="banner danger" role="alert">{error}</div>}
 
       <section className="panel">
         <h2>

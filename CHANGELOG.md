@@ -3,7 +3,7 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
-## [Unreleased]
+## [2.2.0] - 2026-10-21
 
 ### Eklendi
 
@@ -53,7 +53,16 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - **Kabuk sınırı testi:** `web/src` Node builtin'i, servis/aksiyon katmanını
   veya çekirdek karar sınıflarını import edemez; yalnız sözleşme tipleri ve
   saf `ApprovalRules` paylaşılır.
-- Test: `npm test` 92 test.
+- **Klavye ve erişilebilirlik (T44 / M5):** "İçeriğe geç" ve "Listeye geç"
+  bağlantıları; bölümler arasında ok tuşlarıyla gezinme; `/` ile aramaya
+  odaklanma; `?` ile klavye kısayolları penceresi (odak tuzağı, `Esc` ile
+  kapanma ve odağı geri verme). Satır eylemleri artık gerçek düğme; seçim
+  sayısı ekran okuyucuya canlı bildirilir. Odak halkaları, `prefers-reduced-motion`
+  desteği ve metin kontrastı iyileştirildi.
+- **Duman testleri:** `npm run smoke` (çerez token, token'sız 401, yabancı
+  Host 403, tüm okuma uçları, yazılı onay kapıları) ve
+  `npm run smoke:package` (`npm pack` → boş klasöre kur → arayüzü aç).
+- Test: `npm test` 92 test; `npm run smoke` temiz.
 
 ### Düzeltildi
 

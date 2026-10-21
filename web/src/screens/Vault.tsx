@@ -113,7 +113,7 @@ export function Vault({ lang, onChanged }: Props) {
         )}
       </header>
 
-      {error && <div className="banner danger">{error}</div>}
+      {error && <div className="banner danger" role="alert">{error}</div>}
       {notice && <div className="banner success">{notice}</div>}
 
       {!data && !error && <div className="state">{t('common.loading')}</div>}

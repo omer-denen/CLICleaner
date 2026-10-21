@@ -99,7 +99,7 @@ export function Settings({ lang, version }: Props) {
       </header>
 
       {loading && <div className="state">{t('common.loading')}</div>}
-      {error && <div className="banner danger">{error}</div>}
+      {error && <div className="banner danger" role="alert">{error}</div>}
 
       {settings && (
         <>
@@ -197,14 +197,14 @@ export function Settings({ lang, version }: Props) {
               <span className="dim">{t('settings.updateHint')}</span>
             </div>
 
-            {updateError && <div className="banner danger">{updateError}</div>}
+            {updateError && <div className="banner danger" role="alert">{updateError}</div>}
 
             {update && (
               <div className="settings-update">
                 {update.mode === 'off' || !update.checked ? (
                   <p className="dim">{t('settings.update.offline')}</p>
                 ) : update.error ? (
-                  <p className="banner danger">
+                  <p className="banner danger" role="alert">
                     {t('settings.update.error')}: {update.error}
                   </p>
                 ) : (

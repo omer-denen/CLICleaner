@@ -118,7 +118,7 @@ export function Env({ lang }: Props) {
         </header>
 
         {loading && <div className="state">{t('common.loading')}</div>}
-        {error && <div className="banner danger">{error}</div>}
+        {error && <div className="banner danger" role="alert">{error}</div>}
 
         {analysis && (
           <>
@@ -273,7 +273,7 @@ export function Env({ lang }: Props) {
 
       <aside className="env-detail">
         <h2>{t('env.plan.title')}</h2>
-        {actionError && <div className="banner danger">{actionError}</div>}
+        {actionError && <div className="banner danger" role="alert">{actionError}</div>}
 
         {!plan && !result && <p className="dim">{t('env.plan.empty')}</p>}
 
@@ -319,7 +319,7 @@ export function Env({ lang }: Props) {
             )}
 
             {plan.plan.requiresAdmin && (
-              <div className="banner danger">{t('env.plan.admin')}</div>
+              <div className="banner danger" role="alert">{t('env.plan.admin')}</div>
             )}
             <p className="dim">{t('env.plan.backupNote')}</p>
 

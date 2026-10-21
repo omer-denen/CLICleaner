@@ -193,7 +193,7 @@ export function Projects({ lang }: Props) {
         </div>
         <p className="dim hint">{t('projects.rootsHint')}</p>
 
-        {listError && <div className="banner danger">{t('projects.error')}: {listError}</div>}
+        {listError && <div className="banner danger" role="alert">{t('projects.error')}: {listError}</div>}
 
         {list && (
           <>
@@ -231,6 +231,7 @@ export function Projects({ lang }: Props) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 aria-label={t('projects.search')}
+                data-search
               />
               <div className="kind-tabs">
                 {TABS.map((item) => (
@@ -299,7 +300,7 @@ export function Projects({ lang }: Props) {
 
         {!selected && <p className="dim">{t('projects.detail.empty')}</p>}
         {selected && analyzing && <p className="dim">{t('projects.loading')}</p>}
-        {analysisError && <div className="banner danger">{analysisError}</div>}
+        {analysisError && <div className="banner danger" role="alert">{analysisError}</div>}
 
         {analysis && (
           <>

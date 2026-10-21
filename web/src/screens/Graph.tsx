@@ -103,7 +103,7 @@ export function Graph({ lang }: Props) {
         </header>
 
         {loading && <div className="state">{t('graph.loading')}</div>}
-        {error && <div className="banner danger">{error}</div>}
+        {error && <div className="banner danger" role="alert">{error}</div>}
 
         {view && (
           <>
@@ -265,7 +265,7 @@ export function Graph({ lang }: Props) {
           </button>
         </div>
 
-        {whatIfError && <div className="banner danger">{whatIfError}</div>}
+        {whatIfError && <div className="banner danger" role="alert">{whatIfError}</div>}
 
         {whatIf && (
           <>

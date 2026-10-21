@@ -279,6 +279,10 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
           )}
         </header>
 
+        <a className="skip-inline" href="#cluster-list">
+          {t('a11y.skipList')}
+        </a>
+
         <div className="scan-controls">
           <div className="env-chips">
             {(meta?.envs ?? []).map((env) => (
@@ -302,7 +306,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
             className="control"
             value={profile}
             onChange={(e) => setProfile(e.target.value)}
-            aria-label="profile"
+            aria-label={t('disk.filter.profile')}
           >
             <option value="">—</option>
             {(meta?.profiles ?? []).map((p) => (
@@ -336,7 +340,14 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
                 {formatBytes(scan.bytes)}
               </span>
             </div>
-            <div className="progress">
+            <div
+              className="progress"
+              role="progressbar"
+              aria-label={t('a11y.scanProgress')}
+              aria-valuemin={0}
+              aria-valuemax={scan.total || 0}
+              aria-valuenow={scan.done}
+            >
               <span
                 style={{
                   width: `${scan.total > 0 ? Math.min(100, (scan.done / scan.total) * 100) : 0}%`,
@@ -358,8 +369,8 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
           </div>
         )}
 
-        {scanError && <div className="banner danger">{t('disk.scanFailed')}: {scanError}</div>}
-        {error && <div className="banner danger">{error}</div>}
+        {scanError && <div className="banner danger" role="alert">{t('disk.scanFailed')}: {scanError}</div>}
+        {error && <div className="banner danger" role="alert">{error}</div>}
 
         <div className="filters">
           <input
@@ -369,6 +380,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             aria-label={t('disk.search')}
+            data-search
           />
           <div className="kind-tabs">
             {KINDS.map((item) => (
@@ -431,6 +443,11 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
         </div>
 
         <div className="selection-bar">
+          <span className="sr-only" role="status" aria-live="polite">
+            {`${view?.selection.clusterCount ?? selected.size} ${t('disk.selected')} · ${formatBytes(
+              view?.selection.bytes ?? 0,
+            )}`}
+          </span>
           <span>
             <strong className="mono">{view?.selection.clusterCount ?? selected.size}</strong>{' '}
             {t('disk.selected')}
@@ -463,7 +480,7 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
           </button>
         </div>
 
-        <div className="cluster-head" role="row">
+        <div className="cluster-head">
           <span />
           <span />
           <span>{t('table.cluster')}</span>
@@ -482,7 +499,14 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
         )}
 
         {view && view.clusters.length > 0 && (
-          <div className="cluster-scroll" ref={parentRef}>
+          <div
+            className="cluster-scroll"
+            ref={parentRef}
+            id="cluster-list"
+            tabIndex={-1}
+            role="group"
+            aria-label={t('a11y.clusterList')}
+          >
             <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
               {virtualizer.getVirtualItems().map((item) => {
                 const c = view.clusters[item.index];
@@ -499,11 +523,6 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
                       transform: `translateY(${item.start}px)`,
                     }}
                     onClick={() => setDetailKey(c.key)}
-                    role="row"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') setDetailKey(c.key);
-                    }}
                   >
                     <input
                       type="checkbox"
@@ -513,11 +532,25 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`${t('disk.selected')}: ${c.title}`}
                     />
-                    <span className={`risk-dot risk-${c.risk}`} title={t(RISK_LABEL[c.risk] ?? 'risk.safe')} />
-                    <span className="cluster-title-wrap">
+                    <span
+                      className={`risk-dot risk-${c.risk}`}
+                      role="img"
+                      aria-label={t(RISK_LABEL[c.risk] ?? 'risk.safe')}
+                      title={t(RISK_LABEL[c.risk] ?? 'risk.safe')}
+                    />
+                    <button
+                      type="button"
+                      className="cluster-title-wrap row-open"
+                      aria-label={`${t('a11y.openDetail')}: ${c.title}`}
+                      aria-current={detailKey === c.key ? 'true' : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailKey(c.key);
+                      }}
+                    >
                       <span className="cluster-title">{c.title}</span>
                       <span className="cluster-path mono">{c.primaryPath}</span>
-                    </span>
+                    </button>
                     <span className="badge">{t(VERDICT_LABEL[c.verdictKind] ?? 'verdict.keep')}</span>
                     <span className="badge">{t(CATEGORY_LABEL[c.category] ?? 'category.unknown')}</span>
                     <span className="mono num">{formatBytes(c.reclaimableBytes)}</span>
