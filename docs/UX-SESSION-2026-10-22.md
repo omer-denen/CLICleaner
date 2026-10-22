@@ -365,4 +365,4 @@ dosya gösteriyor.
 kanıt yerine **DOM ölçümleri** kullanıldı. Ekran görüntüsü bir sonraki
 turda yeniden denenebilir.
 
-**Commit:** bu turun commit'i `main`'e gönderildi (git log: UX-038..041).
+**Commit:** `ff2eaeb` — UX-038..041 uygulaması; `main`'e gönderildi.
