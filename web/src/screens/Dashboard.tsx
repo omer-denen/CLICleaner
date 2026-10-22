@@ -1,15 +1,24 @@
 import { Fragment, useState } from 'react';
 import type {
   DashboardCardId,
+  DashboardDetailId,
+  DashboardDetailRow,
   DashboardLedgerId,
   DashboardResponse,
 } from '../../../src/core/contract.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
-import { formatAge, formatBytes, formatScanRow, formatTimestamp } from '../format.ts';
+import {
+  formatAge,
+  formatBytes,
+  formatCount,
+  formatScanRow,
+  formatTimestamp,
+} from '../format.ts';
 import {
   CARD_TITLE_LABEL,
   CATEGORY_LABEL,
   CONFIDENCE_LABEL,
+  DETAIL_TEXT_LABEL,
   DETAIL_TITLE_LABEL,
   REGEN_LABEL,
   SCAN_REASON_LABEL,
@@ -78,10 +87,10 @@ export function Dashboard({
     translateUpper(lang, key, vars);
 
   /**
-   * Secili kart. Kartlar birer INDEKStir; detay "altindaki liste"de
-   * gorunur. `null` -> varsayilan liste (Guvenli Kazanimlar).
+   * Secili DEFTER karti (Korunan / Geri kazanilabilir / Kasa / Araclarda).
+   * Risk kartlari artik tiklanmaz; icerikleri alt listede acilir.
    */
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<DashboardDetailId | null>(null);
 
   const verdicts: MessageKey[] = [
     'verdict.recommend',
@@ -90,12 +99,24 @@ export function Dashboard({
     'verdict.keep',
   ];
 
-  // Secili kartin detayi (motorun satirlari).
-  const detail =
-    selected === null
-      ? null
-      : (data.details.find((d) => d.id === selected) ?? null);
-  const selectedCard = data.cards.find((c) => c.detailId === selected) ?? null;
+  const detail = selectedId
+    ? (data.details.find((d) => d.id === selectedId) ?? null)
+    : null;
+
+  /** Sabit metin kimliklerini TR/EN'e cevirir; kullanici verisi aynen kalir. */
+  const rowLabel = (row: DashboardDetailRow): string => {
+    const key = row.labelId ? DETAIL_TEXT_LABEL[row.labelId] : null;
+    return key ? t(key) : row.label;
+  };
+  const rowValue = (row: DashboardDetailRow): string => {
+    if (row.valueId) {
+      const key = DETAIL_TEXT_LABEL[row.valueId];
+      if (key) return t(key, { count: row.amount ?? 0 });
+    }
+    if (row.valueKind === 'bytes') return formatBytes(row.amount ?? 0);
+    if (row.valueKind === 'count') return formatCount(row.amount ?? 0, lang);
+    return row.value;
+  };
 
   return (
     <div className="dashboard">
@@ -109,11 +130,23 @@ export function Dashboard({
 
       <section className="ledgers" aria-label={t('dash.ledgers')}>
         {data.ledgers.map((ledger) => (
-          <article key={ledger.id} className={`ledger ledger-${ledger.id}`}>
+          <button
+            key={ledger.id}
+            type="button"
+            className={`ledger ledger-${ledger.id}${selectedId === ledger.detailId ? ' active' : ''}`}
+            aria-pressed={selectedId === ledger.detailId}
+            onClick={() =>
+              setSelectedId((prev) => (prev === ledger.detailId ? null : ledger.detailId))
+            }
+          >
             <span className="ledger-label">{t(LEDGER_LABEL[ledger.id])}</span>
-            <strong className="ledger-value">{formatBytes(ledger.bytes)}</strong>
-            <span className="ledger-note dim">{t(LEDGER_NOTE[ledger.id])}</span>
-          </article>
+            <strong className="ledger-value">
+              {ledger.known ? formatBytes(ledger.bytes) : t('ledger.unknown')}
+            </strong>
+            <span className="ledger-note dim">
+              {t(ledger.known ? LEDGER_NOTE[ledger.id] : 'ledger.cli.note.empty')}
+            </span>
+          </button>
         ))}
       </section>
 
@@ -126,15 +159,7 @@ export function Dashboard({
       {data.cards.length > 0 && (
         <section className="cards" aria-label={t('dash.cards')}>
           {data.cards.map((card) => (
-            <button
-              key={`${card.id}-${card.detailId}`}
-              type="button"
-              className={`card card-${card.tone}${selected === card.detailId ? ' active' : ''}`}
-              aria-pressed={selected === card.detailId}
-              onClick={() =>
-                setSelected((prev) => (prev === card.detailId ? null : card.detailId))
-              }
-            >
+            <article key={card.id} className={`card card-${card.tone}`}>
               <span className="card-title">{t(CARD_TITLE_LABEL[card.titleId])}</span>
               {card.target && (
                 <span className="card-target">{tu(CARD_TARGET[card.target])}</span>
@@ -153,7 +178,7 @@ export function Dashboard({
                   )}
                 </span>
               )}
-            </button>
+            </article>
           ))}
         </section>
       )}
@@ -164,11 +189,13 @@ export function Dashboard({
           <button
             type="button"
             className="ghost detail-back"
-            onClick={() => setSelected(null)}
+            onClick={() => setSelectedId(null)}
           >
             {t('detail.back')}
           </button>
-          {detail.id === 'scan' ? (
+          {detail.noteId ? (
+            <p className="dim">{t(DETAIL_TEXT_LABEL[detail.noteId])}</p>
+          ) : detail.kind === 'scan' ? (
             <>
               <ul className="scan-reasons">
                 {data.scan.view.reasons.map((reason) => (
@@ -191,9 +218,17 @@ export function Dashboard({
               <tbody>
                 {detail.rows.map((row, i) => (
                   <tr key={`${row.label}-${i}`}>
-                    <td className="mono">{row.label}</td>
-                    <td className={row.tone === 'danger' ? 'danger-text' : 'dim'}>
-                      {row.value}
+                    <td className="mono">{rowLabel(row)}</td>
+                    <td
+                      className={
+                        row.tone === 'danger'
+                          ? 'danger-text'
+                          : row.tone === 'warn'
+                            ? 'warn-text'
+                            : 'dim'
+                      }
+                    >
+                      {rowValue(row)}
                     </td>
                   </tr>
                 ))}

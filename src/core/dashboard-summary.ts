@@ -44,6 +44,8 @@ export interface DashboardFacts {
     cliBytes: number;
     cliCount: number;
     brokenInstalls: number;
+    /** CLI envanteri gercekten tarandi mi? (0 B ile "bilinmiyor" farki) */
+    cliKnown: boolean;
   } | null;
   env: {
     pathIssues: number;
@@ -103,10 +105,23 @@ export class DashboardSummary {
       {
         id: 'protected',
         bytes: Math.max(0, totals.totalBytes - totals.reclaimableBytes),
+        known: true,
+        detailId: 'ledger-protected',
       },
-      { id: 'reclaimable', bytes: totals.reclaimableBytes },
-      { id: 'vault', bytes: this.facts.vault.bytes },
-      { id: 'cli', bytes: inv?.cliBytes ?? 0 },
+      {
+        id: 'reclaimable',
+        bytes: totals.reclaimableBytes,
+        known: true,
+        detailId: 'ledger-reclaimable',
+      },
+      { id: 'vault', bytes: this.facts.vault.bytes, known: true, detailId: 'ledger-vault' },
+      {
+        id: 'cli',
+        bytes: inv?.cliBytes ?? 0,
+        // Envanter hic taranmadiysa 0 B "bos" degil "bilinmiyor" demektir.
+        known: inv?.cliKnown ?? false,
+        detailId: 'ledger-cli',
+      },
     ];
   }
 

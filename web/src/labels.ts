@@ -1,6 +1,8 @@
 import type {
   DashboardCardTitleId,
   DashboardDetailId,
+  DashboardDetailTextId,
+  EnvFindingKind,
   ScanStatusKind,
   ScanStatusReason,
   ScanStatusRowId,
@@ -38,6 +40,10 @@ export const DETAIL_TITLE_LABEL: Record<DashboardDetailId, MessageKey> = {
   recover: 'detail.recover',
   vault: 'detail.vault',
   schedules: 'detail.schedules',
+  'ledger-protected': 'detail.ledger.protected',
+  'ledger-reclaimable': 'detail.ledger.reclaimable',
+  'ledger-vault': 'detail.ledger.vault',
+  'ledger-cli': 'detail.ledger.cli',
 };
 
 /**
@@ -142,6 +148,32 @@ export const ENV_FINDING_LABEL: Record<string, MessageKey> = {
   'orphan-variable': 'env.kind.orphan-variable',
   'sensitive-variable': 'env.kind.sensitive-variable',
   'empty-variable': 'env.kind.empty-variable',
+};
+
+/**
+ * Bulgu turu -> gerekce cumlesi.
+ *
+ * Motor `reason` alanini CLI icin Turkce tutar; arayuz bu kimlikten
+ * TR/EN metni secer (AGENTS.md 9/18).
+ */
+export const ENV_REASON_LABEL: Record<EnvFindingKind, MessageKey> = {
+  'missing-path': 'env.reason.missing-path',
+  'duplicate-path': 'env.reason.duplicate-path',
+  'shadowed-command': 'env.reason.shadowed-command',
+  'orphan-variable': 'env.reason.orphan-variable',
+  'sensitive-variable': 'env.reason.sensitive-variable',
+  'empty-variable': 'env.reason.empty-variable',
+};
+
+/** Detay satirindaki sabit metinler: kimlik -> ceviri anahtari. */
+export const DETAIL_TEXT_LABEL: Record<DashboardDetailTextId, MessageKey> = {
+  ...ENV_REASON_LABEL,
+  operation: 'detail.operation',
+  'operation-vault': 'detail.operation.vault',
+  'interrupted-items': 'detail.interrupted.items',
+  'schedule-missed': 'detail.schedule.missed',
+  'schedule-due': 'detail.schedule.due',
+  'ledger-cli-empty': 'ledger.cli.empty',
 };
 
 export const GRAPH_NODE_LABEL: Record<string, MessageKey> = {

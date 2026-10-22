@@ -161,10 +161,13 @@ code,
 }
 
 .scan-expired::before,
-.scan-chip.scan-expired::before,
+.scan-chip.scan-expired::before {
+  background: var(--warn);
+}
+
 .scan-dirty::before,
 .scan-chip.scan-dirty::before {
-  background: var(--warn);
+  background: var(--danger);
 }
 
 .scan-dirty-expired::before,
@@ -195,7 +198,7 @@ code,
 }
 
 .scan-chip.scan-dirty .scan-chip-label {
-  color: var(--warn);
+  color: var(--danger);
 }
 
 /* ------------------------------------------------- tarama durumu raporu */
@@ -316,6 +319,10 @@ code,
 
 .danger-text {
   color: var(--danger);
+}
+
+.warn-text {
+  color: var(--warn);
 }
 
 /* ------------------------------------------------------------------- shell */
@@ -530,6 +537,26 @@ code,
   border-radius: 10px;
   background: var(--panel);
   border-top-width: 2px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+.ledger:hover {
+  border-color: var(--faint);
+  background: var(--panel-2);
+}
+
+.ledger:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+.ledger.active {
+  border-color: var(--accent);
+  background: var(--panel-2);
 }
 
 .ledger-protected {
@@ -574,19 +601,21 @@ code,
 }
 
 /*
- * Kart: 3 satirlik izgara.
- *   satir 1: [vurgu] [konu (baslik)]      [sayi]
- *   satir 2: [vurgu] [sonuc (alt baslik)] [hedef ekran]
- * Vurgu cubugu iki satiri da kaplar, icerik DIKEYDE ORTALANIR.
- * Kart bir INDEXtir: tiklanir, detay "altindaki liste"de acilir.
+ * Risk karti: 3 satirlik izgara (STATIK; tiklanmaz).
+ *   satir 1: [vurgu] [konu (baslik)]
+ *   satir 2: [vurgu] [sayi + sonuc]
+ *   satir 3: [vurgu] [meta]                [hedef ekran]
+ * Tum kartlarda satirlar ayni hizada kalir; baslik tasmaz.
  */
 .card {
   display: grid;
   grid-template-columns: 3px minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   align-items: center;
+  align-content: start;
   column-gap: 8px;
   row-gap: 2px;
+  min-height: 88px;
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -595,22 +624,6 @@ code,
   color: inherit;
   text-align: left;
   width: 100%;
-  cursor: pointer;
-}
-
-.card:hover {
-  border-color: var(--faint);
-  background: var(--panel-2);
-}
-
-.card:focus-visible {
-  outline: 2px solid var(--info);
-  outline-offset: 1px;
-}
-
-.card.active {
-  border-color: var(--accent);
-  background: var(--panel-2);
 }
 
 .card::before {
@@ -637,11 +650,14 @@ code,
 }
 
 .card-title {
-  grid-column: 2;
+  grid-column: 2 / span 2;
   grid-row: 1;
   min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-summary {
@@ -651,6 +667,7 @@ code,
   align-items: baseline;
   gap: 6px;
   min-width: 0;
+  min-height: 22px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -675,8 +692,9 @@ code,
 
 .card-target {
   grid-column: 3;
-  grid-row: 1;
+  grid-row: 3;
   font-size: 10.5px;
+  line-height: 15px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--faint);
@@ -687,13 +705,19 @@ code,
 }
 
 .card-meta {
-  grid-column: 2 / span 2;
+  grid-column: 2;
   grid-row: 3;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  font-size: 10px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 15px;
   color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ------------------------------------------------------------------ panel */

@@ -46,7 +46,7 @@ test('TTL asildi: expired, uyari tonu, "tarama eski" sebebi', () => {
 test('disk degisti: dirty, "expired" DEGIL ayri bir sebep', () => {
   const view = scanStatusView(facts({ dirty: true }));
   assert.equal(view.kind, 'dirty');
-  assert.equal(view.tone, 'warn');
+  assert.equal(view.tone, 'danger');
   assert.deepEqual(view.reasons, ['dirty']);
   assert.equal(view.action, 'scan');
 });
@@ -76,6 +76,15 @@ test('tarama surerken: scanning, eylem yok', () => {
   assert.deepEqual(view.reasons, ['scanning']);
   assert.equal(view.action, 'none');
   assert.deepEqual(view.header, { kind: 'scanning', ageMs: null });
+});
+
+test('ust cubuk: yas, taraniyor veya yok', () => {
+  assert.equal(scanStatusView(facts()).header.kind, 'age');
+  assert.equal(scanStatusView(facts({ scanning: true, state: 'scanning' })).header.kind, 'scanning');
+  assert.equal(
+    scanStatusView(facts({ lastScanAt: null, ageMs: null })).header.kind,
+    'none',
+  );
 });
 
 test('rapor satirlari: deger turu motorun karari', () => {

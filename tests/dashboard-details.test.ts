@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DashboardDetails } from '../src/core/dashboard-details.ts';
 import type { EnvFinding } from '../src/core/env-engine.ts';
+import { cluster } from './helpers.ts';
 
 function envFinding(over: Partial<EnvFinding> = {}): EnvFinding {
   return {
@@ -18,12 +19,15 @@ function envFinding(over: Partial<EnvFinding> = {}): EnvFinding {
 
 function input(over: Partial<ConstructorParameters<typeof DashboardDetails>[0]> = {}) {
   return {
+    clusters: [],
     envFindings: null,
     commandShadows: null,
     brokenTools: null,
     brokenEdges: null,
     interrupted: [],
     expiredVault: [],
+    vaultItems: [],
+    cliItems: null,
     schedules: [],
     ...over,
   };
@@ -119,4 +123,97 @@ test('detay listesi butun kartlari kapsar ve hedefleri dogru', () => {
   assert.equal(byId.recover?.target, null);
   assert.equal(byId.vault?.target, 'vault');
   assert.equal(byId.schedules?.target, 'schedules');
+});
+
+test('defter detaylari: korunan, geri kazanilabilir, kasa, araclar', () => {
+  const views = new DashboardDetails(
+    input({
+      clusters: [
+        cluster({ key: 'a', title: 'A', totalBytes: 1000, reclaimableBytes: 400 }),
+        cluster({ key: 'b', title: 'B', totalBytes: 2000, reclaimableBytes: 0 }),
+      ],
+      vaultItems: [
+        { id: 'v1', label: 'C:\\kasa', value: '', valueKind: 'bytes', amount: 500 },
+      ],
+      cliItems: [
+        {
+          id: 'c1',
+          label: 'opencode · npm-global',
+          value: '',
+          valueKind: 'bytes',
+          amount: 700,
+        },
+      ],
+    }),
+  ).views();
+  const byId = Object.fromEntries(views.map((v) => [v.id, v]));
+
+  const protectedRows = byId['ledger-protected']?.rows ?? [];
+  assert.equal(protectedRows.length, 2);
+  assert.equal(
+    protectedRows.reduce((sum, r) => sum + (r.amount ?? 0), 0),
+    2600,
+  );
+  assert.equal(byId['ledger-reclaimable']?.rows[0]?.amount, 400);
+  assert.equal(byId['ledger-vault']?.rows[0]?.amount, 500);
+  assert.equal(byId['ledger-cli']?.rows[0]?.label, 'opencode · npm-global');
+  assert.equal(byId['ledger-cli']?.rows[0]?.amount, 700);
+  assert.equal(byId['ledger-cli']?.noteId, undefined);
+});
+
+test('envanter yoksa araclar defteri not tasir', () => {
+  const views = new DashboardDetails(input({ cliItems: null })).views();
+  const cli = views.find((v) => v.id === 'ledger-cli');
+  assert.equal(cli?.rows.length, 0);
+  assert.equal(cli?.noteId, 'ledger-cli-empty');
+});
+
+test('detay turu: tarama ozel, digerleri satir listesi', () => {
+  const views = new DashboardDetails(input()).views();
+  const byId = Object.fromEntries(views.map((v) => [v.id, v]));
+  assert.equal(byId.scan?.kind, 'scan');
+  assert.equal(byId.paths?.kind, 'rows');
+  assert.equal(byId.recover?.kind, 'rows');
+});
+
+test('sabit metinler metin degil kimlik + sayi tasir', () => {
+  const views = new DashboardDetails(
+    input({
+      envFindings: [envFinding({ kind: 'missing-path' })],
+      interrupted: [
+        {
+          id: 'op1',
+          label: '',
+          labelId: 'operation-vault',
+          value: '',
+          valueId: 'interrupted-items',
+          amount: 2,
+          tone: 'warn',
+        },
+      ],
+      expiredVault: [
+        { id: 'v1', label: 'C:\\x', value: '', valueKind: 'bytes', amount: 1024, tone: 'warn' },
+      ],
+      schedules: [
+        {
+          id: 's1',
+          label: 'plan',
+          value: '',
+          valueId: 'schedule-missed',
+          amount: 3,
+          tone: 'warn',
+        },
+      ],
+    }),
+  ).views();
+  const byId = Object.fromEntries(views.map((v) => [v.id, v]));
+
+  assert.equal(byId.paths?.rows[0]?.valueId, 'missing-path');
+  assert.equal(byId.recover?.rows[0]?.labelId, 'operation-vault');
+  assert.equal(byId.recover?.rows[0]?.valueId, 'interrupted-items');
+  assert.equal(byId.recover?.rows[0]?.amount, 2);
+  assert.equal(byId.vault?.rows[0]?.valueKind, 'bytes');
+  assert.equal(byId.vault?.rows[0]?.amount, 1024);
+  assert.equal(byId.schedules?.rows[0]?.valueId, 'schedule-missed');
+  assert.equal(byId.schedules?.rows[0]?.amount, 3);
 });

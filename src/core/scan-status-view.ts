@@ -65,7 +65,7 @@ export class ScanStatusView {
       case 'expired':
         return 'warn';
       case 'dirty':
-        return 'warn';
+        return 'danger';
       case 'dirty-expired':
         return 'danger';
       case 'scanning':

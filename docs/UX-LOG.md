@@ -377,7 +377,20 @@ kısmi iş "düzeltildi" diye raporlanmaz). Bu turda 038–041'in **tamamı**
 uygulanmadan hiçbiri "düzeltildi" olarak işaretlenmedi; her madde ölçümle
 doğrulandı.
 
-**S8 durumu:** 6/6 kapandı (038–042 düzeltildi, 043 kural olarak eklendi).
+### UX-044 · Genel Bakış · Tıklanabilir kartlar yanlış kümeydi — `düzeltildi`
+> *"Önceki Tarama, ortam yolları, komut yolu kartları'nın içerikleri hizalanacak,
+> Korunan, Geri kazanılabilir, Kasa, Araçlarda kartlarına tıklama atayalım,
+> içerikler alt kısımda listelensin istedim. O da tam tersini yaptı."*
+
+**Uygulama:** Risk kartları (Önceki Tarama, Ortam yolları, Komut yolu) statik
+`<article>`; **defter kartları** (Korunan, Geri kazanılabilir, Kasada,
+Araçlarda) `<button aria-pressed>` ve detayları `ledger-protected`,
+`ledger-reclaimable`, `ledger-vault`, `ledger-cli` altında açılıyor.
+Risk kartları 3 satırlık sabit ızgarada hizalandı: başlık y=293, özet y=313,
+hedef/meta y=337; üçü de 183×88 px. "Araçlarda" envanter yoksa **bilinmiyor**
++ "Envanter taranmadı"; envanter taraması bitince dashboard tazelenir.
+
+**S8 durumu:** 7/7 kapandı (038–042, 044 düzeltildi; 043 kural olarak eklendi).
 
 ---
 
@@ -385,9 +398,9 @@ doğrulandı.
 
 | Durum | Adet | Maddeler |
 |---|---|---|
-| `düzeltildi` | 4 | UX-001, UX-009, UX-013, UX-027, UX-028 (5) |
-| `planlandi` | 8 | UX-002, UX-003, UX-004, UX-005, UX-006, UX-010, UX-029, UX-030 |
-| `acik` | 15 | kalanlar |
+| `düzeltildi` | 17 | UX-001, UX-009, UX-013, UX-027, UX-028, UX-032..036, UX-038..044 |
+| `planlandi` | 4 | UX-029, UX-030, UX-031, UX-037 |
+| `acik` | 22 | kalanlar |
 | `reddedildi` | 0 | — |
 
 **Planlanan işlerin tamamı:** `docs/UX-PLAN-2026-10-21.md` (P1..P8).
@@ -441,13 +454,17 @@ raporu açılır).
 Kullanıcı: *"her kart tıklanabilir olmalı… ve her kartın detayı altındaki
 listede gösterilmeli."*
 
+> **22.10.2026 düzeltmesi:** Tıklanabilirlik yanlış kümeye (risk kartlarına)
+> verilmişti; doğrusu **defter kartları**ydı. Ayrıntı: **UX-044**.
+
 **Çözüm (motor):** Yeni `src/core/dashboard-details.ts` → `DashboardDetails`
 saf sınıfı. Her kart için **detay satırları** üretir (yol, komut, araç, kenar,
 işlem, kasa öğesi, plan). `DashboardResponse.details` ile API'den gelir.
 Arayüz yalnızca basar; hangi kartın seçildiğini bilir, satırları hesaplamaz.
 
-- Kart artık `<button>` (`aria-pressed`); tıklanınca **alt liste** o kartın
-  detayına dönüşür; "Güvenli kazanımlara dön" ile geri alınır.
+- **Defter kartları** `<button>` (`aria-pressed`); tıklanınca **alt liste** o
+  defterin detayına dönüşür; "Panele dön" ile geri alınır.
+- **Risk kartları** statik `<article>`: Önceki Tarama, Ortam yolları, Komut yolu.
 - Satır etiketleri **doğru alandan** gelir: yol bulgularında sol = yol, sağ =
   gerekçe (`variable` alanı her zaman "Path" olduğu için kullanılamaz);
   gölgede komutta sol = komut adı (`klist`, `notepad`, `wsl`).
@@ -485,9 +502,9 @@ damgalı tek kayıt **sonuncusudur**; tarama geçmişi yok.
 
 | Durum | Adet |
 |---|---|
-| `düzeltildi` | 11 (UX-001, UX-009, UX-013, UX-027..030, UX-032..036, UX-042) |
-| `planlandi` | 9 (UX-002..006, UX-010, UX-029..031, UX-037) |
-| `acik` | 18 (S8'deki UX-038..041 dahil) |
+| `düzeltildi` | 17 (UX-001, UX-009, UX-013, UX-027, UX-028, UX-032..036, UX-038..044) |
+| `planlandi` | 4 (UX-029, UX-030, UX-031, UX-037) |
+| `acik` | 22 (kalanlar) |
 | `reddedildi` | 0 |
 
 **Denetimde sınanan ama sorun OLMAYANLAR (kayıt için):**

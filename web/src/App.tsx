@@ -83,6 +83,8 @@ export function App() {
   const [help, setHelp] = useState(false);
   /** Tarama durumu ayrinti raporu (rozetten acilir). */
   const [scanReport, setScanReport] = useState(false);
+  /** "Yeniden tara" istegi: Disk ekrani bu sayac artinca taramayi baslatir. */
+  const [scanRequest, setScanRequest] = useState(0);
   /** Genis ekranda menu: yalniz ikon (yer kazandirir). */
   const [railCollapsed, setRailCollapsed] = useState(
     () => localStorage.getItem('residue.rail') === 'collapsed',
@@ -122,14 +124,6 @@ export function App() {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const refreshStatus = useCallback(async (): Promise<void> => {
-    try {
-      setStatus(await api.scanStatus());
-    } catch {
-      /* durum yenilenemezse eski deger kalir */
     }
   }, []);
 
@@ -379,7 +373,8 @@ export function App() {
               meta={meta}
               status={status}
               lang={lang}
-              onStatus={() => void refreshStatus()}
+              scanRequest={scanRequest}
+              onStatus={() => void load()}
               onOpenScanStatus={() => setScanReport(true)}
               onPlan={(nextPlan) => {
                 setPlan(nextPlan);
@@ -403,7 +398,9 @@ export function App() {
             <Projects lang={lang} />
           )}
 
-          {!loading && !error && screen === 'tools' && <Tools lang={lang} />}
+          {!loading && !error && screen === 'tools' && (
+            <Tools lang={lang} onChanged={() => void load()} />
+          )}
 
           {!loading && !error && screen === 'env' && <Env lang={lang} />}
 
@@ -501,7 +498,10 @@ export function App() {
           status={status}
           lang={lang}
           onClose={() => setScanReport(false)}
-          onRescan={() => setScreen('disk')}
+          onRescan={() => {
+            setScreen('disk');
+            setScanRequest((n) => n + 1);
+          }}
         />
       )}
 

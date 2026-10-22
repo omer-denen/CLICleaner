@@ -7,7 +7,7 @@ import type {
 import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
-import { ENV_FINDING_LABEL, ENV_SCOPE_LABEL } from '../labels.ts';
+import { ENV_FINDING_LABEL, ENV_REASON_LABEL, ENV_SCOPE_LABEL } from '../labels.ts';
 
 interface Props {
   lang: Lang;
@@ -193,7 +193,11 @@ export function Env({ lang }: Props) {
                         </span>
                       </span>
                       <span className="dim mono">{finding.value}</span>
-                      <span className="dim">{finding.reason}</span>
+                      <span className="dim">
+                        {ENV_REASON_LABEL[finding.kind]
+                          ? t(ENV_REASON_LABEL[finding.kind])
+                          : finding.reason}
+                      </span>
                     </li>
                   ))}
                 </ul>

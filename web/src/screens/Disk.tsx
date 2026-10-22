@@ -12,7 +12,7 @@ import type {
 import { api, ApiError } from '../api.ts';
 import { openEvents } from '../sse.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
-import { formatAge, formatBytes } from '../format.ts';
+import { formatBytes } from '../format.ts';
 import { ScanStatusChip } from '../components/ScanStatus.tsx';
 import {
   CATEGORY_LABEL,
@@ -35,6 +35,8 @@ interface Props {
   meta: MetaResponse | null;
   status: ScanStatusResponse | null;
   lang: Lang;
+  /** Artan sayac: "Yeniden tara" istegi geldiginde tarama baslar. */
+  scanRequest: number;
   onStatus: () => void;
   onOpenScanStatus: () => void;
   onPlan: (plan: PlanResponse) => void;
@@ -50,6 +52,7 @@ export function Disk({
   meta,
   status,
   lang,
+  scanRequest,
   onStatus,
   onOpenScanStatus,
   onPlan,
@@ -221,6 +224,19 @@ export function Disk({
       setScanError(err instanceof ApiError ? err.message : String(err));
     }
   };
+
+  /**
+   * "Yeniden tara" istegi: App sayaci artirir, Disk taramayi baslatir.
+   * Ayni istek iki kez calismaz; tarama surerken gelen istek yok sayilir.
+   */
+  const handledScanRequest = useRef(0);
+  useEffect(() => {
+    if (scanRequest <= 0 || scanRequest === handledScanRequest.current) return;
+    if (!meta) return;
+    handledScanRequest.current = scanRequest;
+    if (scan) return;
+    void startScan();
+  }, [scanRequest, meta, scan]);
 
   const toggle = (key: string): void => {
     setSelected((previous) => {

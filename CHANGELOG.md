@@ -3,6 +3,21 @@
 Bu proje [Semantic Versioning](https://semver.org/lang/tr/) kullanır.
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 
+## [0.3.0-alpha.0] - 2026-10-22
+
+### Düzeltildi
+
+- Tarama durumu artık tek kaynaktan geliyor; üst çubuk ile Genel Bakış
+  kartı aynı bilgiyi gösteriyor.
+- "Yeniden tara" düğmesi taramayı gerçekten başlatıyor.
+- Genel Bakış detay listeleri ve PATH gerekçeleri TR/EN olarak gösteriliyor.
+- Aynı detayı paylaşan plan kartlarının seçimi düzeltildi.
+- "Disk değişti" durumu tüm yüzeylerde aynı önem tonunu kullanıyor.
+
+### Değişti
+
+- Proje **beta öncesi (alpha)** olarak işaretlendi; sürüm `0.3.0-alpha.0`.
+
 ## [Unreleased]
 
 ### Eklendi

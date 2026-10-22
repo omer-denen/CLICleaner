@@ -47,6 +47,7 @@ function facts(over: Partial<DashboardFacts> = {}): DashboardFacts {
       cliBytes: 0,
       cliCount: 0,
       brokenInstalls: 0,
+      cliKnown: true,
     },
     env: null,
     graph: null,
@@ -72,6 +73,7 @@ test('iki defter: korunan = toplam - geri kazanilabilir', () => {
         cliBytes: 700,
         cliCount: 3,
         brokenInstalls: 0,
+        cliKnown: true,
       },
     }),
   ).view();
@@ -81,6 +83,15 @@ test('iki defter: korunan = toplam - geri kazanilabilir', () => {
   assert.equal(ledgers.reclaimable, 400);
   assert.equal(ledgers.vault, 500);
   assert.equal(ledgers.cli, 700);
+  assert.equal(view.ledgers.find((l) => l.id === 'cli')?.known, true);
+  assert.equal(view.ledgers.find((l) => l.id === 'cli')?.detailId, 'ledger-cli');
+});
+
+test('envanter yoksa CLI defteri bilinmiyor', () => {
+  const view = new DashboardSummary(facts({ inventory: null })).view();
+  const cli = view.ledgers.find((l) => l.id === 'cli');
+  assert.equal(cli?.known, false);
+  assert.equal(cli?.bytes, 0);
 });
 
 test('guvenli kazanimlar yalnizca DefaultSelection kuralini gecenler', () => {
@@ -116,6 +127,7 @@ test('kartlar: tarama, ortam, kurtarma, kasa ve planlar', () => {
         cliBytes: 0,
         cliCount: 0,
         brokenInstalls: 2,
+        cliKnown: true,
       },
       env: { pathIssues: 3, orphanVars: 1, shadowedCommands: 4 },
       graph: { broken: 1, critical: 0, shadowed: 2 },
@@ -146,6 +158,19 @@ test('kartlar: tarama, ortam, kurtarma, kasa ve planlar', () => {
     at: 900,
     ageMs: TTL + 1_000,
   });
+});
+
+test('tarama karti meta tasir; kart kimlikleri benzersiz', () => {
+  const view = new DashboardSummary(
+    facts({
+      scan: scanPart([], { dirty: true }),
+      schedules: { rules: 2, due: 1, missed: 2 },
+    }),
+  ).view();
+  const scan = view.cards.find((c) => c.id === 'scan-dirty');
+  assert.equal(scan?.tone, 'danger');
+  assert.deepEqual(scan?.meta, { at: 900, ageMs: 100 });
+  assert.equal(new Set(view.cards.map((c) => c.id)).size, view.cards.length);
 });
 
 test('tarama hic yapilmadiysa bilgi karti cikar, sayilar sifir', () => {

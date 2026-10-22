@@ -20,6 +20,18 @@ olacağını ve kararın gerekçesini gösterir.
 > artıklardır. **Hiçbir şey sen onaylamadan silinmez;** ilk tarama yalnızca
 > listeler.
 
+> **Alpha (0.3.0-alpha.0):** Proje **beta öncesi** aşamadadır. Arayüz ve sözleşme
+> değişebilir; üretim ortamında veri silme için kullanmadan önce `--dry-run`
+> ve kasa ile deneyin. Kararlı bir sürüm duyurulana kadar sürüm numarası
+> **0.x** kalır. npm'deki `2.2.0` bu alpha'dan önceki sürümdür; alpha paketi
+> npm'e yüklenmedi.
+
+## Neden Güvenilir?
+
+Her işlem önce analiz edilir. Bağımlılıkları tespit edilir, onayınıza sunulur.
+Siz isterseniz plana alır, kasanıza taşırsınız. Kontrol tamamen sizde olur.
+Biz silme işlemi yapmayız... Siz temizliğinizi yaparsınız.
+
 ---
 
 ## Kapsam ve sınırlar

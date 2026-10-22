@@ -104,15 +104,20 @@ export class DashboardService {
 
     const interruptedItems: DashboardDetailItem[] = (interrupted ?? []).map((op) => ({
       id: op.operationId,
-      label: op.mode ?? 'İşlem',
-      value: `${op.items.length} öge`,
+      label: '',
+      labelId: op.mode === 'vault' ? 'operation-vault' : 'operation',
+      value: '',
+      valueId: 'interrupted-items',
+      amount: op.items.length,
       tone: 'warn' as const,
     }));
 
     const expiredItems: DashboardDetailItem[] = (expired ?? []).map((e) => ({
       id: e.id,
       label: e.originalPath ?? e.id,
-      value: `${e.bytes} B`,
+      value: '',
+      valueKind: 'bytes',
+      amount: e.bytes,
       tone: 'warn' as const,
     }));
 
@@ -121,17 +126,44 @@ export class DashboardService {
       .map((s) => ({
         id: s.id,
         label: s.name,
-        value: s.missed > 0 ? `${s.missed} kaçırılan çalışma` : 'zamanı geldi',
+        value: '',
+        valueId: s.missed > 0 ? ('schedule-missed' as const) : ('schedule-due' as const),
+        amount: s.missed,
         tone: s.missed > 0 ? ('warn' as const) : ('default' as const),
       }));
 
+    // Defter kartlari: Kasa ve Araclarda icerikleri.
+    const expiredIds = new Set((expired ?? []).map((e) => e.id));
+    const vaultItems: DashboardDetailItem[] = (vault ?? []).map((e) => ({
+      id: e.id,
+      label: e.originalPath ?? e.id,
+      value: '',
+      valueKind: 'bytes',
+      amount: e.bytes,
+      tone: expiredIds.has(e.id) ? ('warn' as const) : ('default' as const),
+    }));
+
+    const cliItems: DashboardDetailItem[] | null = inv
+      ? inv.tools.map((t) => ({
+          id: t.id,
+          label: `${t.command} · ${t.source}`,
+          value: '',
+          valueKind: 'bytes',
+          amount: t.totalBytes,
+          tone: t.status === 'unused' ? ('warn' as const) : ('default' as const),
+        }))
+      : null;
+
     const details = new DashboardDetails({
+      clusters,
       envFindings: env?.findings ?? null,
       commandShadows: env?.commandShadows ?? null,
       brokenTools,
       brokenEdges,
       interrupted: interruptedItems,
       expiredVault: expiredItems,
+      vaultItems,
+      cliItems,
       schedules: scheduleItems,
     }).views();
 
@@ -157,6 +189,7 @@ export class DashboardService {
         cliBytes,
         cliCount,
         brokenInstalls,
+        cliKnown: inv !== null,
       },
       env: env
         ? {

@@ -67,6 +67,13 @@ export function ScanStatusDialog({ status, lang, onClose, onRescan }: DialogProp
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  // `onClose` her App render'inda yeni bir arrow olabilir; efektin yeniden
+  // calisip odagi kapat dugmesine cekmemesi icin guncel referansi tut.
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     openerRef.current = document.activeElement as HTMLElement | null;
@@ -75,7 +82,7 @@ export function ScanStatusDialog({ status, lang, onClose, onRescan }: DialogProp
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -102,7 +109,7 @@ export function ScanStatusDialog({ status, lang, onClose, onRescan }: DialogProp
       window.removeEventListener('keydown', onKey, true);
       openerRef.current?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>

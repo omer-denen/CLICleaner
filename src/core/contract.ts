@@ -18,7 +18,7 @@ import type {
   RootCause,
   WhatIfResult,
 } from './dependency-graph.ts';
-import type { EnvFinding, EnvPlan } from './env-engine.ts';
+import type { EnvFinding, EnvFindingKind, EnvPlan } from './env-engine.ts';
 import type {
   ScheduleFrequency,
   ScheduleRule,
@@ -959,8 +959,19 @@ export type DashboardCardTitleId =
  * Risk kartinin detayi — "altindaki liste"de gosterilen satirlar.
  *
  * Kart bir INDEXtir; detayi ayni sayfada asagidaki listede gorunur.
- * Satirlar motorun metnidir (kullanici verisi + gerekce).
+ * Satirlar kullanici verisini ve sabit metin KIMLIKLERINI tasir; metin
+ * TR/EN olarak arayuzde uretilir.
  */
+/**
+ * Defter kartlarinin (Korunan / Geri kazanilabilir / Kasa / Araclarda)
+ * detay kimlikleri. Bu kartlar tiklanir; icerikleri alt listede acilir.
+ */
+export type DashboardLedgerDetailId =
+  | 'ledger-protected'
+  | 'ledger-reclaimable'
+  | 'ledger-vault'
+  | 'ledger-cli';
+
 export type DashboardDetailId =
   | 'scan'
   | 'paths'
@@ -970,19 +981,50 @@ export type DashboardDetailId =
   | 'deps'
   | 'recover'
   | 'vault'
-  | 'schedules';
+  | 'schedules'
+  | DashboardLedgerDetailId;
+
+/**
+ * Detay satirinda sabit metin yerine kullanilan ceviri kimligi.
+ *
+ * Kullanici verisi (yol, komut, degisken) `label`/`value` alaninda kalir;
+ * YALNIZCA sabit cumleler kimlik tasir. Metin TR/EN olarak `web/src/i18n.ts`
+ * icinde uretilir (AGENTS.md 9/18).
+ */
+export type DashboardDetailTextId =
+  | EnvFindingKind
+  | 'operation'
+  | 'operation-vault'
+  | 'interrupted-items'
+  | 'schedule-missed'
+  | 'schedule-due'
+  | 'ledger-cli-empty';
 
 export interface DashboardDetailRow {
   /** Sol etiket (ornegin yol, degisken, komut adi). */
   label: string;
   /** Sag deger (ornegin gerekce, yol, tarih). */
   value: string;
+  /** Sabit etiket: doluysa `label` yerine cevrilir. */
+  labelId?: DashboardDetailTextId;
+  /** Sabit deger: doluysa `value` yerine cevrilir. */
+  valueId?: DashboardDetailTextId;
+  /** `valueId`/`valueKind` icin sayisal deger. */
+  amount?: number;
+  /** Sabit metin yoksa sayinin bicimi. */
+  valueKind?: 'bytes' | 'count';
   tone?: 'default' | 'warn' | 'danger';
 }
 
+export type DashboardDetailKind = 'rows' | 'scan';
+
 export interface DashboardDetailView {
   id: DashboardDetailId;
+  /** 'scan' -> satirlar `scan.view`'dan gelir; 'rows' -> `rows` kullanilir. */
+  kind: DashboardDetailKind;
   rows: DashboardDetailRow[];
+  /** Satir yoksa gosterilecek aciklama (or. envanter taranmadi). */
+  noteId?: DashboardDetailTextId;
   /** Detayin tam listesi olan ekran (yoksa null). */
   target: DashboardTarget | null;
 }
@@ -1014,6 +1056,10 @@ export type DashboardLedgerId = 'protected' | 'reclaimable' | 'vault' | 'cli';
 export interface DashboardLedgerView {
   id: DashboardLedgerId;
   bytes: number;
+  /** false -> deger bilinmiyor (or. CLI envanteri hic taranmadi). */
+  known: boolean;
+  /** Bu defterin icerigi hangi detay listesinde? */
+  detailId: DashboardLedgerDetailId;
 }
 
 /** Varsayilan secim kuralini gecen kume; "neden" kimlikle gelir. */

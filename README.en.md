@@ -19,6 +19,18 @@ folder is, what exactly deletion would cost, and why it decided that way.
 > the developer and AI leftovers that Windows never lists. **Nothing is
 > deleted without your approval;** the first scan only lists.
 
+> **Alpha (0.3.0-alpha.0):** The project is **pre-beta**. The UI and contract may
+> change; before using it for real deletions, try `--dry-run` and the vault.
+> The version stays **0.x** until a stable release is announced. The `2.2.0`
+> version on npm predates this alpha; the alpha package is not published.
+
+## Why trust it?
+
+Every operation is analyzed first. Dependencies are identified and presented
+for your approval. If you want, you can put it on a plan and move it to your
+vault. Control is entirely yours. We do not delete anything... You do the
+cleanup.
+
 ---
 
 ## Scope and limits

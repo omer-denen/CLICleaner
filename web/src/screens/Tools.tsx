@@ -26,6 +26,8 @@ const STATUS_TABS: Array<{ id: CliStatusFilter; label: MessageKey }> = [
 
 interface Props {
   lang: Lang;
+  /** Envanter degisti (tarama/execute): dashboard defterlerini tazele. */
+  onChanged?: () => void;
 }
 
 /**
@@ -36,7 +38,7 @@ interface Props {
  * asamalidir: plan -> yazili `SIL` -> paket yoneticisinin kendi komutu.
  * Arayuz kendi filtresini/toplamini HESAPLAMAZ.
  */
-export function Tools({ lang }: Props) {
+export function Tools({ lang, onChanged }: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
 
@@ -124,6 +126,7 @@ export function Tools({ lang }: Props) {
               closeStream.current = null;
               setJob(null);
               void loadView();
+              onChanged?.();
               break;
             case 'cancelled':
               closeStream.current?.();
@@ -209,6 +212,7 @@ export function Tools({ lang }: Props) {
       setView(null);
       setLoaded(false);
       await loadView();
+      onChanged?.();
     } catch (err) {
       setPlanError(err instanceof ApiError ? err.message : String(err));
     } finally {

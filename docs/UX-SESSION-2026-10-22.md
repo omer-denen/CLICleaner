@@ -17,10 +17,11 @@
 
 | | |
 |---|---|
-| Sürüm | 2.2.0 (npm'de yayında, `v2.2.0` tag'li) |
-| Commit | `0d27351` (docs: 2.2.0 sonrası Graf UX devir notu) |
-| Yayınlanmamış | Graf UX paketi (2.3.0 adayı) — main'de, npm'de değil |
-| Testler | 107 → **114** (bu oturumda +7) |
+| Sürüm (oturum başı) | 2.2.0 (npm'de yayında, `v2.2.0` tag'li) |
+| Sürüm (oturum sonu) | **0.3.0 alpha** — beta öncesi; npm'e yayınlanmadı |
+| Commit | `0d27351` (başlangıç) → `ff2eaeb` (UX-038..041) |
+| Yayınlanmamış | Graf UX paketi + UX-038..041 — **0.3.0 alpha adayı** |
+| Testler | 98 → **121** (9 tarama durumu + 7 detay + 4 inceleme + 3 defter) |
 | Sunucu | `residue ui --web --port 4411` (bu oturumda açıldı) |
 
 **Başlangıçtaki iki sunucu tuzağı:** `4399` (önceki oturumdan kalma süreç) ve
@@ -30,7 +31,7 @@
 
 ## 2. Yapılan işler (teslim edilenler)
 
-### 2.1 UX denetimi başlatıldı — `docs/UX-LOG.md` (yeni, 462 satır)
+### 2.1 UX denetimi başlatıldı — `docs/UX-LOG.md` (yeni, 521 satır)
 
 Sınıf bazlı UX bulgu kaydı. Sınıflar:
 
@@ -45,7 +46,7 @@ Sınıf bazlı UX bulgu kaydı. Sınıflar:
 | **S7** Düzen | Menü, panel genişliği |
 
 Her madde: **belirti / kanıt (ölçüm) / öneri / durum**.
-**36 madde** kaydedildi: 10 düzeltildi, 9 planlandı, 14 açık.
+**43 başlık** kaydedildi: 17 düzeltildi, 4 planlandı, 22 açık; UX-043 süreç notu.
 
 Denetim **ölçümle** yapıldı (`getBoundingClientRect`, `getComputedStyle`,
 API yanıtları) — gözle tahmin yok. Örnek ölçümler: `labelH` 18.1/36.3/54.4 px,
@@ -121,8 +122,9 @@ tablosu başlıkta okunabilir adı, altında ham anahtarı gösteriyor.
   işlem` · `Kasa ögeleri`→`Süresi dolmuş kasa öğesi` · `Zamanlanmış işler`→…
 - **Yeni motor** `src/core/dashboard-details.ts` (148 satır, saf TS):
   `DashboardDetails` → her kart için detay satırları → `DashboardResponse.details`
-- Kartlar `<button aria-pressed>`; tıklanınca **alt liste** o kartın detayına
-  dönüyor ("Güvenli kazanımlara dön" ile geri alınır).
+- **Defter kartları** `<button aria-pressed>`; tıklanınca **alt liste** o
+  defterin detayına dönüyor. **Risk kartları statiktir** (Önceki Tarama,
+  Ortam yolları, Komut yolu); 22.10.2026 düzeltmesi: **UX-044**.
 - Satır etiketleri **doğru alandan**: yol bulgularında sol = yol, sağ =
   gerekçe (`variable` alanı her zaman "Path" olduğu için kullanılamaz);
   gölgede komutta sol = komut adı (`klist`, `notepad`, `wsl`).
@@ -154,16 +156,16 @@ yukarıda · P9 her tarama için tarihli kayıt.
 
 ## 3. Dosya bazlı değişiklik dökümü
 
-**Yeni (9 dosya, 1.652 satır):**
+**Yeni (10 dosya):**
 
 | Dosya | Satır | Ne |
 |---|---|---|
-| `docs/UX-LOG.md` | 462 | Sınıf bazlı denetim kaydı |
+| `docs/UX-LOG.md` | 521 | Sınıf bazlı denetim kaydı |
 | `docs/UX-PLAN-2026-10-21.md` | 307 | Ertelenen işler (P1–P9) |
 | `src/core/scan-status-view.ts` | 147 | Tarama durumu motoru |
 | `src/core/dashboard-details.ts` | 148 | Kart detayı motoru |
-| `tests/scan-status-view.test.ts` | 107 | 9 test |
-| `tests/dashboard-details.test.ts` | 122 | 7 test |
+| `tests/scan-status-view.test.ts` | 120 | 10 test |
+| `tests/dashboard-details.test.ts` | 173 | 9 test |
 | `web/src/components/ScanStatus.tsx` | 165 | Rozet + ayrıntı diyaloğu |
 | `web/src/components/ScanStamp.tsx` | 41 | Damga satırı |
 | `web/src/components/icons.tsx` | 113 | 12 SVG ikon |
@@ -181,7 +183,7 @@ yukarıda · P9 her tarama için tarihli kayıt.
 | `web/src/format.ts` | `formatDuration`, `formatTimestamp`, `formatCount`, `formatRatio`, `formatScanRow` |
 | `web/src/i18n.ts` | ~60 yeni anahtar (TR/EN): `cardtitle.*`, `detail.*`, `scan.stamp`, `scan.kind.*`, `scan.reason.*`, `scan.row.*`, `nav.open/close/collapse`, `dash.safeWins.why` |
 | `web/src/labels.ts` | `CARD_TITLE_LABEL`, `DETAIL_TITLE_LABEL`, `SCAN_STATUS_LABEL`, `SCAN_REASON_LABEL`, `SCAN_ROW_LABEL` |
-| `web/src/screens/Dashboard.tsx` | kart → `<button>` + `aria-pressed`, alt liste detay değişimi, damga, konu/sonuç |
+| `web/src/screens/Dashboard.tsx` | defter kartı → `<button>` + `aria-pressed`, risk kartı statik, alt liste detay değişimi, damga, konu/sonuç |
 | `web/src/screens/Disk.tsx` | rozet → `ScanStatusChip` |
 | `web/src/styles.css` | kart ızgarası, rozet tonları, diyalog, ikon/rail daraltma, drawer, damga, detay listesi |
 
@@ -196,7 +198,7 @@ yukarıda · P9 her tarama için tarihli kayıt.
 | Kontrol | Sonuç |
 |---|---|
 | `npm run typecheck` (src + web) | **temiz** |
-| `npm test` | **114/114** (başlangıçta 107 → +7 yeni) |
+| `npm test` | **121/121** (98 → 114 → 118 → 121) |
 | `npm run smoke` | **34/34, temiz** |
 | `npm run build:web` | 430.87 KB JS (121.78 KB gzip), 33.45 KB CSS (6.35 KB gzip) |
 | Gerçek tarayıcı (ego-browser, Edge/Chromium) | aşağıda |
@@ -208,7 +210,7 @@ yukarıda · P9 her tarama için tarihli kayıt.
 - TR/EN çevirileri tam
 - Menu: 4 durumun `aria-label`/`aria-expanded` doğru (geniş açık/daraltılmış,
   dar kapalı/açık)
-- Kart → alt liste → "Güvenli kazanımlara dön" → geri
+- Defter kartı → alt liste → "Panele dön" → geri (22.10.2026).
 - Yol detayı 3 satır (gerçek yol + gerekçe), komut detayı 30 satır
 - Konsol hatası **yok**
 
@@ -305,9 +307,8 @@ oturumda iki kez ihlal edildi. → Gelecekte: belirsiz ifade = **önce sor**.
 | 8 | **Yayın yok** — işler bitene kadar patch çıkarılmayacak (kullanıcı kararı) | — |
 | 9 | Disk → Projeler → Araçlar → PATH & Ortam → Graf → Planlar → Kasa → Ayarlar ekranları **ilk kullanıcı gözüyle denetlenmedi** | `docs/UX-LOG.md` |
 
-**Sunucu durumu:** `4411` (PID 7188) açık, güncel kodla. `4399` bu oturumda
-kapatıldı (eski koddu) — **kullanıcının önceki sunucusuydu**; gerekirse
-`node bin/residue.mjs ui --web --no-browser --port 4399` ile geri açılabilir.
+**Sunucu durumu:** `4411` üçüncü turda güncel kodla yeniden başlatıldı
+(eski süreç K15 gereği kapatıldı).
 
 **Tarayıcı:** ego-browser space 12 (`residue-ux-audit-20261021`), `p1` →
 `http://127.0.0.1:4411/`. Uzaktan sürülüyor (kullanıcı arada kontrol ediyor).
@@ -366,3 +367,30 @@ kanıt yerine **DOM ölçümleri** kullanıldı. Ekran görüntüsü bir sonraki
 turda yeniden denenebilir.
 
 **Commit:** `ff2eaeb` — UX-038..041 uygulaması; `main`'e gönderildi.
+
+---
+
+## 8. Üçüncü tur — inceleme düzeltmeleri (0.3.0 alpha)
+
+**Durum:** önceki turun incelemesinde bulunan açıklar kapatıldı; sürüm
+**0.3.0 alpha** (beta değil). Yayın yok.
+
+- **Tarama durumu tek kaynak:** Disk taraması bitince `App.load()` dashboard +
+  meta + status'u birlikte tazeler; üst çubuk ile kart aynı veriyi gösterir.
+- **"Yeniden tara" gerçekten tarar:** `App.scanRequest` sayacı → `Disk` effect →
+  `startScan`; tarama sürerken gelen istek yok sayılır.
+- **Detay satırları i18n kuralına çekildi:** `DashboardDetailRow`
+  `labelId`/`valueId`/`amount`/`valueKind` taşır; servis Türkçe metin ve ham
+  bayt üretmez; env gerekçeleri `ENV_REASON_LABEL` ile TR/EN.
+- **Kart seçimi (UX-044):** tıklanabilirlik risk kartlarından **defter
+  kartlarına** taşındı; seçim kart kimliğiyle tutulur, `aria-pressed` benzersiz.
+- **Kart hizası:** risk kartları 3 satırlık sabit ızgarada; başlık y=293,
+  özet y=313, hedef/meta y=337; üçü de 183×88 px.
+- **"Araçlarda" defteri:** envanter yoksa **bilinmiyor** + "Envanter taranmadı";
+  envanter bitince `Tools.onChanged` → `App.load()` dashboard'u tazeler.
+- **Ton:** `dirty` artık `danger` (chip + kart aynı).
+- **Tarama detayı:** `DashboardDetailView.kind='scan'` ile açıkça ayrıldı.
+- **Odak:** `ScanStatusDialog` efekti `onClose` referansıyla mount-only.
+- **Test:** **121/121**; typecheck temiz; smoke 34/34.
+- **Sürüm:** `package.json` + `package-lock.json` **0.3.0-alpha.0**; README/README.en
+  ve AGENTS "alpha / beta öncesi" notu.
