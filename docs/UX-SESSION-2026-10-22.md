@@ -19,7 +19,7 @@
 |---|---|
 | Sürüm (oturum başı) | 2.2.0 (npm'de yayında, `v2.2.0` tag'li) |
 | Sürüm (oturum sonu) | **0.3.0 alpha** — beta öncesi; npm'e yayınlanmadı |
-| Commit | `0d27351` (başlangıç) → `ff2eaeb` (UX-038..041) |
+| Commit | `0d27351` (başlangıç) → `ff2eaeb` (UX-038..041) → `f891fee` (0.3.0 alpha / UX-044) |
 | Yayınlanmamış | Graf UX paketi + UX-038..041 — **0.3.0 alpha adayı** |
 | Testler | 98 → **121** (9 tarama durumu + 7 detay + 4 inceleme + 3 defter) |
 | Sunucu | `residue ui --web --port 4411` (bu oturumda açıldı) |
@@ -394,3 +394,6 @@ turda yeniden denenebilir.
 - **Test:** **121/121**; typecheck temiz; smoke 34/34.
 - **Sürüm:** `package.json` + `package-lock.json` **0.3.0-alpha.0**; README/README.en
   ve AGENTS "alpha / beta öncesi" notu.
+- **Commit:** `f891fee` — 0.3.0-alpha.0 / UX-044; `main`'e gönderildi.
+  Doğrulama: `npm test` **121/121**, typecheck temiz, smoke **34/34**,
+  build **434.45 KB JS / 122.63 KB gzip**, CSS 34.06 KB (6.43 KB gzip).
