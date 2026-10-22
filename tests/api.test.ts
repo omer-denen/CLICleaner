@@ -52,6 +52,14 @@ test('yeni motor uclari yanit verir', async () => {
   assert.equal(await cliView.json(), null);
 });
 
+test('sag panel plan ucu: aktif plan yoksa null', async () => {
+  const r = await fetch(`${base}/api/plan`, {
+    headers: { 'x-residue-token': token },
+  });
+  assert.equal(r.status, 200);
+  assert.equal(await r.json(), null);
+});
+
 test('env plani plan kimligi ve yazili ifade dondurur', async () => {
   const r = await fetch(`${base}/api/env/plan`, {
     method: 'POST',

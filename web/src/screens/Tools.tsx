@@ -15,6 +15,7 @@ import { openEvents } from '../sse.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
 import { CLI_SOURCE_LABEL, CLI_STATUS_LABEL, CONFIDENCE_LABEL } from '../labels.ts';
+import { RightPanelPortal, useRightPanel } from '../components/RightPanel.tsx';
 
 const STATUS_TABS: Array<{ id: CliStatusFilter; label: MessageKey }> = [
   { id: 'all', label: 'disk.kind.all' },
@@ -45,6 +46,7 @@ export function Tools({ lang, onChanged }: Props) {
   // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
   const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
     translateUpper(lang, key, vars);
+  const panel = useRightPanel();
 
   const [view, setView] = useState<CliViewResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -188,11 +190,7 @@ export function Tools({ lang, onChanged }: Props) {
       });
       setPlan(next);
       setPhrase('');
-      setTimeout(() => {
-        document
-          .querySelector('.tools-detail')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
+      panel?.activate('action');
     } catch (err) {
       setPlanError(err instanceof ApiError ? err.message : String(err));
     }
@@ -457,6 +455,7 @@ export function Tools({ lang, onChanged }: Props) {
                     onClick={() => {
                       setDetailId(tool.id);
                       setPlan(null);
+                      panel?.activate('evidence');
                     }}
                   >
                     <input
@@ -476,6 +475,7 @@ export function Tools({ lang, onChanged }: Props) {
                         e.stopPropagation();
                         setDetailId(tool.id);
                         setPlan(null);
+                        panel?.activate('evidence');
                       }}
                     >
                       <span className="cli-command mono">{tool.command}</span>
@@ -517,8 +517,8 @@ export function Tools({ lang, onChanged }: Props) {
         )}
       </section>
 
-      <aside className="tools-detail">
-        {plan ? (
+      <RightPanelPortal module="action">
+        {plan && (
           <section className="plan-panel">
             <h2>{tu('tools.plan.title')}</h2>
             <p className="dim">{t('tools.plan.phraseHint', { phrase: plan.phrase })}</p>
@@ -611,8 +611,11 @@ export function Tools({ lang, onChanged }: Props) {
               </button>
             </div>
           </section>
-        ) : (
-          <>
+        )}
+      </RightPanelPortal>
+
+      <RightPanelPortal module="evidence">
+          <aside className="tools-detail">
             <h2>{tu('tools.detail')}</h2>
             {!detail ? (
               <p className="dim">{t('tools.detail.empty')}</p>
@@ -744,8 +747,10 @@ export function Tools({ lang, onChanged }: Props) {
                 )}
               </>
             )}
-          </>
-        )}
+          </aside>
+      </RightPanelPortal>
+
+      <RightPanelPortal module="action">
 
         {results && (
           <section className="plan-panel">
@@ -771,7 +776,7 @@ export function Tools({ lang, onChanged }: Props) {
             </ul>
           </section>
         )}
-      </aside>
+      </RightPanelPortal>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import type {
 import { api, ApiError } from '../api.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
+import { RightPanelPortal, useRightPanel } from '../components/RightPanel.tsx';
 
 const TABS: Array<{ id: ProjectTab; label: MessageKey }> = [
   { id: 'all', label: 'projects.tab.all' },
@@ -50,6 +51,7 @@ export function Projects({ lang }: Props) {
   // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
   const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
     translateUpper(lang, key, vars);
+  const panel = useRightPanel();
 
   const [rootsInput, setRootsInput] = useState('');
   const [roots, setRoots] = useState<string[]>([]);
@@ -272,7 +274,10 @@ export function Projects({ lang }: Props) {
                     key={project.root}
                     type="button"
                     className={`project-row${selected === project.root ? ' active' : ''}`}
-                    onClick={() => setSelected(project.root)}
+                    onClick={() => {
+                      setSelected(project.root);
+                      panel?.activate('evidence');
+                    }}
                   >
                     <span className="project-name-wrap">
                       <span className="project-name">{project.name}</span>
@@ -299,7 +304,8 @@ export function Projects({ lang }: Props) {
         )}
       </section>
 
-      <aside className="disk-detail projects-detail">
+      <RightPanelPortal>
+        <aside className="disk-detail projects-detail">
         <h2>{tu('projects.detail')}</h2>
 
         {!selected && <p className="dim">{t('projects.detail.empty')}</p>}
@@ -448,6 +454,7 @@ export function Projects({ lang }: Props) {
           </>
         )}
       </aside>
+      </RightPanelPortal>
     </div>
   );
 }

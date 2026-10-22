@@ -390,7 +390,26 @@ Risk kartları 3 satırlık sabit ızgarada hizalandı: başlık y=293, özet y=
 hedef/meta y=337; üçü de 183×88 px. "Araçlarda" envanter yoksa **bilinmiyor**
 + "Envanter taranmadı"; envanter taraması bitince dashboard tazelenir.
 
-**S8 durumu:** 7/7 kapandı (038–042, 044 düzeltildi; 043 kural olarak eklendi).
+**S8 durumu:** 8/8 kapandı (038–042, 044, 045 düzeltildi; 043 kural olarak eklendi).
+
+### UX-045 · Tüm ekranlar · Sağ panel yalnız Dashboard'da ve statikti — `düzeltildi`
+> *"Sadece kanıtlar detayları değil, sağ içeriği daha dinamik kullanmak istiyorum.
+> Diğer menülerde de aynı şekilde aktif olarak kullanmak lazım."*
+
+**Araştırma (uygulama desenleri):** Office task pane (sabit sağ yüzey, ~320px,
+katlanır), VS Code sidebar (3–5 modül), Figma properties (seçim sürücülü içerik),
+Azure DevOps panel (listeden çıkmadan detay/eylem).
+
+**Uygulama:** `web/src/components/RightPanel.tsx` — ekranlardan bağımsız modül
+kabığı. Modüller: **Kanıtlar**, **İşlem**, **Planlananlar**, **Bağlam**.
+Ekran asideleri portal ile panelde: Disk/Tools/Projects/Graph/Env; Dashboard
+defter detayı Kanıtlar modülünde. `GET /api/plan` **salt okunur**; Planlananlar
+satır çıkarma Plan ekranındaki **aynı motoru** kullanır, onay Plan'da kalır.
+Panel varsayılan açık + katlanır (`localStorage`); 1180px altında gizli.
+
+**Doğrulama:** Gerçek tarayıcıda dashboard kanıtı 80 satır; Disk küme kanıtı;
+Tools SIL planı İşlem sekmesinde; Planlananlar 7→6 çıkarma; EN/TR ve klavye
+okları; panel katla/aç. Test **123/123**.
 
 ---
 
@@ -398,7 +417,7 @@ hedef/meta y=337; üçü de 183×88 px. "Araçlarda" envanter yoksa **bilinmiyor
 
 | Durum | Adet | Maddeler |
 |---|---|---|
-| `düzeltildi` | 17 | UX-001, UX-009, UX-013, UX-027, UX-028, UX-032..036, UX-038..044 |
+| `düzeltildi` | 18 | UX-001, UX-009, UX-013, UX-027, UX-028, UX-032..036, UX-038..045 |
 | `planlandi` | 4 | UX-029, UX-030, UX-031, UX-037 |
 | `acik` | 22 | kalanlar |
 | `reddedildi` | 0 | — |
@@ -425,6 +444,8 @@ istemiyorum. Diğer bazı içerikler de eklemek istiyorum. ortadan bir split
 atarak"* + *"özelleştilebilir bir sağ panel menüsü olacak"*.
 **Plan:** `docs/UX-PLAN-2026-10-21.md` → **P1** (modül tabanlı, katlanır,
 sürüklenebilir split, özelleştirilebilir).
+> **22.10.2026 F1:** katlanır + modül kabuğu uygulandı (UX-045); modül seçimi ve
+> sürüklenebilir split (F3) hâlâ planlı.
 
 ### UX-032 · Genel Bakış · Kart "sonuç" idi, "konu" eksikti — `düzeltildi`
 **Belirti:** "Disk değişti" bir **sonuç**tur; neyin sonucu olduğu belirsizdi.
@@ -502,7 +523,7 @@ damgalı tek kayıt **sonuncusudur**; tarama geçmişi yok.
 
 | Durum | Adet |
 |---|---|
-| `düzeltildi` | 17 (UX-001, UX-009, UX-013, UX-027, UX-028, UX-032..036, UX-038..044) |
+| `düzeltildi` | 18 (UX-001, UX-009, UX-013, UX-027, UX-028, UX-032..036, UX-038..045) |
 | `planlandi` | 4 (UX-029, UX-030, UX-031, UX-037) |
 | `acik` | 22 (kalanlar) |
 | `reddedildi` | 0 |

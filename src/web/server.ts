@@ -745,6 +745,12 @@ async function handleRequest(
     return;
   }
 
+  // Sag panel "Planlananlar": SALT OKUNUR, en son gecerli plan.
+  if (route === 'GET /api/plan') {
+    sendJson(res, 200, ctx.remove.currentPlan());
+    return;
+  }
+
   if (route === 'POST /api/plan') {
     await handleCreatePlan(req, res, ctx);
     return;

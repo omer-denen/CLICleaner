@@ -85,3 +85,16 @@ test('yuksek risk ayrica acik isaretleme ister', () => {
   assert.equal(plan.requiresHighAck, true);
   assert.equal(plan.phrase, 'TASI');
 });
+
+test('currentPlan sag panel icin en son gecerli plani dondurur', () => {
+  const svc = new DeleteService(() => {});
+  assert.equal(svc.currentPlan(), null);
+
+  const safe = scan([cluster({ key: 'safe' })]);
+  const first = svc.createPlan(safe, ['safe'], 'recycle');
+  assert.equal(svc.currentPlan()?.planId, first.planId);
+
+  const second = svc.createPlan(safe, ['safe'], 'recycle');
+  assert.equal(svc.currentPlan()?.planId, second.planId);
+  assert.equal(svc.currentPlan()?.plan.clusters[0]?.key, 'safe');
+});

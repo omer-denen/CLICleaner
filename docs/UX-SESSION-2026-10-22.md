@@ -21,7 +21,7 @@
 | Sürüm (oturum sonu) | **0.3.0 alpha** — beta öncesi; npm'e yayınlanmadı |
 | Commit | `0d27351` (başlangıç) → `ff2eaeb` (UX-038..041) → `f891fee` (0.3.0 alpha / UX-044) |
 | Yayınlanmamış | Graf UX paketi + UX-038..041 — **0.3.0 alpha adayı** |
-| Testler | 98 → **121** (9 tarama durumu + 7 detay + 4 inceleme + 3 defter) |
+| Testler | 98 → **123** (9 tarama durumu + 7 detay + 4 inceleme + 3 defter + 2 sag panel) |
 | Sunucu | `residue ui --web --port 4411` (bu oturumda açıldı) |
 
 **Başlangıçtaki iki sunucu tuzağı:** `4399` (önceki oturumdan kalma süreç) ve
@@ -46,7 +46,7 @@ Sınıf bazlı UX bulgu kaydı. Sınıflar:
 | **S7** Düzen | Menü, panel genişliği |
 
 Her madde: **belirti / kanıt (ölçüm) / öneri / durum**.
-**43 başlık** kaydedildi: 17 düzeltildi, 4 planlandı, 22 açık; UX-043 süreç notu.
+**44 başlık** kaydedildi: 18 düzeltildi, 4 planlandı, 22 açık; UX-043 süreç notu.
 
 Denetim **ölçümle** yapıldı (`getBoundingClientRect`, `getComputedStyle`,
 API yanıtları) — gözle tahmin yok. Örnek ölçümler: `labelH` 18.1/36.3/54.4 px,
@@ -198,7 +198,7 @@ yukarıda · P9 her tarama için tarihli kayıt.
 | Kontrol | Sonuç |
 |---|---|
 | `npm run typecheck` (src + web) | **temiz** |
-| `npm test` | **121/121** (98 → 114 → 118 → 121) |
+| `npm test` | **123/123** (98 → 114 → 118 → 121 → 123) |
 | `npm run smoke` | **34/34, temiz** |
 | `npm run build:web` | 430.87 KB JS (121.78 KB gzip), 33.45 KB CSS (6.35 KB gzip) |
 | Gerçek tarayıcı (ego-browser, Edge/Chromium) | aşağıda |
@@ -397,3 +397,31 @@ turda yeniden denenebilir.
 - **Commit:** `f891fee` — 0.3.0-alpha.0 / UX-044; `main`'e gönderildi.
   Doğrulama: `npm test` **121/121**, typecheck temiz, smoke **34/34**,
   build **434.45 KB JS / 122.63 KB gzip**, CSS 34.06 KB (6.43 KB gzip).
+
+---
+
+## 9. Dördüncü tur — sağ panel modülleri (UX-045)
+
+**Durum:** Kullanıcı: *"sadece kanıtlar detayları değil, sağ içeriği daha
+dinamik kullanmak istiyorum. Diğer menülerde de aynı şekilde aktif olarak
+kullanmak lazım."* Uygulama araştırması: Office task pane, VS Code sidebar,
+Figma properties, Azure DevOps panel.
+
+- **Yeni:** `web/src/components/RightPanel.tsx` — `RightPanelProvider`,
+  `RightPanelPortal`, `useRightPanel`, `RightPanel`; `PlannedModule.tsx`.
+- **Modüller:** `Kanıtlar`, `İşlem`, `Planlananlar`, `Bağlam`. Ekran asideleri
+  portal ile taşındı: Disk, Tools, Env, Projects, Graph; Dashboard defter
+  detayı Kanıtlar'da.
+- **API:** `GET /api/plan` salt okunur (`DeleteService.currentPlan`); TTL
+  süzgeci; panelde süre dolunca temizlenir. Planlananlar çıkarma Plan
+  ekranındaki aynı motoru kullanır; onay Plan'da kalır.
+- **Varsayılanlar:** panel açık + katlanır, 320px, 3–4 modül, seçim sürücülü
+  içerik; `localStorage: residue.panel`; ≤1180px gizli; `role=tablist` +
+  ok tuşları.
+- **Doğrulama:** **123/123**, typecheck temiz, build **442.11 KB JS /
+  124.77 KB gzip**, smoke **34/34**. ego-browser: Kanıtlar 80 satır; Disk küme
+  kanıtı; Tools SIL planı İşlem'de; Planlananlar 7→6 çıkarma; EN/TR; klavye
+  okları; panel katla/aç.
+- **Kasa notu:** oturumda 6 kümeli plan kasaya taşındı (5.5 GB); Kasa'dan
+  geri alınabilir.
+- **Açık (F3):** sürüklenebilir split genişliği + kullanıcı modül seçimi.

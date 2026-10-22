@@ -18,6 +18,7 @@ import {
   GRAPH_STRENGTH_LABEL,
 } from '../labels.ts';
 import { openEvents } from '../sse.ts';
+import { RightPanelPortal, useRightPanel } from '../components/RightPanel.tsx';
 
 interface Props {
   lang: Lang;
@@ -77,6 +78,7 @@ export function Graph({ lang }: Props) {
   // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
   const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
     translateUpper(lang, key, vars);
+  const panel = useRightPanel();
 
   const [view, setView] = useState<GraphViewResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -294,6 +296,7 @@ export function Graph({ lang }: Props) {
     setRunning(true);
     setWhatIfError(null);
     setWhatIf(null);
+    panel?.activate('action');
     try {
       setWhatIf(await api.graphWhatIf(q));
     } catch (err) {
@@ -833,7 +836,8 @@ export function Graph({ lang }: Props) {
         )}
       </section>
 
-      <aside className="graph-detail" id="graph-whatif">
+      <RightPanelPortal module="action">
+        <aside className="graph-detail" id="graph-whatif">
         <h2>{tu('graph.whatIf.title')}</h2>
         <p className="dim">{t('graph.whatIf.hint')}</p>
 
@@ -973,6 +977,7 @@ export function Graph({ lang }: Props) {
           </>
         )}
       </aside>
+      </RightPanelPortal>
     </div>
   );
 }

@@ -14,6 +14,13 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.1/) temellidir.
 - Aynı detayı paylaşan plan kartlarının seçimi düzeltildi.
 - "Disk değişti" durumu tüm yüzeylerde aynı önem tonunu kullanıyor.
 
+### Eklendi
+
+- **Sağ panel ekranlardan bağımsız modül yüzeyine dönüştü.** Kanıtlar, İşlem,
+  Planlananlar ve Bağlam sekmeleri; Disk, Araçlar, PATH & Ortam, Projeler ve
+  Graf detayları aynı panelde; planı görüntüleme ve plandan çıkarma.
+- Sağ panel varsayılan açık, katlanabilir; dar ekranda gizlenir.
+
 ### Değişti
 
 - Proje **beta öncesi (alpha)** olarak işaretlendi; sürüm `0.3.0-alpha.0`.

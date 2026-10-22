@@ -14,6 +14,8 @@ import {
   formatScanRow,
   formatTimestamp,
 } from '../format.ts';
+import { RightPanelPortal, useRightPanel } from '../components/RightPanel.tsx';
+import { ScanStamp } from '../components/ScanStamp.tsx';
 import {
   CARD_TITLE_LABEL,
   CATEGORY_LABEL,
@@ -24,7 +26,6 @@ import {
   SCAN_REASON_LABEL,
   SCAN_ROW_LABEL,
 } from '../labels.ts';
-import { ScanStamp } from '../components/ScanStamp.tsx';
 
 const LEDGER_LABEL: Record<DashboardLedgerId, MessageKey> = {
   protected: 'ledger.protected',
@@ -91,6 +92,7 @@ export function Dashboard({
    * Risk kartlari artik tiklanmaz; icerikleri alt listede acilir.
    */
   const [selectedId, setSelectedId] = useState<DashboardDetailId | null>(null);
+  const panel = useRightPanel();
 
   const verdicts: MessageKey[] = [
     'verdict.recommend',
@@ -135,9 +137,12 @@ export function Dashboard({
             type="button"
             className={`ledger ledger-${ledger.id}${selectedId === ledger.detailId ? ' active' : ''}`}
             aria-pressed={selectedId === ledger.detailId}
-            onClick={() =>
-              setSelectedId((prev) => (prev === ledger.detailId ? null : ledger.detailId))
-            }
+            onClick={() => {
+              setSelectedId((prev) =>
+                prev === ledger.detailId ? null : ledger.detailId,
+              );
+              panel?.activate('evidence');
+            }}
           >
             <span className="ledger-label">{t(LEDGER_LABEL[ledger.id])}</span>
             <strong className="ledger-value">
@@ -183,8 +188,9 @@ export function Dashboard({
         </section>
       )}
 
-      {detail ? (
-        <section className="panel" aria-label={t(DETAIL_TITLE_LABEL[detail.id])}>
+      <RightPanelPortal>
+        {detail && (
+          <section className="panel" aria-label={t(DETAIL_TITLE_LABEL[detail.id])}>
           <h2>{tu(DETAIL_TITLE_LABEL[detail.id])}</h2>
           <button
             type="button"
@@ -236,8 +242,10 @@ export function Dashboard({
             </table>
           )}
         </section>
-      ) : (
-        <section className="panel">
+        )}
+      </RightPanelPortal>
+
+      <section className="panel">
           <h2>{tu('dash.safeWins')}</h2>
           <p className="panel-note dim">{t('dash.safeWins.why')}</p>
           <ScanStamp at={data.scan.at} ageMs={data.scan.ageMs} lang={lang} />
@@ -272,7 +280,6 @@ export function Dashboard({
             </table>
           )}
         </section>
-      )}
 
       <section className="panel verdicts">
         <h2>{tu('dash.verdicts')}</h2>

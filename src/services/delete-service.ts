@@ -106,6 +106,42 @@ export class DeleteService {
     };
   }
 
+  /**
+   * SAG PANEL icin SALT OKUNUR: en son gecerli plan.
+   *
+   * Arayuz plan listesini kendi tutmaz; tek kaynak buradaki TTL'li kayittir.
+   * Suresi dolan planlar burada temizlenir (execute ile ayni kural).
+   */
+  currentPlan(): PlanResponse | null {
+    const now = Date.now();
+    let latest: StoredPlan | null = null;
+    for (const [id, stored] of this.plans) {
+      if (now > stored.expiresAt) {
+        this.plans.delete(id);
+        continue;
+      }
+      if (!latest || stored.createdAt >= latest.createdAt) latest = stored;
+    }
+    if (!latest) return null;
+
+    const approvalKind = latest.plan.mode === 'recycle' ? 'vaultMove' : 'delete';
+    const view: PlanView = {
+      mode: latest.plan.mode,
+      clusters: latest.plan.clusters,
+      targets: latest.plan.targets,
+      totalBytes: latest.plan.totalBytes,
+    };
+    return {
+      planId: latest.planId,
+      plan: view,
+      requiresPhrase: latest.requiresPhrase,
+      approvalKind,
+      phrase: ApprovalRules.phrase(approvalKind),
+      requiresHighAck: latest.requiresHighAck,
+      expiresAt: latest.expiresAt,
+    };
+  }
+
   execute(planId: string, phrase: string | undefined, acknowledgeHigh: boolean): ExecuteStartResponse {
     const stored = this.plans.get(planId);
     if (!stored) throw new ServiceError(404, 'Plan bulunamadi veya zaten kullanildi');

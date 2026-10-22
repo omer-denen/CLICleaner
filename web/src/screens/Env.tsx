@@ -8,6 +8,7 @@ import { ApprovalRules } from '../../../src/core/approval.ts';
 import { api, ApiError } from '../api.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { ENV_FINDING_LABEL, ENV_REASON_LABEL, ENV_SCOPE_LABEL } from '../labels.ts';
+import { RightPanelPortal, useRightPanel } from '../components/RightPanel.tsx';
 
 interface Props {
   lang: Lang;
@@ -26,6 +27,7 @@ export function Env({ lang }: Props) {
   // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
   const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
     translateUpper(lang, key, vars);
+  const panel = useRightPanel();
 
   const [analysis, setAnalysis] = useState<EnvAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,11 +68,7 @@ export function Env({ lang }: Props) {
       const next = await api.envPlan({ scope, removeMissing, removeDuplicates });
       setPlan(next);
       setPhrase('');
-      setTimeout(() => {
-        document
-          .querySelector('.env-detail')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
+      panel?.activate('action');
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -279,7 +277,8 @@ export function Env({ lang }: Props) {
         )}
       </section>
 
-      <aside className="env-detail">
+      <RightPanelPortal module="action">
+        <aside className="env-detail">
         <h2>{tu('env.plan.title')}</h2>
         {actionError && <div className="banner danger" role="alert">{actionError}</div>}
 
@@ -395,6 +394,7 @@ export function Env({ lang }: Props) {
           </section>
         )}
       </aside>
+      </RightPanelPortal>
     </div>
   );
 }

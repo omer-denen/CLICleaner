@@ -239,6 +239,9 @@ export const api = {
   plan: (keys: string[]): Promise<PlanResponse> =>
     post<PlanResponse>('/api/plan', { keys, mode: 'recycle' }),
 
+  /** Sag panel "Planlananlar": sunucudaki en son gecerli plan (yoksa null). */
+  planned: (): Promise<PlanResponse | null> => request<PlanResponse | null>('/api/plan'),
+
   execute: (
     planId: string,
     phrase: string | undefined,

@@ -14,6 +14,7 @@ import { openEvents } from '../sse.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatBytes } from '../format.ts';
 import { ScanStatusChip } from '../components/ScanStatus.tsx';
+import { RightPanelPortal, useRightPanel } from '../components/RightPanel.tsx';
 import {
   CATEGORY_LABEL,
   CONFIDENCE_LABEL,
@@ -63,6 +64,7 @@ export function Disk({
   // Etiket/basliklar: dil bilincli buyuk harf (TR: i -> İ).
   const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
     translateUpper(lang, key, vars);
+  const panel = useRightPanel();
 
   const [text, setText] = useState('');
   const [debouncedText, setDebouncedText] = useState('');
@@ -546,7 +548,10 @@ export function Disk({
                       width: '100%',
                       transform: `translateY(${item.start}px)`,
                     }}
-                    onClick={() => setDetailKey(c.key)}
+                    onClick={() => {
+                      setDetailKey(c.key);
+                      panel?.activate('evidence');
+                    }}
                   >
                     <input
                       type="checkbox"
@@ -570,6 +575,7 @@ export function Disk({
                       onClick={(e) => {
                         e.stopPropagation();
                         setDetailKey(c.key);
+                        panel?.activate('evidence');
                       }}
                     >
                       <span className="cluster-title">{c.title}</span>
@@ -593,7 +599,8 @@ export function Disk({
         )}
       </section>
 
-      <aside className="disk-detail">
+      <RightPanelPortal>
+        <aside className="disk-detail">
         <h2>{tu('disk.detail')}</h2>
         {!detail ? (
           <p className="dim">{t('disk.detail.empty')}</p>
@@ -687,6 +694,7 @@ export function Disk({
           </>
         )}
       </aside>
+      </RightPanelPortal>
     </div>
   );
 }

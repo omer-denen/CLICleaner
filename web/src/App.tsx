@@ -11,6 +11,13 @@ import { translate, translateUpper, type Lang, type MessageKey } from './i18n.ts
 import { formatBytes } from './format.ts';
 import { ScanStatusChip, ScanStatusDialog } from './components/ScanStatus.tsx';
 import { Icon, type IconName } from './components/icons.tsx';
+import {
+  RightPanel,
+  RightPanelProvider,
+  type RightPanelModule,
+  type RightPanelModuleId,
+} from './components/RightPanel.tsx';
+import { PlannedModule } from './components/PlannedModule.tsx';
 import { Dashboard } from './screens/Dashboard.tsx';
 import { Disk } from './screens/Disk.tsx';
 import { Env } from './screens/Env.tsx';
@@ -57,17 +64,24 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-const WIDE: Screen[] = [
-  'disk',
-  'plan',
-  'vault',
-  'projects',
-  'tools',
-  'env',
-  'graph',
-  'schedules',
-  'settings',
-];
+/** Ekran -> sag panel modulleri (VS Code "3-5 modul" siniri). */
+function modulesFor(screen: Screen): RightPanelModuleId[] {
+  switch (screen) {
+    case 'dashboard':
+    case 'disk':
+    case 'projects':
+      return ['evidence', 'planned', 'context'];
+    case 'tools':
+      return ['evidence', 'action', 'planned', 'context'];
+    case 'env':
+    case 'graph':
+      return ['action', 'planned', 'context'];
+    case 'plan':
+      return ['context'];
+    default:
+      return ['planned', 'context'];
+  }
+}
 
 export function App() {
   const [lang, setLang] = useState<Lang>(() =>
@@ -78,6 +92,10 @@ export function App() {
   const [meta, setMeta] = useState<MetaResponse | null>(null);
   const [status, setStatus] = useState<ScanStatusResponse | null>(null);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
+  /** Sag panel "Planlananlar": sunucudaki guncel plan (TTL'li). */
+  const [planned, setPlanned] = useState<PlanResponse | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [help, setHelp] = useState(false);
@@ -91,6 +109,11 @@ export function App() {
   );
   /** Dar ekranda menu: acilir/kapanir panel. */
   const [railOpen, setRailOpen] = useState(false);
+  /** Sag panel: varsayilan ACIK (Office task pane); katlanabilir. */
+  const [rightCollapsed, setRightCollapsed] = useState(
+    () => localStorage.getItem('residue.panel') === 'collapsed',
+  );
+  const [rightTab, setRightTab] = useState<RightPanelModuleId>('evidence');
   /** Dar ekran mi? (820px alti) */
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches,
@@ -108,18 +131,64 @@ export function App() {
   const tu = (key: MessageKey, vars?: Record<string, string | number>) =>
     translateUpper(lang, key, vars);
 
+  // Ekran degisince o ekranin BIRINCIL modulunu ac (Office baglam deseni).
+  // Ayni ekranda kullanici baska sekmeye gecerse korunur.
+  const previousScreenRef = useRef(screen);
+  useEffect(() => {
+    if (previousScreenRef.current === screen) return;
+    previousScreenRef.current = screen;
+    const ids = modulesFor(screen);
+    const primary =
+      ids[0] === 'planned' && !planned && ids.includes('context')
+        ? 'context'
+        : ids[0];
+    if (primary) setRightTab(primary);
+  }, [screen, planned]);
+
+  const removePlanned = async (key: string): Promise<void> => {
+    if (!planned || planBusy) return;
+    setPlanBusy(true);
+    setPlanError(null);
+    try {
+      const remaining = planned.plan.clusters
+        .filter((cluster) => cluster.key !== key)
+        .map((cluster) => cluster.key);
+      if (remaining.length === 0) {
+        setPlanned(null);
+        setPlan(null);
+        return;
+      }
+      // Plan ekranindaki "plandan cikar" ile AYNI motor: sunucu yeniden kurar.
+      const next = await api.plan(remaining);
+      setPlanned(next);
+      setPlan(next);
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 410)) {
+        setPlanned(null);
+        setPlan(null);
+      }
+      setPlanError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setPlanBusy(false);
+    }
+  };
+
   const load = useCallback(async () => {
     setError(null);
     try {
       // Tum istekler SALT OKUNUR; karar motorda verilir.
-      const [nextDashboard, nextMeta, nextStatus] = await Promise.all([
+      const [nextDashboard, nextMeta, nextStatus, nextPlanned] = await Promise.all([
         api.dashboard(),
         api.meta(),
         api.scanStatus(),
+        api.planned(),
       ]);
       setDashboard(nextDashboard);
       setMeta(nextMeta);
       setStatus(nextStatus);
+      setPlanned(nextPlanned);
+      // Plan ekranindaki sonuc gorunumunu ezmemek icin yalnizca varsa yaz.
+      if (nextPlanned) setPlan(nextPlanned);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -139,6 +208,22 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('residue.rail', railCollapsed ? 'collapsed' : 'expanded');
   }, [railCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('residue.panel', rightCollapsed ? 'collapsed' : 'expanded');
+  }, [rightCollapsed]);
+
+  // Plan TTL: suresi dolan plan sag panelde kalmasin (sunucu da 410 verir).
+  useEffect(() => {
+    if (!planned) return;
+    const remaining = planned.expiresAt - Date.now();
+    if (remaining <= 0) {
+      setPlanned(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setPlanned(null), remaining + 500);
+    return () => window.clearTimeout(timer);
+  }, [planned]);
 
   // Dar ekran takibi: menu otomatik gizlenir, hamburger ile acilir.
   useEffect(() => {
@@ -246,8 +331,6 @@ export function App() {
     buttons[next]?.focus();
   };
 
-  const wide = WIDE.includes(screen);
-
   // Hamburger etiketi BUTONUN YAPTIGI ISLEMI anlatir (durumu degil).
   const railToggleLabel = isNarrow
     ? railOpen
@@ -256,6 +339,71 @@ export function App() {
     : railCollapsed
       ? t('nav.open')
       : t('nav.collapse');
+
+  // Sag panel modulleri: karar YOK; yalnizca sunum + motordan gelen sayilar.
+  const panelModules: RightPanelModule[] = [];
+  if (['dashboard', 'disk', 'projects', 'tools'].includes(screen)) {
+    panelModules.push({
+      id: 'evidence',
+      label: 'rightPanel.evidence',
+      slot: true,
+      empty: 'rightPanel.evidence.empty',
+    });
+  }
+  if (['tools', 'env', 'graph'].includes(screen)) {
+    panelModules.push({
+      id: 'action',
+      label: 'rightPanel.action',
+      slot: true,
+      empty: 'rightPanel.action.empty',
+    });
+  }
+  if (screen !== 'plan') {
+    panelModules.push({
+      id: 'planned',
+      label: 'rightPanel.planned',
+      badge: planned?.plan.clusters.length ?? null,
+      content: (
+        <PlannedModule
+          plan={planned}
+          lang={lang}
+          busy={planBusy}
+          error={planError}
+          onRemove={(key) => void removePlanned(key)}
+          onOpenPlan={() => setScreen('plan')}
+        />
+      ),
+    });
+  }
+  panelModules.push({
+    id: 'context',
+    label: 'rightPanel.context',
+    content: (
+      <>
+        <section className="context-block">
+          <h2>{tu('safety.title')}</h2>
+          <p className="dim">{t('safety.body')}</p>
+        </section>
+        {meta && (
+          <section className="context-block">
+            <h2>{tu('context.meta')}</h2>
+            <dl className="meta-list">
+              <dt>{t('context.ui')}</dt>
+              <dd className="mono">{meta.ui ? 'web' : 'api'}</dd>
+              <dt>{t('context.cwd')}</dt>
+              <dd className="mono" title={meta.cwd}>
+                {meta.cwd ?? '—'}
+              </dd>
+              <dt>{t('context.home')}</dt>
+              <dd className="mono" title={meta.home}>
+                {meta.home ?? '—'}
+              </dd>
+            </dl>
+          </section>
+        )}
+      </>
+    ),
+  });
 
   return (
     <div
@@ -305,6 +453,18 @@ export function App() {
           </button>
           <button
             type="button"
+            className="ghost rp-toggle"
+            aria-label={
+              rightCollapsed ? t('rightPanel.expand') : t('rightPanel.collapse')
+            }
+            aria-expanded={!rightCollapsed}
+            aria-controls="app-right-panel"
+            onClick={() => setRightCollapsed((value) => !value)}
+          >
+            <Icon name="panel" size={14} />
+          </button>
+          <button
+            type="button"
             className="ghost key-help"
             aria-label={t('a11y.shortcuts')}
             aria-keyshortcuts="?"
@@ -324,7 +484,8 @@ export function App() {
         </div>
       </header>
 
-      <div className={`shell${wide ? ' shell-wide' : ''}`}>
+      <RightPanelProvider active={rightTab} onActivate={setRightTab}>
+        <div className={`shell${rightCollapsed ? ' shell-wide' : ''}`}>
         <nav
           className="rail"
           id="app-rail"
@@ -378,6 +539,8 @@ export function App() {
               onOpenScanStatus={() => setScanReport(true)}
               onPlan={(nextPlan) => {
                 setPlan(nextPlan);
+                setPlanned(nextPlan);
+                setPlanError(null);
                 setScreen('plan');
               }}
             />
@@ -389,8 +552,14 @@ export function App() {
               lang={lang}
               onBack={() => setScreen('disk')}
               onVault={() => setScreen('vault')}
-              onReplace={setPlan}
-              onExecuted={() => void load()}
+              onReplace={(next) => {
+                setPlan(next);
+                setPlanned(next);
+              }}
+              onExecuted={() => {
+                setPlanned(null);
+                void load();
+              }}
             />
           )}
 
@@ -434,33 +603,17 @@ export function App() {
             ].includes(screen) && <div className="state">{t('common.soon')}</div>}
         </main>
 
-        {!wide && (
-          <aside className="context">
-            <section className="context-block">
-              <h2>{tu('safety.title')}</h2>
-              <p className="dim">{t('safety.body')}</p>
-            </section>
-
-            {meta && (
-              <section className="context-block">
-                <h2>{tu('context.meta')}</h2>
-                <dl className="meta-list">
-                  <dt>{t('context.ui')}</dt>
-                  <dd className="mono">{meta.ui ? 'web' : 'api'}</dd>
-                  <dt>{t('context.cwd')}</dt>
-                  <dd className="mono" title={meta.cwd}>
-                    {meta.cwd ?? '—'}
-                  </dd>
-                  <dt>{t('context.home')}</dt>
-                  <dd className="mono" title={meta.home}>
-                    {meta.home ?? '—'}
-                  </dd>
-                </dl>
-              </section>
-            )}
-          </aside>
+        {!rightCollapsed && (
+          <RightPanel
+            lang={lang}
+            modules={panelModules}
+            active={rightTab}
+            onActivate={setRightTab}
+            onCollapse={() => setRightCollapsed(true)}
+          />
         )}
       </div>
+      </RightPanelProvider>
 
       <footer className="statusbar">
         {dashboard ? (
