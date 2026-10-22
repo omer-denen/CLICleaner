@@ -15,8 +15,8 @@
 |---|---|---|---|
 | 1 | **T70 / P1** | Yanlış silme riski: E1, E2, E3, E9, C1–C5 | ✅ 22.10.2026 (19 test) |
 | 2 | **T71 / P3** | Keşif ve koruma: D6, D7, D8, D1–D5, D9 | ✅ 22.10.2026 (16 test) |
-| 3 | **T72 / P2** | Ölçüm doğruluğu: W1–W6, E4, E8 | 📋 sıradaki |
-| 4 | **T73 / P4** | Sağlamlık ve temizlik: C7–C10, E6, E7, E10, E11 | 📋 |
+| 3 | **T72 / P2** | Ölçüm doğruluğu: W1–W6, E4, E8 | ✅ 22.10.2026 (9 test) |
+| 4 | **T73 / P4** | Sağlamlık ve temizlik: C7–C10, E6, E7, E10, E11 | 📋 sıradaki |
 
 **T69 (kanıt hijyeni / CLI kullanım kanıtı) bu sıranın dışında kalır**, ayrı
 kalem olarak durur: o iş `cli-inventory.ts` + `usageVerdict` ile ilgilidir,
@@ -136,22 +136,51 @@ gerçekten "pkgcache + %TEMP%" olarak çalışır.
 
 ---
 
-## 5. Uygulama notları
+## 5. P2 uygulama sonucu (T72 — TAMAMLANDI, 22.10.2026)
+
+**Commit kapsamı:** `src/core/walker.ts`, `src/core/analyze.ts`,
+`src/core/types.ts`, `tests/walker-measurement.test.ts` (**9 test**).
+
+| # | Bulgu | Yapılan |
+|---|---|---|
+| W1 | `largeFiles` ilk bulunan N'i tutuyordu | Gerçek "en büyük N": liste doluyken en küçük kayıt çıkarılır; sıra büyükten küçüğe |
+| W2 | `stat` bigint değil; `BigInt(st.ino)` yuvarlanmış sayıdan | `stat(..., { bigint: true })`; anahtar `dev:ino` bigint olarak. **Gerçek ölçüm:** 2052 dizinde maks. ino 1.43e17 (> 2^53), 518'inde hassasiyet kaybı, **1 gerçek çakışma** → iddia doğrulandı |
+| W3 | `onProgress` dosya döngüsünde (`dirs % 256 === 0`) | Zaman tabanlı kısıtlama (100 ms) + tur sonunda zorunlu bildirim |
+| W4 | Hardlink'ler bayt olarak çok sayılıyordu | `nlink > 1` + `dev:ino` kümesi; tekrar baytları `hardlinkedBytes`'ta raporlanır |
+| W5 | ENOENT dışı tüm hatalar `gone` | `reason: 'error'` + `code` (`EBUSY`, `EMFILE`, `EIO`...); `types.ts` güncellendi |
+| W6 | Klasör içinde sıralı `stat` | 32'lik gruplarla sınırlı paralel `stat` (bellek sınırı korunur) |
+| E4 | `os-user-data`/`unknown` default dalı pozitif tahmin üretiyordu; `temp`/`runtime` tamamı | `estimateReclaimable`: `temp` → 3 gün, `runtime` → 90 gün kırılımı; `os-user-data`/`unknown`/`electron` → 0. `classifyPath` sonunda `reclaimableBytes = hedef toplamı` (git/koruma süzgecinden sonra) |
+| E8 | Aynı dizin birden çok kez yürünüyordu | `MeasureCache` (yol → tek promise); alt parça/uzantı/sürüm ölçümleri paylaşır |
+
+**Doğrulama:** `npm run typecheck` temiz · `npm test` **167/167** (158 → 167,
++9) · gerçek ölçüm: repo `node_modules` 7615 dosya / 82.226.567 bayt,
+PowerShell toplamıyla **birebir aynı**, 139 ms.
+
+**Sınır:** OneDrive yer tutucuları için "tahsis edilen boyut" okunmuyor
+(README'de vaat edilmiyor); yalnızca hardlink düzeltmesi yapıldı.
+
+---
+
+## 6. Uygulama notları
 
 - **Motor kuralı:** `classifier.ts` + `analyze.ts` saf kanıt katmanıdır;
   `src/core/` dışına bağımlılık eklenmez.
 - **AGENTS kural 13:** genel ad (`models`, `sessions`, `cache`) tek başına
   kanıt değildir; içerik kanıtı aranır.
-- **AGENTS kural 9:** proje içi taramalar rapor modunda kalır; P1/P3
+- **AGENTS kural 9:** proje içi taramalar rapor modunda kalır; P1/P3/P2
   değişiklikleri bu kapıyı gevşetmez.
 - **Belirsizlik:** dosya adı/kalıp doğrulanamıyorsa güvenli tarafa düş
   (`ask` / `report-only`).
 
 ---
 
-## 5. Devir
+## 7. Devir
 
 - Bu belge güncellenir: her prompt bitiminde durum sütunu ve "doğrulama"
   tablosu işlenir.
-- `state.json`: T70 (P1, done), T71 (P3, done), T72 (P2), T73 (P4).
-  `SESSION_LOG.md`: oturum özeti.
+- `state.json`: T70 (P1, done), T71 (P3, done), T72 (P2, done),
+  **T73 (P4) sıradaki**. `SESSION_LOG.md` + `docs/HANDOVER-2026-10-22b.md`:
+  oturum özeti.
+- **P4 başlarken:** C7–C11, E6, E7, E10, E11 maddelerini önce kodda
+  doğrula; özellikle E10'da `GPU_STATE` globalini `ClassifyOptions`'a
+  taşımak imzaları değiştirir (web/server çağrıları kontrol edilmeli).

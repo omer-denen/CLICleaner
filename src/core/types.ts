@@ -274,5 +274,7 @@ export interface ScanStats {
 
 export interface SkippedEntry {
   path: string;
-  reason: 'denied' | 'long-path' | 'link-loop' | 'gone';
+  reason: 'denied' | 'long-path' | 'link-loop' | 'gone' | 'error';
+  /** Hata kodu: yalnizca `reason === 'error'` iken dolu (EBUSY, EMFILE...). */
+  code?: string;
 }

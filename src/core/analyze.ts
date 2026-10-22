@@ -6,7 +6,7 @@ import { debug, warn } from '../util/log.ts';
 import { probeDir, ownerFromName, type Probe } from './classifier.ts';
 import { isOwnDataPath, isProtectedUserPath } from './discover.ts';
 import { isGitTracked } from './git.ts';
-import { walk } from './walker.ts';
+import { walk, type WalkResult } from './walker.ts';
 import { buildClusterEvidence } from './evidence-tree.ts';
 import type {
   Archetype,
@@ -88,12 +88,15 @@ export async function classifyPath(
 
   const now = opts.now ?? Date.now();
   const probe = await probeDir(root);
+  // Yasla kisitli hedefler icin kirilimlar: temp 3 gun, ortam havuzu 90 gun.
   const w = await walk({
     root,
     largeThreshold: 32 * 1024 * 1024,
     maxLarge: 12,
     signal: opts.signal,
     onProgress: opts.onProgress,
+    olderThanDays: [3, 90],
+    now,
   });
   if (w.skipped.length > 0) opts.onSkipped?.(w.skipped);
 
@@ -115,19 +118,18 @@ export async function classifyPath(
   };
 
   const archetype = detectArchetype(ev, root, w.extensionCounts, probe);
-  let reclaimable = estimateReclaimable(archetype, w.bytes, w.extensionCounts);
+  let reclaimable = estimateReclaimable(archetype, w.bytes, w.extensionCounts, w.olderBytes);
   // T28: --nuke-models verildiyse tum model deposu hedeflenir.
   if (archetype === 'model-store' && opts.allow?.models) reclaimable = w.bytes;
+
+  // Alt parca olcumleri ayni yolu birden fazla kez yurumesin (E8):
+  // tek bir `MeasureCache` tum alt parca olcumlerini paylasir.
+  const measure = new MeasureCache();
 
   // T32: pnpm/bun ana klasorleri uygulamayi da icerir. Depo kokü
   // taranan klasorden farkliysa YALNIZCA depo olculur ve hedeflenir.
   if (archetype === 'pkg-manager-cache' && probe.cacheRoot) {
-    const cw = await walk({
-      root: probe.cacheRoot,
-      largeThreshold: Infinity,
-      maxLarge: 0,
-      signal: opts.signal,
-    });
+    const cw = await measure.measure(probe.cacheRoot);
     if (!opts.signal?.aborted) {
       ev.cacheRoot = probe.cacheRoot;
       reclaimable = cw.bytes;
@@ -144,13 +146,13 @@ export async function classifyPath(
   // klasorlerinde ise kullanilmayan app-<surum> klasorleri ayni
   // sekilde GERCEK YOLDAN olculur.
   const extra: SubPart[] = [];
-  if (probe.editorExtensions) extra.push(...(await detectEditorOrphans(root)));
-  if (probe.appVersions) extra.push(...(await detectAppVersionOrphans(root)));
-  if (archetype === 'agent-workspace') extra.push(...(await detectAgentParts(root, ev)));
+  if (probe.editorExtensions) extra.push(...(await detectEditorOrphans(root, measure)));
+  if (probe.appVersions) extra.push(...(await detectAppVersionOrphans(root, measure)));
+  if (archetype === 'agent-workspace') extra.push(...(await detectAgentParts(root, ev, measure)));
   // Ic ice parca olmaz: bir parca digerinin icindeyse yalnizca DIS olan
   // kalir. Aksi halde bayt iki kez sayilir ve silme hedefleri cakisir
   // (or. CUDA dizini "-gpu" varyant dizininin icinde).
-  const sub = dropNestedSubParts([...extra, ...(await detectSubParts(root, ev, now))]);
+  const sub = dropNestedSubParts([...extra, ...(await detectSubParts(root, ev, now, measure))]);
   // Yalnizca GERCEKTEN geri kazanilabilir alt parcalar toplanir. Ajan
   // calisma alanindaki beceri/plan (keep) ve bagimlilik (report-only)
   // parcalari "silinebilir" sayiya KATILMAZ.
@@ -236,7 +238,7 @@ export async function classifyPath(
     verdict.because.push('Hassas sinif: kullanici acikca istedi');
   }
   const rawTargets = [
-    ...buildDeleteTargets(root, archetype, sub, w.bytes, now, ev, opts.allow),
+    ...buildDeleteTargets(root, archetype, sub, w.bytes, now, ev, opts.allow, w.olderBytes),
     ...sensitive,
   ];
   // T32: depo alt klasoru hedefleniyorsa boyutu olculmus degerden al.
@@ -283,22 +285,25 @@ export async function classifyPath(
 
   // Boyutu 0 olan hedefleri (Electron onbellegi, hassas klasorler) GERCEK
   // yoldan olc. Tek yerde yapilir; olcum sonucu bos kalan hedef dusurulur.
+  //
+  // YASLA KISITLI hedef (`older`) ASLA bu yolla olculmez: "3 gunden eski
+  // dosyalar" hedefinin bayti yas kirilimindan gelir. Burada tum klasoru
+  // olcmek hedefi sessizce "tamami" yapardi.
   let finalTargets = targets;
-  if (targets.some((t) => t.bytes === 0)) {
+  if (targets.some((t) => t.bytes === 0 && t.kind === 'whole')) {
     const measured = await Promise.all(
       targets.map(async (t) => {
-        if (t.bytes > 0) return t;
-        const cw = await walk({
-          root: t.path,
-          largeThreshold: Infinity,
-          maxLarge: 0,
-          signal: opts.signal,
-        });
+        if (t.bytes > 0 || t.kind !== 'whole') return t;
+        const cw = await measure.measure(t.path);
         return { ...t, bytes: cw.bytes };
       }),
     );
-    finalTargets = measured.filter((t) => t.bytes > 0);
-    // Olcum sonucu hedef kalmadiysa karar "onerilen" kalamaz.
+    finalTargets = measured;
+  }
+  // 0 baytlik hedef "silinecek dosya yok" demektir (yas kirilimi bos ya
+  // da olcum bos). Tutarlilik kurali burada da gecerlidir.
+  if (finalTargets.some((t) => t.bytes === 0)) {
+    finalTargets = finalTargets.filter((t) => t.bytes > 0);
     if (finalTargets.length === 0) enforceTargetConsistency(verdict, root, archetype);
   }
 
@@ -313,9 +318,10 @@ export async function classifyPath(
   }
 
   const targetBytes = finalTargets.reduce((a, t) => a + t.bytes, 0);
-  const measuredArchetype =
-    archetype === 'electron-app-data' || sensitive.length > 0 || (archetype === 'model-store' && opts.allow?.models);
-  if (measuredArchetype) reclaimable = Math.max(reclaimable, targetBytes);
+  // Tek kaynak: kume seviyesindeki "geri kazanilabilir" = gercek silme
+  // hedeflerinin toplami (git/koruma suzgecinden SONRA). Tahmin ile
+  // hedef toplami ayrisamaz (E4).
+  reclaimable = targetBytes;
 
   return {
     key,
@@ -380,6 +386,7 @@ function buildDeleteTargets(
   now: number,
   ev?: Evidence,
   allow?: SensitiveAllow,
+  olderBytes?: Map<number, number>,
 ): DeleteTarget[] {
   switch (archetype) {
     case 'virtual-disk':
@@ -388,14 +395,15 @@ function buildDeleteTargets(
       return []; // HICBIR ZAMAN otomatik hedeflenmez
 
     case 'temp-scratch':
-      // Sadece 3 gunden eski gecici dosyalar
+      // Sadece 3 gunden eski gecici dosyalar. Bayt, YAS KIRILIMINDAN gelir:
+      // tum klasoru "silinecek" gibi gostermek yanlis olur.
       return [
         {
           path: root,
           kind: 'older',
           minAgeDays: 3,
           label: `${baseName(root)} — 3 gunden eski gecici dosyalar`,
-          bytes: totalBytes,
+          bytes: olderBytes ? (olderBytes.get(3) ?? 0) : totalBytes,
         },
       ];
 
@@ -478,14 +486,15 @@ function buildDeleteTargets(
       ];
 
     case 'runtime-pool':
-      // Ortam havuzu: yasla kisitla (cok eskiyse oner)
+      // Ortam havuzu: yasla kisitla (90 gunden eski ortamlar). Bayt yas
+      // kirilimindan gelir; tum havuz hedef gibi gosterilmez.
       return [
         {
           path: root,
           kind: 'older',
           minAgeDays: 90,
           label: `${baseName(root)} — 90 gunden eski ortamlar`,
-          bytes: totalBytes,
+          bytes: olderBytes ? (olderBytes.get(90) ?? 0) : totalBytes,
         },
       ];
 
@@ -591,13 +600,13 @@ export interface SubPart {
  * Hicbiri silme hedefi olmaz; `agent-workspace` zaten hedef uretmez.
  * Buradaki amac, "52 MB var ama dokunulmaz" ayrimini gorunur kilmaktir.
  */
-async function detectAgentParts(root: string, ev: Evidence): Promise<SubPart[]> {
+async function detectAgentParts(root: string, ev: Evidence, measure: MeasureCache): Promise<SubPart[]> {
   const markers = new Set(ev.markers ?? []);
   if (!markers.has('skill-store') && !markers.has('skill-lock')) return [];
 
   const out: SubPart[] = [];
 
-  const skills = await measureChild(root, 'skills');
+  const skills = await measureChild(root, 'skills', measure);
   if (skills) {
     out.push({
       path: `${root}\\skills`,
@@ -610,7 +619,7 @@ async function detectAgentParts(root: string, ev: Evidence): Promise<SubPart[]> 
   }
 
   if (markers.has('agent-plan')) {
-    const plan = await measureChild(root, 'plan');
+    const plan = await measureChild(root, 'plan', measure);
     if (plan) {
       out.push({
         path: `${root}\\plan`,
@@ -624,7 +633,7 @@ async function detectAgentParts(root: string, ev: Evidence): Promise<SubPart[]> 
 
   const lock = [...markers].find((m) => m.startsWith('lockfile:'))?.slice('lockfile:'.length);
   for (const name of ['node_modules', '.venv', 'venv']) {
-    const deps = await measureChild(root, name);
+    const deps = await measureChild(root, name, measure);
     if (!deps) continue;
     out.push({
       path: `${root}\\${name}`,
@@ -645,6 +654,7 @@ async function detectAgentParts(root: string, ev: Evidence): Promise<SubPart[]> 
 async function measureChild(
   root: string,
   name: string,
+  measure: MeasureCache,
 ): Promise<{ bytes: number; files: number } | null> {
   const dir = `${root}\\${name}`;
   try {
@@ -653,7 +663,7 @@ async function measureChild(
   } catch {
     return null;
   }
-  const w = await walk({ root: dir, largeThreshold: Infinity, maxLarge: 0 });
+  const w = await measure.measure(dir);
   if (w.bytes === 0 && w.files === 0) return null;
   return { bytes: w.bytes, files: w.files };
 }
@@ -677,6 +687,27 @@ export function dropNestedSubParts(parts: SubPart[]): SubPart[] {
   });
 }
 
+/**
+ * Alt parca olcum onbellegi (E8).
+ *
+ * Ayni klasor birden fazla yoldan olculebilir (or. hem "eski uygulama
+ * surumu" hem "GPU varyanti"). Her olcum tam bir yuruyustur; ayni yolu
+ * ikinci kez yurumek bos maliyettir. Anahtar yolun kendisidir; ayni
+ * yoldan gelen istekler AYNI promise'i paylasir.
+ */
+class MeasureCache {
+  private readonly pending = new Map<string, Promise<WalkResult>>();
+
+  measure(path: string): Promise<WalkResult> {
+    const key = path.toLowerCase();
+    const hit = this.pending.get(key);
+    if (hit) return hit;
+    const p = walk({ root: path, largeThreshold: Infinity, maxLarge: 0 });
+    this.pending.set(key, p);
+    return p;
+  }
+}
+
 export function logGpuVerdict(signals: LogSignal[]): { gpuUsed: boolean; cpuLine: boolean; cpuOnly: boolean } {
   const means = signals.map((s) => s.means).join(' | ');
   const gpuUsed = /GPU saglayicisi kullanildi/i.test(means);
@@ -687,7 +718,7 @@ export function logGpuVerdict(signals: LogSignal[]): { gpuUsed: boolean; cpuLine
   return { gpuUsed, cpuLine, cpuOnly: cpuLine && !gpuUsed };
 }
 
-async function detectSubParts(root: string, ev: Evidence, now: number): Promise<SubPart[]> {
+async function detectSubParts(root: string, ev: Evidence, now: number, measure: MeasureCache): Promise<SubPart[]> {
   const out: SubPart[] = [];
   const gpuAbsent = GPU_STATE ? !GPU_STATE.hasNvidia : false;
   const cpuOnly = logGpuVerdict(ev.logSignals ?? []).cpuOnly;
@@ -704,7 +735,7 @@ async function detectSubParts(root: string, ev: Evidence, now: number): Promise<
       /^onnxruntime[_-].*cuda.*\.dll$/i.test(name),
   );
   for (const d of cudaDirs) {
-    const w = await walk({ root: d, largeThreshold: Infinity, maxLarge: 0 });
+    const w = await measure.measure(d);
     out.push({
       path: d,
       bytes: w.bytes,
@@ -741,7 +772,7 @@ async function detectSubParts(root: string, ev: Evidence, now: number): Promise<
     const isModelVariant = await looksLikeModelDir(variantDir);
     if (!isModelVariant) continue;
 
-    const w = await walk({ root: variantDir, largeThreshold: Infinity, maxLarge: 0 });
+    const w = await measure.measure(variantDir);
     if (w.bytes < 8 * 1024 * 1024) continue; // isaretsiz kucuk klasorleri atla
     out.push({
       path: variantDir,
@@ -770,7 +801,7 @@ async function detectSubParts(root: string, ev: Evidence, now: number): Promise<
  * listeler. Ikisinde de yoksa ve ad uzanti surumu kalibindaysa artik
  * sayilir. Klasorun TAMAMI hedeflenmez; yalnizca bu alt klasorler.
  */
-async function detectEditorOrphans(root: string): Promise<SubPart[]> {
+async function detectEditorOrphans(root: string, measure: MeasureCache): Promise<SubPart[]> {
   const extDir = `${root}\\extensions`;
   let entries: Dirent[];
   try {
@@ -799,7 +830,7 @@ async function detectEditorOrphans(root: string): Promise<SubPart[]> {
     if (!obsolete.has(key) && (!manifest.ok || !looksLikeVersion)) continue;
 
     const dir = `${extDir}\\${e.name}`;
-    const w = await walk({ root: dir, largeThreshold: Infinity, maxLarge: 0 });
+    const w = await measure.measure(dir);
     if (w.bytes === 0) continue;
     out.push({
       path: dir,
@@ -860,7 +891,7 @@ async function readObsoleteFile(file: string): Promise<Set<string>> {
  * (resources/app/package.json veya Chromium runtime dosyalari).
  * Tek surum varsa parca uretilmez; uygulama guncel surumdedir.
  */
-async function detectAppVersionOrphans(root: string): Promise<SubPart[]> {
+async function detectAppVersionOrphans(root: string, measure: MeasureCache): Promise<SubPart[]> {
   let entries: Dirent[];
   try {
     entries = await readdir(longPath(root), { withFileTypes: true });
@@ -884,7 +915,7 @@ async function detectAppVersionOrphans(root: string): Promise<SubPart[]> {
   const keep = candidates[0]!;
   const out: SubPart[] = [];
   for (const c of candidates.slice(1)) {
-    const w = await walk({ root: c.path, largeThreshold: Infinity, maxLarge: 0 });
+    const w = await measure.measure(c.path);
     if (w.bytes === 0) continue;
     out.push({
       path: c.path,
@@ -1293,14 +1324,17 @@ export function estimateReclaimable(
   archetype: Archetype,
   totalBytes: number,
   extCounts: Map<string, number>,
+  olderBytes?: Map<number, number>,
 ): number {
   switch (archetype) {
     case 'pkg-manager-cache':
     case 'crash-artifacts':
-    case 'temp-scratch':
       return totalBytes; // tamami yeniden uretilebilir
     case 'updater-staging':
       return totalBytes;
+    case 'temp-scratch':
+      // Hedef yalnizca 3 gunden eski dosyalar; tahmin de o kirilimdan gelir.
+      return olderBytes ? (olderBytes.get(3) ?? 0) : 0;
     case 'accelerator-runtime':
       // Yalnizca cihazda GPU yoksa tamami artik sayilir; GPU varsa
       // kullanici karar vermeli.
@@ -1318,7 +1352,8 @@ export function estimateReclaimable(
       // surumu) silinebilir; kok klasor hedeflenmez.
       return 0;
     case 'runtime-pool':
-      return totalBytes;
+      // Hedef 90 gunden eski ortamlar.
+      return olderBytes ? (olderBytes.get(90) ?? 0) : 0;
     case 'global-packages':
       // Global paket kurulumu bir ONBELLEK DEGILDIR; silmek kurulu
       // araclari ve PATH baglantilarini bozar.
@@ -1338,12 +1373,13 @@ export function estimateReclaimable(
     case 'editor-workspace':
     case 'os-user-data':
     case 'unknown':
-    default: {
-      // Onarilabilir tahmin: agirlikli dosya turlerini hesapla
-      const del = (extCounts.get('log') ?? 0) + (extCounts.get('db') ?? 0);
-      const total = [...extCounts.values()].reduce((a, b) => a + b, 0) || 1;
-      return Math.round(totalBytes * Math.min(1, (del / total) * 2));
-    }
+    case 'electron-app-data':
+    default:
+      // KANIT YOKSA TAHMIN DE YOK (E4). Eski varsayilan dal, log/db
+      // sayisindan pozitif "geri kazanilabilir" uretiyordu; oysa karar
+      // "silinmez" idi. Artik 0; gercek deger silme hedeflerinden gelir.
+      void extCounts;
+      return 0;
   }
 }
 
