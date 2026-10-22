@@ -1,6 +1,6 @@
 import { resolve, sep } from 'node:path';
 import type { DeleteTarget } from '../core/types.ts';
-import { isOwnDataPath } from '../core/discover.ts';
+import { isOwnDataPath, isProtectedUserPath } from '../core/discover.ts';
 
 /**
  * Silme hedefi guvenlik kapisi.
@@ -64,6 +64,10 @@ export function unsafeTargetReason(target: string): string | null {
   // Aracin KENDI veri dizini (kasa, gunluk, karantina) ve ALTINDAKI
   // her sey korunur: kullanicinin geri donus adimlari orada yasar.
   if (isOwnDataPath(t)) return 'aracin kendi veri dizini (kasa/gunluk) korunur';
+
+  // Kimlik bilgisi klasorleri kullanici degeridir; "onbellek" gibi
+  // gorunen alt dosyalar olsa bile silinmez (D8).
+  if (isProtectedUserPath(t)) return 'kimlik bilgisi klasoru (.ssh/.gnupg/.aws/.azure/.kube) korunur';
 
   for (const p of protectedPaths()) {
     const pp = norm(p);

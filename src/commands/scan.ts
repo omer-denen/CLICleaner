@@ -47,12 +47,14 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
 
   let envs = args.envs;
   let exclude = args.exclude;
+  let readOnly = false;
 
   if (args.profile) {
     const p = BUILTIN_PROFILES[args.profile];
     if (!p) throw new Error(`Bilinmeyen profil: ${args.profile}. Secenekler: ${Object.keys(BUILTIN_PROFILES).join(', ')}`);
     envs = p.envs;
     exclude = [...exclude, ...(p.exclude ?? [])];
+    readOnly = p.readOnly === true;
   }
 
   if (envs.length === 0) envs = ['dotfolders', 'localappdata', 'roamingappdata'];
@@ -79,6 +81,7 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
   );
   let targets: Array<{ path: string; origin: Part['origin'] }>;
   let dStats: { dotDirs: number; localDirs: number; roamingDirs: number; denied: number };
+  const allSkipped: SkippedEntry[] = [];
   if (roots.length > 0) {
     targets = [];
     const skippedRoots: string[] = [];
@@ -116,6 +119,12 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
     const discovered = await discover(envs, { exclude });
     targets = discovered.targets;
     dStats = discovered.stats;
+    // Kesifte atlanan yollar (erisim reddi, junction) sonuca akar.
+    allSkipped.push(...discovered.skipped);
+    for (const w of discovered.warnings) warn('kesif uyarisi', { mesaj: w });
+    if (discovered.virtualDisks.length > 0) {
+      info('sanal diskler bulundu (yalnizca raporlanir)', { adet: discovered.virtualDisks.length });
+    }
   }
   args.onTargets?.(targets.map((t) => t.path));
 
@@ -140,7 +149,6 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
 
   // Kuyruk tabanli paralel tarama (6 es zamanli is)
   const results: Cluster[] = [];
-  const allSkipped: SkippedEntry[] = [];
   let done = 0;
   let bytesSeen = 0;
 
@@ -164,7 +172,11 @@ export async function runScan(args: ScanArgs): Promise<ScanResult> {
           minAgeDays: args.minAgeDays,
           signal: args.signal,
           allow: args.allow,
-          onSkipped: args.onSkipped,
+          readOnly,
+          onSkipped: (sk) => {
+            allSkipped.push(...sk);
+            args.onSkipped?.(sk);
+          },
           onProgress: (_dirs, bytes) =>
             args.onProgress?.(done, targets.length, bytesSeen + bytes),
         });

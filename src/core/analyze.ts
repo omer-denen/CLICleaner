@@ -4,7 +4,7 @@ import type { Dirent } from 'node:fs';
 import { longPath } from '../util/longpath.ts';
 import { debug, warn } from '../util/log.ts';
 import { probeDir, ownerFromName, type Probe } from './classifier.ts';
-import { isOwnDataPath } from './discover.ts';
+import { isOwnDataPath, isProtectedUserPath } from './discover.ts';
 import { isGitTracked } from './git.ts';
 import { walk } from './walker.ts';
 import { buildClusterEvidence } from './evidence-tree.ts';
@@ -48,6 +48,11 @@ export interface ClassifyOptions {
   onSkipped?: (skipped: SkippedEntry[]) => void;
   /** Alt dizin ilerlemesi: buyuk tek hedefte de canli geri bildirim. */
   onProgress?: (dirs: number, bytes: number) => void;
+  /**
+   * Salt okunur tarama (profil `readOnly`): kanit toplanir, karar
+   * uretilir ama SILME HEDEFI olusmaz. Karar katmani bunu zorunlu kilar.
+   */
+  readOnly?: boolean;
 }
 
 /** Ortam tespiti: makinede GPU var mi? */
@@ -71,6 +76,13 @@ export async function classifyPath(
   // kosulda "artik" olarak gosterilmez; tarama kapsamina da girmez.
   if (isOwnDataPath(root)) {
     debug('kendi veri dizini atlandi', { root, origin });
+    return null;
+  }
+
+  // Kimlik bilgisi klasorleri (.ssh, .gnupg, .aws, .azure, .kube):
+  // icinde onbellek gibi gorunen dosyalar olsa bile siniflandirilmaz.
+  if (isProtectedUserPath(root)) {
+    debug('kimlik bilgisi klasoru atlandi', { root, origin });
     return null;
   }
 
@@ -234,14 +246,27 @@ export async function classifyPath(
     }
   }
   // Git farkindaligi (T27): tracked yollar silme hedefinden cikarilir.
+  // Ters yon korumasi (D7): tarama koku kendi veri dizinini ya da bir
+  // kimlik bilgisi klasorunu ICERIYORSA alt hedefler arasinda o yol
+  // kalabilir; hedef listesine giremez.
   const targets: DeleteTarget[] = [];
   let gitSkipped = 0;
+  let protectedSkipped = 0;
   for (const t of rawTargets) {
+    if (isOwnDataPath(t.path) || isProtectedUserPath(t.path)) {
+      protectedSkipped++;
+      continue;
+    }
     if (isGitTracked(t.path)) {
       gitSkipped++;
       continue;
     }
     targets.push(t);
+  }
+  if (protectedSkipped > 0) {
+    verdict.preconditions.push(
+      `${protectedSkipped} korunan yol (kendi veri dizini / kimlik bilgisi) hedef alinmadi`,
+    );
   }
   if (gitSkipped > 0) {
     verdict.preconditions.push(
@@ -275,6 +300,16 @@ export async function classifyPath(
     finalTargets = measured.filter((t) => t.bytes > 0);
     // Olcum sonucu hedef kalmadiysa karar "onerilen" kalamaz.
     if (finalTargets.length === 0) enforceTargetConsistency(verdict, root, archetype);
+  }
+
+  // Salt okunur profil (`audit`): kanit ve karar kalir, hedef KALMAZ.
+  // Bu, arayuz dugmesinin pasifligine guvenmek yerine motorun kendisinde
+  // uygulanan bir garantidir.
+  if (opts.readOnly) {
+    finalTargets = [];
+    reclaimable = 0;
+    verdict.kind = verdict.kind === 'keep' ? 'keep' : 'report-only';
+    verdict.preconditions.push('Salt okunur profil: silme hedefi uretilmez');
   }
 
   const targetBytes = finalTargets.reduce((a, t) => a + t.bytes, 0);

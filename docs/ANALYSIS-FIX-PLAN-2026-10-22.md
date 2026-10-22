@@ -14,8 +14,8 @@
 | Sıra | Görev | Kapsam | Durum |
 |---|---|---|---|
 | 1 | **T70 / P1** | Yanlış silme riski: E1, E2, E3, E9, C1–C5 | ✅ 22.10.2026 (19 test) |
-| 2 | **T71 / P3** | Keşif ve koruma: D6, D7, D8, D1–D5, D9 | 📋 sıradaki |
-| 3 | **T72 / P2** | Ölçüm doğruluğu: W1–W6, E4, E8 | 📋 |
+| 2 | **T71 / P3** | Keşif ve koruma: D6, D7, D8, D1–D5, D9 | ✅ 22.10.2026 (16 test) |
+| 3 | **T72 / P2** | Ölçüm doğruluğu: W1–W6, E4, E8 | 📋 sıradaki |
 | 4 | **T73 / P4** | Sağlamlık ve temizlik: C7–C10, E6, E7, E10, E11 | 📋 |
 
 **T69 (kanıt hijyeni / CLI kullanım kanıtı) bu sıranın dışında kalır**, ayrı
@@ -103,13 +103,46 @@ tanıma).
 
 ---
 
-## 4. Uygulama notları
+## 4. P3 uygulama sonucu (T71 — TAMAMLANDI, 22.10.2026)
+
+**Commit kapsamı:** `src/core/discover.ts`, `src/core/analyze.ts`,
+`src/commands/scan.ts`, `src/actions/guard.ts`,
+`tests/discovery-guards.test.ts` (**16 test**).
+
+| # | Bulgu | Yapılan |
+|---|---|---|
+| D1 | `--env temp` tüm LocalAppData'yı tarıyordu | `temp` ve `vdisk` geniş AppData döngüsünden çıkarıldı; `temp` yalnız `%TEMP%` ekler |
+| D2 | `lean` profilinde `exclude: ['Temp']` temp kökünü de eliyordu | `Temp` dislaması kaldırıldı; karar koda yorumla yazıldı |
+| D3 | `PROTECTED_ROOTS` vdisk'i keşfetmiyordu | `findVirtualDiskDirs()`: yalnız `Packages\*\LocalState` ve `wsl\*` içinde `.vhd/.vhdx` olan klasör; `virtual-disk` → hedef yok |
+| D5 | `audit` "hiçbir şey silme" vaadi kodda taşınmıyordu | `Profile.readOnly` + `ClassifyOptions.readOnly`; motor hedefleri sıfırlar (`report-only`) |
+| D6 | `isOwnDataPath` normalize etmiyordu | `normalizeForCompare()`: eğik çizgi, `\\?\`, çift ayırıcı, `..`, `realpath` (junction/8.3), küçük harf, sınır kontrolü |
+| D7 | Ters yön koruma yoktu | `filterProtectedTargets()` + `classifyPath` hedef süzgeci; not: "N korunan yol hedef alınmadı" |
+| D8 | `.ssh/.gnupg/.aws/.azure/.kube` adaydı | `PROTECTED_DOT` + `isProtectedUserPath()`; keşif, `classifyPath` ve `guard.ts` üçünde de |
+| D9 | `listDirs` her hatada `[]`; `stats.denied` hiç artmıyordu; junction sessiz | `listDirs` → `{names, denied, missing, links}`; `DiscoveryResult.warnings` + `skipped`; `scan.ts` uyarıları günlüğe yazar |
+| D10 | Roaming döngüsünde kendi veri koruması yoktu | Eklendi |
+| D11 | Ölü yardımcılar | `exists`, `sortTargets`, `ownerlessName` kaldırıldı |
+| D12 | Veri dizini adı | Doğrulandı: `residue-cleaner` hiçbir sürümde veri dizini olmadı; ek yok |
+
+**D4 (kapsam dışı bırakıldı, bilinçli):** `pkgcache` / `agent` / `runtime`
+seçimleri hâlâ aynı aday kümesini (nokta klasörleri + AppData çocukları)
+genişletir; ayrımı **sınıflandırma** yapar. Profil başına ayrı keşif kümesi
+yazmak tarama kapsamını daraltıp mevcut sonuçları değiştirir; bu bir
+tasarım işidir, güvenlik düzeltmesi değildir. `lean` garantisi artık
+gerçekten "pkgcache + %TEMP%" olarak çalışır.
+
+**Doğrulama:** `npm run typecheck` temiz · `npm test` **158/158** (142 → 158,
++16) · gerçek CLI: `--profile audit` çıktısında "Salt okunur profil" notu ve
+0 hedef.
+
+---
+
+## 5. Uygulama notları
 
 - **Motor kuralı:** `classifier.ts` + `analyze.ts` saf kanıt katmanıdır;
   `src/core/` dışına bağımlılık eklenmez.
 - **AGENTS kural 13:** genel ad (`models`, `sessions`, `cache`) tek başına
   kanıt değildir; içerik kanıtı aranır.
-- **AGENTS kural 9:** proje içi taramalar rapor modunda kalır; P1
+- **AGENTS kural 9:** proje içi taramalar rapor modunda kalır; P1/P3
   değişiklikleri bu kapıyı gevşetmez.
 - **Belirsizlik:** dosya adı/kalıp doğrulanamıyorsa güvenli tarafa düş
   (`ask` / `report-only`).
@@ -120,4 +153,5 @@ tanıma).
 
 - Bu belge güncellenir: her prompt bitiminde durum sütunu ve "doğrulama"
   tablosu işlenir.
-- `state.json`: T70–T73. `SESSION_LOG.md`: oturum özeti.
+- `state.json`: T70 (P1, done), T71 (P3, done), T72 (P2), T73 (P4).
+  `SESSION_LOG.md`: oturum özeti.
