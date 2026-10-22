@@ -1,4 +1,5 @@
 import { DashboardSummary, type DashboardFacts } from '../core/dashboard-summary.ts';
+import { DashboardDetails, type DashboardDetailItem } from '../core/dashboard-details.ts';
 import { diskFindings } from '../core/findings.ts';
 import { interruptedOperations } from '../core/operation-journal.ts';
 import { expiredVaultEntries, listVaultEntries } from '../actions/vault.ts';
@@ -78,6 +79,62 @@ export class DashboardService {
     const retentionDays = settings?.vaultRetentionDays ?? 30;
     const expired = vault ? await safe(() => expiredVaultEntries(retentionDays)) : null;
 
+    // --- Kart detaylari: secilen kartin satirlari ----------------------
+    const brokenTools: DashboardDetailItem[] | null = inv
+      ? inv.tools
+          .filter((t) => t.health === 'broken')
+          .map((t) => ({
+            id: t.id,
+            label: t.command,
+            value: t.installPath,
+            tone: 'danger' as const,
+          }))
+      : null;
+
+    const brokenEdges: DashboardDetailItem[] | null = graph
+      ? graph.edges
+          .filter((e) => e.state === 'broken' || e.state === 'missing-chain')
+          .map((e) => ({
+            id: e.id,
+            label: `${e.from} → ${e.to}`,
+            value: e.evidence ?? e.kind,
+            tone: 'danger' as const,
+          }))
+      : null;
+
+    const interruptedItems: DashboardDetailItem[] = (interrupted ?? []).map((op) => ({
+      id: op.operationId,
+      label: op.mode ?? 'İşlem',
+      value: `${op.items.length} öge`,
+      tone: 'warn' as const,
+    }));
+
+    const expiredItems: DashboardDetailItem[] = (expired ?? []).map((e) => ({
+      id: e.id,
+      label: e.originalPath ?? e.id,
+      value: `${e.bytes} B`,
+      tone: 'warn' as const,
+    }));
+
+    const scheduleItems: DashboardDetailItem[] = (schedules ?? [])
+      .filter((s) => s.missed > 0 || s.due)
+      .map((s) => ({
+        id: s.id,
+        label: s.name,
+        value: s.missed > 0 ? `${s.missed} kaçırılan çalışma` : 'zamanı geldi',
+        tone: s.missed > 0 ? ('warn' as const) : ('default' as const),
+      }));
+
+    const details = new DashboardDetails({
+      envFindings: env?.findings ?? null,
+      commandShadows: env?.commandShadows ?? null,
+      brokenTools,
+      brokenEdges,
+      interrupted: interruptedItems,
+      expiredVault: expiredItems,
+      schedules: scheduleItems,
+    }).views();
+
     const pathIssues =
       env?.findings.filter(
         (f) => f.kind === 'missing-path' || f.kind === 'duplicate-path',
@@ -92,6 +149,7 @@ export class DashboardService {
         ageMs: status.ageMs,
         scanning: status.scanning,
         clusters,
+        view: status.view,
       },
       inventory: {
         diskBytes,
@@ -125,6 +183,7 @@ export class DashboardService {
         due: (schedules ?? []).filter((s) => s.due).length,
         missed: (schedules ?? []).reduce((sum, s) => sum + s.missed, 0),
       },
+      details,
     };
 
     return new DashboardSummary(facts).view();

@@ -131,6 +131,18 @@ code,
   background: var(--panel);
   font-size: 12px;
   color: var(--dim);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.scan-chip:hover {
+  border-color: var(--faint);
+  color: var(--text);
+}
+
+.scan-chip:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
 }
 
 .scan-chip::before {
@@ -139,19 +151,171 @@ code,
   height: 7px;
   border-radius: 50%;
   background: var(--faint);
+  flex: none;
 }
 
-.scan-current::before {
+/* Durum tonlari: motor `kind`/`tone` kararini verir. */
+.scan-current::before,
+.scan-chip.scan-current::before {
   background: var(--accent);
 }
 
-.scan-stale::before,
-.scan-never::before {
+.scan-expired::before,
+.scan-chip.scan-expired::before,
+.scan-dirty::before,
+.scan-chip.scan-dirty::before {
   background: var(--warn);
 }
 
-.scan-scanning::before {
+.scan-dirty-expired::before,
+.scan-chip.scan-dirty-expired::before {
+  background: var(--danger);
+}
+
+.scan-scanning::before,
+.scan-chip.scan-scanning::before {
   background: var(--info);
+}
+
+.scan-chip-static {
+  cursor: default;
+}
+
+.scan-chip-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.scan-chip-age {
+  color: var(--dim);
+}
+
+.scan-chip.scan-dirty-expired .scan-chip-label {
+  color: var(--danger);
+}
+
+.scan-chip.scan-dirty .scan-chip-label {
+  color: var(--warn);
+}
+
+/* ------------------------------------------------- tarama durumu raporu */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 10, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 40;
+}
+
+.scan-dialog {
+  width: min(620px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+.scan-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.scan-dialog-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.scan-dialog-state {
+  margin: 10px 0 16px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.scan-dialog-state.tone-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.scan-dialog-state.tone-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.scan-dialog-state.tone-ok {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.scan-dialog-section {
+  margin-top: 14px;
+}
+
+.scan-dialog-section h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+.scan-reasons {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.scan-reasons li + li {
+  margin-top: 4px;
+}
+
+.scan-dialog .meta-list {
+  margin-top: 0;
+}
+
+.scan-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------- genel bakis: kart detaylari */
+
+.scan-stamp {
+  display: inline-block;
+  font-size: 11.5px;
+}
+
+.panel-note {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+}
+
+.detail-back {
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  padding: 3px 8px;
+}
+
+.danger-text {
+  color: var(--danger);
 }
 
 /* ------------------------------------------------------------------- shell */
@@ -173,6 +337,9 @@ code,
 }
 
 .rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   text-align: left;
   background: transparent;
   border: 0;
@@ -191,6 +358,78 @@ code,
   background: var(--panel-2);
   color: var(--text);
   box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.rail-item:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -2px;
+}
+
+.rail-item .icon {
+  flex: none;
+  opacity: 0.85;
+}
+
+.rail-item.active .icon {
+  opacity: 1;
+}
+
+.rail-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Menu daraltma: yalniz ikon, yer kazanilir ---------------------- */
+
+.rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 5px 7px;
+}
+
+.app.rail-collapsed .rail {
+  padding: 12px 6px;
+}
+
+.app.rail-collapsed .rail-item {
+  justify-content: center;
+  padding: 9px 4px;
+}
+
+.app.rail-collapsed .rail-label {
+  display: none;
+}
+
+/* --- Dar ekran: menu otomatik gizli, hamburger ile acilir ---------- */
+
+@media (max-width: 820px) {
+  .rail {
+    position: fixed;
+    top: 54px;
+    bottom: 0;
+    left: 0;
+    width: 220px;
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform 0.16s ease;
+    box-shadow: 12px 0 28px rgba(0, 0, 0, 0.45);
+  }
+
+  .app.rail-drawer-open .rail {
+    transform: translateX(0);
+  }
+
+  .app.rail-drawer-open::after {
+    content: "";
+    position: fixed;
+    inset: 54px 0 0 0;
+    background: rgba(3, 6, 10, 0.55);
+    z-index: 20;
+  }
 }
 
 .main {
@@ -334,23 +573,55 @@ code,
   margin-top: 12px;
 }
 
+/*
+ * Kart: 3 satirlik izgara.
+ *   satir 1: [vurgu] [konu (baslik)]      [sayi]
+ *   satir 2: [vurgu] [sonuc (alt baslik)] [hedef ekran]
+ * Vurgu cubugu iki satiri da kaplar, icerik DIKEYDE ORTALANIR.
+ * Kart bir INDEXtir: tiklanir, detay "altindaki liste"de acilir.
+ */
 .card {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--faint);
+  background: var(--panel-2);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+}
+
+.card.active {
+  border-color: var(--accent);
+  background: var(--panel-2);
 }
 
 .card::before {
   content: "";
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: center;
   width: 3px;
   height: 16px;
   border-radius: 2px;
   background: var(--faint);
-  align-self: center;
 }
 
 .card-warn::before {
@@ -365,20 +636,64 @@ code,
   background: var(--info);
 }
 
-.card-label {
-  flex: 1;
+.card-title {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
   font-size: 12.5px;
+  font-weight: 600;
+}
+
+.card-summary {
+  grid-column: 2 / span 2;
+  grid-row: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-count {
+  flex: 0 0 auto;
   font-family: var(--mono);
   font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--dim);
 }
 
 .card-target {
+  grid-column: 3;
+  grid-row: 1;
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: var(--faint);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  grid-column: 2 / span 2;
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: var(--faint);
 }
 
 /* ------------------------------------------------------------------ panel */
@@ -510,22 +825,26 @@ code,
   }
 }
 
+/* Menu daraltilmis: yalniz ikon sutunu (yer kazanilir). */
+.app.rail-collapsed .shell {
+  grid-template-columns: 52px minmax(0, 1fr) 320px;
+}
+
+.app.rail-collapsed .shell.shell-wide {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
+@media (max-width: 1180px) {
+  .app.rail-collapsed .shell,
+  .app.rail-collapsed .shell.shell-wide {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 820px) {
   .shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .rail {
-    flex-direction: row;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    padding: 6px;
-  }
-
-  .rail-item {
-    white-space: nowrap;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .ledgers {

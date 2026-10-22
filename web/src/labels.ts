@@ -1,6 +1,81 @@
+import type {
+  DashboardCardTitleId,
+  DashboardDetailId,
+  ScanStatusKind,
+  ScanStatusReason,
+  ScanStatusRowId,
+} from '../../src/core/contract.ts';
 import type { MessageKey } from './i18n.ts';
 
 /** Ortak etiket haritalari: kimlik -> ceviri anahtari. Karar yok. */
+
+/**
+ * Risk kartinin KONUSU (baslik).
+ *
+ * "Disk değişti" bir SONUCtur; öznesi "Önceki Tarama"dır. Konu ve sonuç
+ * ayrı kimliklerdir; ikisini de motor secer.
+ */
+export const CARD_TITLE_LABEL: Record<DashboardCardTitleId, MessageKey> = {
+  scan: 'cardtitle.scan',
+  paths: 'cardtitle.paths',
+  vars: 'cardtitle.vars',
+  commands: 'cardtitle.commands',
+  installs: 'cardtitle.installs',
+  deps: 'cardtitle.deps',
+  recover: 'cardtitle.recover',
+  vault: 'cardtitle.vault',
+  schedules: 'cardtitle.schedules',
+};
+
+/** "Altindaki liste"de gosterilen detayin basligi. */
+export const DETAIL_TITLE_LABEL: Record<DashboardDetailId, MessageKey> = {
+  scan: 'detail.scan',
+  paths: 'detail.paths',
+  vars: 'detail.vars',
+  commands: 'detail.commands',
+  installs: 'detail.installs',
+  deps: 'detail.deps',
+  recover: 'detail.recover',
+  vault: 'detail.vault',
+  schedules: 'detail.schedules',
+};
+
+/**
+ * Tarama durumu etiketleri.
+ *
+ * Motor `ScanStatusKind` kararini verir; burada yalnizca metne cevrilir.
+ * `stale` tek basina kullanilmaz: motor "expired" ve "dirty" ayrimini yapar.
+ */
+export const SCAN_STATUS_LABEL: Record<ScanStatusKind, MessageKey> = {
+  never: 'scan.kind.never',
+  current: 'scan.kind.current',
+  expired: 'scan.kind.expired',
+  dirty: 'scan.kind.dirty',
+  'dirty-expired': 'scan.kind.dirty-expired',
+  scanning: 'scan.kind.scanning',
+};
+
+/** Detay raporundaki neden metinleri. */
+export const SCAN_REASON_LABEL: Record<ScanStatusReason, MessageKey> = {
+  'never-scanned': 'scan.reason.never-scanned',
+  fresh: 'scan.reason.fresh',
+  expired: 'scan.reason.expired',
+  dirty: 'scan.reason.dirty',
+  scanning: 'scan.reason.scanning',
+};
+
+/** Detay raporundaki satir etiketleri. */
+export const SCAN_ROW_LABEL: Record<ScanStatusRowId, MessageKey> = {
+  lastScan: 'scan.row.lastScan',
+  age: 'scan.row.age',
+  nextRecommended: 'scan.row.nextRecommended',
+  ttl: 'scan.row.ttl',
+  scope: 'scan.row.scope',
+  diskDrive: 'scan.row.diskDrive',
+  diskTotal: 'scan.row.diskTotal',
+  diskFree: 'scan.row.diskFree',
+  diskUsed: 'scan.row.diskUsed',
+};
 
 export const CATEGORY_LABEL: Record<string, MessageKey> = {
   protected: 'category.protected',

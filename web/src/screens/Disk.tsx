@@ -13,6 +13,7 @@ import { api, ApiError } from '../api.ts';
 import { openEvents } from '../sse.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from '../i18n.ts';
 import { formatAge, formatBytes } from '../format.ts';
+import { ScanStatusChip } from '../components/ScanStatus.tsx';
 import {
   CATEGORY_LABEL,
   CONFIDENCE_LABEL,
@@ -30,18 +31,12 @@ const KINDS: Array<{ id: ClusterKindFilter; label: MessageKey }> = [
   { id: 'git', label: 'disk.kind.git' },
 ];
 
-const SCAN_LABEL: Record<ScanStatusResponse['state'], MessageKey> = {
-  never: 'scan.never',
-  current: 'scan.current',
-  stale: 'scan.stale',
-  scanning: 'scan.scanning',
-};
-
 interface Props {
   meta: MetaResponse | null;
   status: ScanStatusResponse | null;
   lang: Lang;
   onStatus: () => void;
+  onOpenScanStatus: () => void;
   onPlan: (plan: PlanResponse) => void;
 }
 
@@ -51,7 +46,14 @@ interface Props {
  * Bu bilesen kendi filtresini, siralmasini veya secim ozetini HESAPLAMAZ;
  * her degisiklikte `/api/disk` cagirir. Silme yoktur: yalniz plan uretir.
  */
-export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
+export function Disk({
+  meta,
+  status,
+  lang,
+  onStatus,
+  onOpenScanStatus,
+  onPlan,
+}: Props) {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
 
@@ -277,9 +279,11 @@ export function Disk({ meta, status, lang, onStatus, onPlan }: Props) {
             <p className="dim">{t('disk.subtitle')}</p>
           </div>
           {status && (
-            <span className={`scan-chip scan-${status.state}`}>
-              {t(SCAN_LABEL[status.state])} · {formatAge(status.ageMs, lang)}
-            </span>
+            <ScanStatusChip
+              view={status.view}
+              lang={lang}
+              onOpen={onOpenScanStatus}
+            />
           )}
         </header>
 

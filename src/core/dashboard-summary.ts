@@ -3,11 +3,13 @@ import { DefaultSelection } from './selection.ts';
 import { categoryOf } from './categories.ts';
 import type {
   DashboardCardView,
+  DashboardDetailView,
   DashboardLedgerView,
   DashboardResponse,
   DashboardSafeWinView,
   DashboardScanView,
   DashboardTotalsView,
+  ScanStatusViewResponse,
 } from './contract.ts';
 import type { Cluster } from './types.ts';
 
@@ -32,6 +34,8 @@ export interface DashboardFacts {
     ageMs: number | null;
     scanning: boolean;
     clusters: Cluster[];
+    /** Motorun ayristirilmis tarama durumu (kartlar da bunu kullanir). */
+    view: ScanStatusViewResponse;
   };
   /** Disk + CLI bulgu toplamlari (envanter onbellegi varsa). */
   inventory: {
@@ -53,7 +57,10 @@ export interface DashboardFacts {
   } | null;
   recover: { interrupted: number };
   vault: { entries: number; bytes: number; expired: number };
+  /** Kayitli plan sayilari (rozet icin). */
   schedules: { rules: number; due: number; missed: number };
+  /** Kart detaylari (secilen kartin satirlari). */
+  details: DashboardDetailView[];
 }
 
 /** Ayni anda gosterilecek "guvenli kazanim" sayisi. */
@@ -79,6 +86,7 @@ export class DashboardSummary {
       scanning: this.facts.scan.scanning,
       clusters: this.facts.scan.clusters.length,
       files: s.fileCount(),
+      view: this.facts.scan.view,
     };
   }
 
@@ -110,16 +118,60 @@ export class DashboardSummary {
     const out: DashboardCardView[] = [];
     const { scan, env, graph, recover, vault, schedules, inventory } = this.facts;
 
-    if (scan.state === 'never') {
-      out.push({ id: 'scan-missing', tone: 'info', count: 0, target: 'disk' });
-    } else if (scan.state === 'stale') {
-      out.push({ id: 'scan-stale', tone: 'warn', count: 0, target: 'disk' });
+    // Tarama karti: "stale" iki sebebi birlestirir; ayrim motorun kararidir.
+    // `dirty` (disk degisti) ile `expired` (sure doldu) AYRI kart olur.
+    // KART = KONU ("Onceki Tarama") + SONUC ("Disk degisti").
+    // Bu kartlar SAYI tasimaz -> count = null ("-" gosterilir).
+    switch (scan.view.kind) {
+      case 'never':
+        out.push({
+          id: 'scan-missing',
+          tone: 'info',
+          titleId: 'scan',
+          stateId: 'scan-missing',
+          detailId: 'scan',
+          count: null,
+          target: 'disk',
+          meta: { at: scan.at, ageMs: scan.ageMs },
+        });
+        break;
+      case 'expired':
+        out.push({
+          id: 'scan-stale',
+          tone: 'warn',
+          titleId: 'scan',
+          stateId: 'scan-stale',
+          detailId: 'scan',
+          count: null,
+          target: 'disk',
+          meta: { at: scan.at, ageMs: scan.ageMs },
+        });
+        break;
+      case 'dirty':
+      case 'dirty-expired':
+        out.push({
+          id: 'scan-dirty',
+          tone: 'danger',
+          titleId: 'scan',
+          stateId: 'scan-dirty',
+          detailId: 'scan',
+          count: null,
+          target: 'disk',
+          meta: { at: scan.at, ageMs: scan.ageMs },
+        });
+        break;
+      case 'current':
+      case 'scanning':
+        break;
     }
 
     if (inventory && inventory.brokenInstalls > 0) {
       out.push({
         id: 'broken-installs',
         tone: 'danger',
+        titleId: 'installs',
+        stateId: 'broken-installs',
+        detailId: 'installs',
         count: inventory.brokenInstalls,
         target: 'tools',
       });
@@ -129,47 +181,97 @@ export class DashboardSummary {
       out.push({
         id: 'broken-dependencies',
         tone: 'danger',
+        titleId: 'deps',
+        stateId: 'broken-dependencies',
+        detailId: 'deps',
         count: graph.broken,
         target: 'graph',
       });
     }
 
     if (env && env.pathIssues > 0) {
-      out.push({ id: 'path-issues', tone: 'warn', count: env.pathIssues, target: 'env' });
+      out.push({
+        id: 'path-issues',
+        tone: 'warn',
+        titleId: 'paths',
+        stateId: 'path-issues',
+        detailId: 'paths',
+        count: env.pathIssues,
+        target: 'env',
+      });
     }
 
     if (env && env.shadowedCommands > 0) {
       out.push({
         id: 'shadowed-commands',
         tone: 'warn',
+        titleId: 'commands',
+        stateId: 'shadowed-commands',
+        detailId: 'commands',
         count: env.shadowedCommands,
         target: 'env',
       });
     }
 
     if (env && env.orphanVars > 0) {
-      out.push({ id: 'orphan-vars', tone: 'info', count: env.orphanVars, target: 'env' });
+      out.push({
+        id: 'orphan-vars',
+        tone: 'info',
+        titleId: 'vars',
+        stateId: 'orphan-vars',
+        detailId: 'vars',
+        count: env.orphanVars,
+        target: 'env',
+      });
     }
 
     if (recover.interrupted > 0) {
-      out.push({ id: 'interrupted', tone: 'danger', count: recover.interrupted, target: 'recover' });
+      out.push({
+        id: 'interrupted',
+        tone: 'danger',
+        titleId: 'recover',
+        stateId: 'interrupted',
+        detailId: 'recover',
+        count: recover.interrupted,
+        // "Kurtarma" icin ekran yok (yalniz CLI komutu) -> hedef yok.
+        target: null,
+      });
     }
 
     if (vault.expired > 0) {
-      out.push({ id: 'vault-expired', tone: 'info', count: vault.expired, target: 'vault' });
+      out.push({
+        id: 'vault-expired',
+        tone: 'info',
+        titleId: 'vault',
+        stateId: 'vault-expired',
+        detailId: 'vault',
+        count: vault.expired,
+        target: 'vault',
+      });
     }
 
     if (schedules.missed > 0) {
       out.push({
         id: 'schedule-missed',
         tone: 'warn',
+        titleId: 'schedules',
+        stateId: 'schedule-missed',
+        detailId: 'schedules',
         count: schedules.missed,
         target: 'schedules',
       });
     }
 
     if (schedules.due > 0) {
-      out.push({ id: 'schedule-due', tone: 'info', count: schedules.due, target: 'schedules' });
+      out.push({
+        id: 'schedule-due',
+        tone: 'info',
+        titleId: 'schedules',
+        stateId: 'schedule-due',
+        detailId: 'schedules',
+        count: schedules.due,
+        target: 'schedules',
+      });
     }
 
     return out;
@@ -188,6 +290,9 @@ export class DashboardSummary {
       if (!DefaultSelection.selected(c)) continue;
       out.push({
         clusterKey: c.key,
+        // Okunabilir ad: ham anahtar ("local:dir:rattler") kullaniciya bir sey
+        // anlatmaz; Disk ekranindaki baslikla ayni olmalidir.
+        title: c.title,
         category: categoryOf(c),
         bytes: c.reclaimableBytes,
         regenerability: c.verdict.regenerability,
@@ -215,6 +320,7 @@ export class DashboardSummary {
       cards: this.cards(),
       safeWins: this.safeWins(),
       totals: this.totals(),
+      details: this.facts.details,
     };
   }
 }

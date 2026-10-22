@@ -9,6 +9,8 @@ import type {
 import { api, ApiError } from './api.ts';
 import { translate, translateUpper, type Lang, type MessageKey } from './i18n.ts';
 import { formatBytes } from './format.ts';
+import { ScanStatusChip, ScanStatusDialog } from './components/ScanStatus.tsx';
+import { Icon, type IconName } from './components/icons.tsx';
 import { Dashboard } from './screens/Dashboard.tsx';
 import { Disk } from './screens/Disk.tsx';
 import { Env } from './screens/Env.tsx';
@@ -32,25 +34,18 @@ type Screen =
   | 'vault'
   | 'settings';
 
-const NAV: Array<{ id: Screen; label: MessageKey }> = [
-  { id: 'dashboard', label: 'nav.dashboard' },
-  { id: 'disk', label: 'nav.disk' },
-  { id: 'plan', label: 'nav.plan' },
-  { id: 'projects', label: 'nav.projects' },
-  { id: 'tools', label: 'nav.tools' },
-  { id: 'env', label: 'nav.env' },
-  { id: 'graph', label: 'nav.graph' },
-  { id: 'schedules', label: 'nav.schedules' },
-  { id: 'vault', label: 'nav.vault' },
-  { id: 'settings', label: 'nav.settings' },
+const NAV: Array<{ id: Screen; label: MessageKey; icon: IconName }> = [
+  { id: 'dashboard', label: 'nav.dashboard', icon: 'dashboard' },
+  { id: 'disk', label: 'nav.disk', icon: 'disk' },
+  { id: 'plan', label: 'nav.plan', icon: 'plan' },
+  { id: 'projects', label: 'nav.projects', icon: 'projects' },
+  { id: 'tools', label: 'nav.tools', icon: 'tools' },
+  { id: 'env', label: 'nav.env', icon: 'env' },
+  { id: 'graph', label: 'nav.graph', icon: 'graph' },
+  { id: 'schedules', label: 'nav.schedules', icon: 'schedules' },
+  { id: 'vault', label: 'nav.vault', icon: 'vault' },
+  { id: 'settings', label: 'nav.settings', icon: 'settings' },
 ];
-
-const SCAN_KEY: Record<ScanStatusResponse['state'], MessageKey> = {
-  never: 'scan.never',
-  current: 'scan.current',
-  stale: 'scan.stale',
-  scanning: 'scan.scanning',
-};
 
 /** Yazı alanında mı? Kısayollar orada devre dışı kalır. */
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -86,6 +81,18 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [help, setHelp] = useState(false);
+  /** Tarama durumu ayrinti raporu (rozetten acilir). */
+  const [scanReport, setScanReport] = useState(false);
+  /** Genis ekranda menu: yalniz ikon (yer kazandirir). */
+  const [railCollapsed, setRailCollapsed] = useState(
+    () => localStorage.getItem('residue.rail') === 'collapsed',
+  );
+  /** Dar ekranda menu: acilir/kapanir panel. */
+  const [railOpen, setRailOpen] = useState(false);
+  /** Dar ekran mi? (820px alti) */
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches,
+  );
 
   const railRef = useRef<HTMLElement | null>(null);
   const helpRef = useRef<HTMLDivElement | null>(null);
@@ -134,6 +141,21 @@ export function App() {
     localStorage.setItem('residue.lang', lang);
     document.documentElement.lang = lang;
   }, [lang]);
+
+  useEffect(() => {
+    localStorage.setItem('residue.rail', railCollapsed ? 'collapsed' : 'expanded');
+  }, [railCollapsed]);
+
+  // Dar ekran takibi: menu otomatik gizlenir, hamburger ile acilir.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)');
+    const onChange = (e: MediaQueryListEvent): void => {
+      setIsNarrow(e.matches);
+      if (!e.matches) setRailOpen(false);
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   // Klavye: `/` arama, `?` kısayollar, `Esc` kapat / odaktan çık.
   useEffect(() => {
@@ -232,13 +254,41 @@ export function App() {
 
   const wide = WIDE.includes(screen);
 
+  // Hamburger etiketi BUTONUN YAPTIGI ISLEMI anlatir (durumu degil).
+  const railToggleLabel = isNarrow
+    ? railOpen
+      ? t('nav.close')
+      : t('nav.open')
+    : railCollapsed
+      ? t('nav.open')
+      : t('nav.collapse');
+
   return (
-    <div className="app">
+    <div
+      className={[
+        'app',
+        railCollapsed ? 'rail-collapsed' : '',
+        isNarrow && railOpen ? 'rail-drawer-open' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <a className="skip-link" href="#main">
         {t('a11y.skip')}
       </a>
 
       <header className="topbar">
+        <button
+          type="button"
+          className="ghost rail-toggle"
+          aria-label={railToggleLabel}
+          aria-expanded={isNarrow ? railOpen : !railCollapsed}
+          aria-controls="app-rail"
+          onClick={() => (isNarrow ? setRailOpen((v) => !v) : setRailCollapsed((v) => !v))}
+        >
+          <Icon name={isNarrow && railOpen ? 'close' : 'menu'} size={14} />
+          <span className="sr-only">{railToggleLabel}</span>
+        </button>
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
             R
@@ -250,7 +300,11 @@ export function App() {
         </div>
         <div className="topbar-right">
           {status && (
-            <span className={`scan-chip scan-${status.state}`}>{t(SCAN_KEY[status.state])}</span>
+            <ScanStatusChip
+              view={status.view}
+              lang={lang}
+              onOpen={() => setScanReport(true)}
+            />
           )}
           <button type="button" className="ghost" onClick={() => void load()}>
             {t('top.refresh')}
@@ -279,6 +333,7 @@ export function App() {
       <div className={`shell${wide ? ' shell-wide' : ''}`}>
         <nav
           className="rail"
+          id="app-rail"
           aria-label={t('nav.sections')}
           ref={railRef}
           onKeyDown={onRailKey}
@@ -290,9 +345,14 @@ export function App() {
               className={`rail-item${screen === item.id ? ' active' : ''}`}
               aria-current={screen === item.id ? 'page' : undefined}
               tabIndex={screen === item.id ? 0 : -1}
-              onClick={() => setScreen(item.id)}
+              title={t(item.label)}
+              onClick={() => {
+                setScreen(item.id);
+                if (isNarrow) setRailOpen(false);
+              }}
             >
-              {t(item.label)}
+              <Icon name={item.icon} />
+              <span className="rail-label">{t(item.label)}</span>
             </button>
           ))}
         </nav>
@@ -320,6 +380,7 @@ export function App() {
               status={status}
               lang={lang}
               onStatus={() => void refreshStatus()}
+              onOpenScanStatus={() => setScanReport(true)}
               onPlan={(nextPlan) => {
                 setPlan(nextPlan);
                 setScreen('plan');
@@ -434,6 +495,15 @@ export function App() {
         <span className="statusbar-spacer" />
         <span className="dim mono">v{meta?.version ?? '—'}</span>
       </footer>
+
+      {scanReport && status && (
+        <ScanStatusDialog
+          status={status}
+          lang={lang}
+          onClose={() => setScanReport(false)}
+          onRescan={() => setScreen('disk')}
+        />
+      )}
 
       {help && (
         <div className="shortcuts-backdrop" onClick={() => setHelp(false)}>

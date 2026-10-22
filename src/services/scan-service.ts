@@ -19,10 +19,12 @@ import { ServiceError, describeError } from './errors.ts';
 import { newId } from './ids.ts';
 import type { Cluster, Env, ScanResult } from '../core/types.ts';
 import type {
+  ScanStatusFacts,
   ScanStatusResponse,
   ScanStreamEvent,
   SettingsResponse,
 } from '../core/contract.ts';
+import { scanStatusView } from '../core/scan-status-view.ts';
 
 /**
  * Disk tarama servisi.
@@ -191,7 +193,7 @@ export class ScanService {
         : dirty || expired
           ? 'stale'
           : 'current';
-    return {
+    const facts: ScanStatusFacts = {
       state,
       lastScanAt: at,
       ageMs,
@@ -204,6 +206,8 @@ export class ScanService {
       // Surucu dolulugu: salt okunur tek sistem cagrisi (P4 gostergesi).
       disk: diskUsage(),
     };
+    // Ayristirma ve etiket karari MOTORDA: "stale" iki sebebi birlestirir.
+    return { ...facts, view: scanStatusView(facts) };
   }
 
   async settings(): Promise<SettingsResponse> {
@@ -372,7 +376,11 @@ export class ScanService {
       // Aksi halde 27 kumelik kismi bir proje taramasi "son tam
       // tarama" gibi gorunurdu.
       if (!args.root && !(args.roots && args.roots.length > 0)) {
-        this.lastScan = { scan: result, at: Date.now() };
+        // Damga `result.finishedAt` olmalı: `Date.now()` kayıt anını verir ve
+        // diskten okunduğunda (`scan-cache.ts` -> finishedAt) farkli deger
+        // ortaya cikar. Ayni veriden ayni zaman damgasi: "dirty" karari
+        // yeniden baslatmada degismesin.
+        this.lastScan = { scan: result, at: result.finishedAt };
         // Sonraki sunucu baslangicinda / sayfa yenilemesinde kullanilir.
         // Testler kismi taramalari onbellege yazmasin (persistScan: false).
         if (this.persistScan) await saveScanCache(result);

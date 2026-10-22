@@ -144,7 +144,84 @@ export interface LatestResponse {
 
 export type ScanFreshness = 'never' | 'current' | 'stale' | 'scanning';
 
-export interface ScanStatusResponse {
+/**
+ * Tarama durumunun AYIRT EDILMIS hali.
+ *
+ * `ScanFreshness` ("stale") iki farkli sebebi tek kelimede birlestirir:
+ * onbellek suresi doldu (`expired`) ve disk taramadan beri degisti (`dirty`).
+ * Arayuzde "Eski" yazan bir rozet, ikisini ayirt edemedigi icin yaniltici
+ * olur; bu tip ayrimi motor yapar.
+ */
+export type ScanStatusKind =
+  | 'never'
+  | 'current'
+  | 'expired'
+  | 'dirty'
+  | 'dirty-expired'
+  | 'scanning';
+
+export type ScanStatusTone = 'info' | 'ok' | 'warn' | 'danger';
+
+/** Detay raporunda gosterilen nedenler (sirali). */
+export type ScanStatusReason = 'never-scanned' | 'fresh' | 'expired' | 'dirty' | 'scanning';
+
+/**
+ * Rapor satirinin deger turu. MOTOR turu secer; arayuz yalnizca bicimlendirir.
+ */
+export type ScanStatusUnit = 'timestamp' | 'duration' | 'bytes' | 'count' | 'ratio' | 'text';
+
+export type ScanStatusRowId =
+  | 'lastScan'
+  | 'age'
+  | 'nextRecommended'
+  | 'ttl'
+  | 'scope'
+  | 'diskDrive'
+  | 'diskTotal'
+  | 'diskFree'
+  | 'diskUsed';
+
+export interface ScanStatusRow {
+  id: ScanStatusRowId;
+  /** Sayisal deger; `unit` nasil bicimlendirilecegini belirtir. */
+  amount?: number;
+  unit?: ScanStatusUnit;
+  /** Motordan gelen metin (kimlik veya kisa aciklama). */
+  text?: string;
+  tone?: ScanStatusTone;
+}
+
+/** Ust cubuktaki rozet: durum degil, ZAMAN gosterilir (UX-040). */
+export type ScanHeaderKind = 'none' | 'age' | 'scanning';
+
+export interface ScanStatusHeader {
+  kind: ScanHeaderKind;
+  ageMs: number | null;
+}
+
+/**
+ * MOTORUN belirledigi tarama durumu gorunumu.
+ *
+ * Etiket, ton, neden sirasi, rapor satirlari ve eylem burada karar verilir.
+ * Arayuz yalnizca bu gorunumu basar.
+ */
+export interface ScanStatusViewResponse {
+  kind: ScanStatusKind;
+  tone: ScanStatusTone;
+  /** Detay raporundaki nedenler (sirali). */
+  reasons: ScanStatusReason[];
+  /** Detay raporundaki satirlar (sirali). */
+  rows: ScanStatusRow[];
+  /** Ust cubuk rozeti icin zaman etiketi (motor secer). */
+  header: ScanStatusHeader;
+  /** Kullaniciya onerilen eylem: 'scan' = yeniden tara. */
+  action: 'scan' | 'none';
+  /** Rozet satirinda yasi goster. */
+  showAge: boolean;
+}
+
+/** Ham tarama durumu gercekleri (karar verilmemis). */
+export interface ScanStatusFacts {
   state: ScanFreshness;
   lastScanAt: number | null;
   ageMs: number | null;
@@ -158,6 +235,11 @@ export interface ScanStatusResponse {
   clusters: number | null;
   /** Surucu dolulugu (salt okunur sistem olcumu). */
   disk: DiskUsageView | null;
+}
+
+export interface ScanStatusResponse extends ScanStatusFacts {
+  /** Motorun belirledigi gorunum (arayuz bunu basar). */
+  view: ScanStatusViewResponse;
 }
 
 export interface DiskUsageView {
@@ -832,6 +914,7 @@ export interface CliQuarantineExecuteResponse {
 export type DashboardCardId =
   | 'scan-missing'
   | 'scan-stale'
+  | 'scan-dirty'
   | 'path-issues'
   | 'orphan-vars'
   | 'broken-installs'
@@ -855,11 +938,75 @@ export type DashboardTarget =
 
 export type DashboardTone = 'info' | 'warn' | 'danger';
 
+/**
+ * Risk kartinin KONUSU (kart ne hakkinda?).
+ *
+ * "Disk değişti" bir SONUCtur; öznesi "Önceki Tarama"dır. Konu ve sonuç
+ * ayrı kimliklerdir; ikisi de motordan gelir.
+ */
+export type DashboardCardTitleId =
+  | 'scan'
+  | 'paths'
+  | 'vars'
+  | 'commands'
+  | 'installs'
+  | 'deps'
+  | 'recover'
+  | 'vault'
+  | 'schedules';
+
+/**
+ * Risk kartinin detayi — "altindaki liste"de gosterilen satirlar.
+ *
+ * Kart bir INDEXtir; detayi ayni sayfada asagidaki listede gorunur.
+ * Satirlar motorun metnidir (kullanici verisi + gerekce).
+ */
+export type DashboardDetailId =
+  | 'scan'
+  | 'paths'
+  | 'vars'
+  | 'commands'
+  | 'installs'
+  | 'deps'
+  | 'recover'
+  | 'vault'
+  | 'schedules';
+
+export interface DashboardDetailRow {
+  /** Sol etiket (ornegin yol, degisken, komut adi). */
+  label: string;
+  /** Sag deger (ornegin gerekce, yol, tarih). */
+  value: string;
+  tone?: 'default' | 'warn' | 'danger';
+}
+
+export interface DashboardDetailView {
+  id: DashboardDetailId;
+  rows: DashboardDetailRow[];
+  /** Detayin tam listesi olan ekran (yoksa null). */
+  target: DashboardTarget | null;
+}
+
+export interface DashboardCardMeta {
+  at: number | null;
+  ageMs: number | null;
+}
+
 export interface DashboardCardView {
   id: DashboardCardId;
   tone: DashboardTone;
-  count: number;
-  target: DashboardTarget;
+  /** Konu (baslik). */
+  titleId: DashboardCardTitleId;
+  /** Sonuc (alt baslik). */
+  stateId: DashboardCardId;
+  /** Bu kartin detayi hangi listede? */
+  detailId: DashboardDetailId;
+  /** null = bu kart sayi tasimaz ("-" gosterilir). */
+  count: number | null;
+  /** Hedef ekran; konu zaten o ekrani anlatıyorsa null. */
+  target: DashboardTarget | null;
+  /** Tarama karti: tarama zamani + gecen sure (UX-038). */
+  meta?: DashboardCardMeta;
 }
 
 export type DashboardLedgerId = 'protected' | 'reclaimable' | 'vault' | 'cli';
@@ -872,6 +1019,8 @@ export interface DashboardLedgerView {
 /** Varsayilan secim kuralini gecen kume; "neden" kimlikle gelir. */
 export interface DashboardSafeWinView {
   clusterKey: string;
+  /** Okunabilir kume adi (motor doldurur; ham anahtar degil). */
+  title: string;
   category: CategoryKey;
   bytes: number;
   regenerability: Regenerability;
@@ -879,12 +1028,14 @@ export interface DashboardSafeWinView {
 }
 
 export interface DashboardScanView {
-  state: 'never' | 'current' | 'stale' | 'scanning';
+  state: ScanFreshness;
   at: number | null;
   ageMs: number | null;
   scanning: boolean;
   clusters: number;
   files: number;
+  /** Motorun belirledigi ayristirilmis tarama durumu. */
+  view: ScanStatusViewResponse;
 }
 
 export interface DashboardTotalsView {
@@ -900,6 +1051,8 @@ export interface DashboardResponse {
   cards: DashboardCardView[];
   safeWins: DashboardSafeWinView[];
   totals: DashboardTotalsView;
+  /** Kart detaylari: secilen kartin satirlari asagidaki listede. */
+  details: DashboardDetailView[];
 }
 
 // ---------------------------------------------------------------------------

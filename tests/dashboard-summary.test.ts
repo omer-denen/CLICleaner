@@ -1,18 +1,46 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DashboardSummary, type DashboardFacts } from '../src/core/dashboard-summary.ts';
+import { scanStatusView } from '../src/core/scan-status-view.ts';
+import type { ScanStatusFacts } from '../src/core/contract.ts';
+import type { Cluster } from '../src/core/types.ts';
 import { cluster, verdict } from './helpers.ts';
+
+const TTL = 86_400_000;
+
+/** Ham tarama gercekleri (motor bunu karara cevirir). */
+function scanFacts(over: Partial<ScanStatusFacts> = {}): ScanStatusFacts {
+  return {
+    state: 'current',
+    lastScanAt: 900,
+    ageMs: 100,
+    ttlMs: TTL,
+    nextRecommendedAt: 900 + TTL,
+    dirty: false,
+    scanning: false,
+    clusters: 0,
+    disk: null,
+    ...over,
+  };
+}
+
+/** Dashboard'in tarama bolumu: gorunum MOTORDA uretilir. */
+function scanPart(clusters: Cluster[], over: Partial<ScanStatusFacts> = {}) {
+  const f = scanFacts(over);
+  return {
+    state: f.state,
+    at: f.lastScanAt,
+    ageMs: f.ageMs,
+    scanning: f.scanning,
+    clusters,
+    view: scanStatusView(f),
+  };
+}
 
 function facts(over: Partial<DashboardFacts> = {}): DashboardFacts {
   return {
     now: 1_000,
-    scan: {
-      state: 'current',
-      at: 900,
-      ageMs: 100,
-      scanning: false,
-      clusters: [],
-    },
+    scan: scanPart([]),
     inventory: {
       diskBytes: 0,
       diskCount: 0,
@@ -25,6 +53,7 @@ function facts(over: Partial<DashboardFacts> = {}): DashboardFacts {
     recover: { interrupted: 0 },
     vault: { entries: 0, bytes: 0, expired: 0 },
     schedules: { rules: 0, due: 0, missed: 0 },
+    details: [],
     ...over,
   };
 }
@@ -32,16 +61,10 @@ function facts(over: Partial<DashboardFacts> = {}): DashboardFacts {
 test('iki defter: korunan = toplam - geri kazanilabilir', () => {
   const view = new DashboardSummary(
     facts({
-      scan: {
-        state: 'current',
-        at: 900,
-        ageMs: 100,
-        scanning: false,
-        clusters: [
-          cluster({ key: 'a', totalBytes: 1000, reclaimableBytes: 400 }),
-          cluster({ key: 'b', totalBytes: 2000, reclaimableBytes: 0 }),
-        ],
-      },
+      scan: scanPart([
+        cluster({ key: 'a', totalBytes: 1000, reclaimableBytes: 400 }),
+        cluster({ key: 'b', totalBytes: 2000, reclaimableBytes: 0 }),
+      ]),
       vault: { entries: 2, bytes: 500, expired: 1 },
       inventory: {
         diskBytes: 3000,
@@ -71,7 +94,7 @@ test('guvenli kazanimlar yalnizca DefaultSelection kuralini gecenler', () => {
   ];
   const view = new DashboardSummary(
     facts({
-      scan: { state: 'current', at: 900, ageMs: 100, scanning: false, clusters },
+      scan: scanPart(clusters),
     }),
   ).view();
 
@@ -86,7 +109,7 @@ test('guvenli kazanimlar yalnizca DefaultSelection kuralini gecenler', () => {
 test('kartlar: tarama, ortam, kurtarma, kasa ve planlar', () => {
   const view = new DashboardSummary(
     facts({
-      scan: { state: 'stale', at: 900, ageMs: 100, scanning: false, clusters: [] },
+      scan: scanPart([], { ageMs: TTL + 1_000 }),
       inventory: {
         diskBytes: 0,
         diskCount: 0,
@@ -119,11 +142,15 @@ test('kartlar: tarama, ortam, kurtarma, kasa ve planlar', () => {
   );
   assert.equal(view.cards.find((c) => c.id === 'path-issues')?.count, 3);
   assert.equal(view.cards.find((c) => c.id === 'interrupted')?.tone, 'danger');
+  assert.deepEqual(view.cards.find((c) => c.id === 'scan-stale')?.meta, {
+    at: 900,
+    ageMs: TTL + 1_000,
+  });
 });
 
 test('tarama hic yapilmadiysa bilgi karti cikar, sayilar sifir', () => {
   const view = new DashboardSummary(
-    facts({ scan: { state: 'never', at: null, ageMs: null, scanning: false, clusters: [] } }),
+    facts({ scan: scanPart([], { state: 'never', lastScanAt: null, ageMs: null }) }),
   ).view();
 
   assert.deepEqual(
