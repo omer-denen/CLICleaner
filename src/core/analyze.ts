@@ -15,6 +15,7 @@ import type {
   DeleteTarget,
   Evidence,
   FileKind,
+  LogSignal,
   Part,
   Regenerability,
   Risk,
@@ -134,7 +135,10 @@ export async function classifyPath(
   if (probe.editorExtensions) extra.push(...(await detectEditorOrphans(root)));
   if (probe.appVersions) extra.push(...(await detectAppVersionOrphans(root)));
   if (archetype === 'agent-workspace') extra.push(...(await detectAgentParts(root, ev)));
-  const sub = [...extra, ...(await detectSubParts(root, ev, now))];
+  // Ic ice parca olmaz: bir parca digerinin icindeyse yalnizca DIS olan
+  // kalir. Aksi halde bayt iki kez sayilir ve silme hedefleri cakisir
+  // (or. CUDA dizini "-gpu" varyant dizininin icinde).
+  const sub = dropNestedSubParts([...extra, ...(await detectSubParts(root, ev, now))]);
   // Yalnizca GERCEKTEN geri kazanilabilir alt parcalar toplanir. Ajan
   // calisma alanindaki beceri/plan (keep) ve bagimlilik (report-only)
   // parcalari "silinebilir" sayiya KATILMAZ.
@@ -488,9 +492,15 @@ function buildSensitiveTargets(
     }
   };
 
-  if (allow.history && markers.has('chat-history')) {
-    for (const n of ['sessions', 'history', 'conversations', 'chats']) {
-      addDir(n, 'sohbet gecmisi (--clear-history)');
+  // Sohbet gecmisi: dizin ADI yetmez. Yalnizca kendi kaniti olan
+  // dizinler hedeflenir (classifier `chat-dir:<ad>` isareti uretir).
+  // Kokteki `chat*.json` dosyasi da isaret uretir ama bu, diger
+  // dizinleri hedef yapmaz.
+  if (allow.history) {
+    for (const m of markers) {
+      if (!m.startsWith('chat-dir:')) continue;
+      const name = m.slice('chat-dir:'.length);
+      if (name && !/[\\/]/.test(name)) addDir(name, 'sohbet gecmisi (--clear-history)');
     }
   }
 
@@ -613,12 +623,39 @@ async function measureChild(
   return { bytes: w.bytes, files: w.files };
 }
 
+/**
+ * Ic ice alt parcalari ayiklar: bir yol digerinin altindaysa yalnizca
+ * DIS (kapsayan) yol kalir.
+ *
+ * Iki sorunu birden cozer: baytlar iki kez sayilmaz ve silme hedefleri
+ * ic ice girmez (ust hedef zaten alt hedefi kapsar).
+ */
+export function dropNestedSubParts(parts: SubPart[]): SubPart[] {
+  const norm = (p: string) => p.toLowerCase().replace(/\\+$/, '');
+  return parts.filter((p, i) => {
+    const child = norm(p.path);
+    return !parts.some((o, j) => {
+      if (i === j) return false;
+      const parent = norm(o.path);
+      return child !== parent && child.startsWith(`${parent}\\`);
+    });
+  });
+}
+
+export function logGpuVerdict(signals: LogSignal[]): { gpuUsed: boolean; cpuLine: boolean; cpuOnly: boolean } {
+  const means = signals.map((s) => s.means).join(' | ');
+  const gpuUsed = /GPU saglayicisi kullanildi/i.test(means);
+  const cpuLine = signals.some((s) => /Device: CPU|CPUExecutionProvider/i.test(s.line));
+  // Olumlu sinyal olumsuzu veto eder: log "Device: CPU" yazsa bile ayni
+  // dosyada GPU saglayicisi kaydi varsa (CUDAExecutionProvider vb.) GPU
+  // kullanilmis demektir. Model katalogu loglari CPU satirini da yazar.
+  return { gpuUsed, cpuLine, cpuOnly: cpuLine && !gpuUsed };
+}
+
 async function detectSubParts(root: string, ev: Evidence, now: number): Promise<SubPart[]> {
   const out: SubPart[] = [];
   const gpuAbsent = GPU_STATE ? !GPU_STATE.hasNvidia : false;
-  const cpuOnly = /Device: CPU|CPUExecutionProvider/i.test(
-    (ev.logSignals ?? []).map((l) => l.line).join(' '),
-  );
+  const cpuOnly = logGpuVerdict(ev.logSignals ?? []).cpuOnly;
   const gpuUnusable = gpuAbsent || cpuOnly;
 
   if (!gpuUnusable) return out;
@@ -707,7 +744,8 @@ async function detectEditorOrphans(root: string): Promise<SubPart[]> {
     return [];
   }
 
-  const active = await readExtensionManifest(`${extDir}\\extensions.json`);
+  const manifest = await readExtensionManifest(`${extDir}\\extensions.json`);
+  const active = manifest.list;
   const obsolete = await readObsoleteFile(`${extDir}\\.obsolete`);
   const out: SubPart[] = [];
 
@@ -717,7 +755,13 @@ async function detectEditorOrphans(root: string): Promise<SubPart[]> {
     if (active.has(key)) continue;
     // Yalnizca uzanti klasoru gibi gorunen adlar (publisher.ad-surum)
     // veya editorun acikca artik dedigi kayitlar.
-    if (!obsolete.has(key) && !/-\d+\.\d+/.test(e.name)) continue;
+    //
+    // DIKKAT: manifest okunamadiysa "aktif surum" bilinmiyor demektir.
+    // Bu durumda ad desenine bakip "artik" demek yanlistir; yalnizca
+    // .obsolete listesine guvenilir. Aksi halde bozuk bir extensions.json
+    // butun kurulu uzantilari silme onerisine cevirirdi.
+    const looksLikeVersion = /-\d+\.\d+/.test(e.name);
+    if (!obsolete.has(key) && (!manifest.ok || !looksLikeVersion)) continue;
 
     const dir = `${extDir}\\${e.name}`;
     const w = await walk({ root: dir, largeThreshold: Infinity, maxLarge: 0 });
@@ -736,11 +780,13 @@ async function detectEditorOrphans(root: string): Promise<SubPart[]> {
   return out.sort((a, b) => b.bytes - a.bytes).slice(0, 40);
 }
 
-async function readExtensionManifest(manifest: string): Promise<Set<string>> {
+async function readExtensionManifest(
+  manifest: string,
+): Promise<{ list: Set<string>; ok: boolean }> {
   const out = new Set<string>();
   try {
     const j = JSON.parse(await readFile(longPath(manifest), 'utf8')) as unknown;
-    if (!Array.isArray(j)) return out;
+    if (!Array.isArray(j)) return { list: out, ok: false };
     for (const item of j) {
       if (!item || typeof item !== 'object') continue;
       const o = item as Record<string, unknown>;
@@ -751,10 +797,11 @@ async function readExtensionManifest(manifest: string): Promise<Set<string>> {
         if (base) out.add(base.toLowerCase());
       }
     }
+    return { list: out, ok: true };
   } catch {
     /* manifest okunamadi: aktif surum bilinmiyor, yalnizca .obsolete kullanilir */
+    return { list: out, ok: false };
   }
-  return out;
 }
 
 async function readObsoleteFile(file: string): Promise<Set<string>> {
@@ -1022,9 +1069,15 @@ export function detectArchetype(
   //    vardir. Birincil tip "model deposu" olmali; kullanilamayan CUDA
   //    parcasi alt parca olarak ayrica degerlendirilir. Aksi halde
   //    uygulamanin kullandigi CPU modelleri de silinebilir gorunur.
-  if (kinds.has('onnx-model') || markers.has('models') || /model katalogu|model calistirma/i.test(logs)) {
-    return 'model-store';
-  }
+  //
+  //    ANCAK: kaynak manifesti olan bir klasor (package.json / lockfile)
+  //    ya da ajan calisma alani model dosyasi tasisa bile PROJE'dir.
+  //    "models" adli bir alt klasor, kullanicinin veri klasorunu model
+  //    deposu yapmaz; bu yuzden proje/ajan korumasi ONCE gelir.
+  const agentWorkspace = markers.has('skill-store') || markers.has('skill-lock');
+  const modelEvidence =
+    kinds.has('onnx-model') || markers.has('models') || /model katalogu|model calistirma/i.test(logs);
+  if (modelEvidence && !probe?.projectManifest && !agentWorkspace) return 'model-store';
 
   // 3. CUDA/cuDNN runtime yigini (model icermeyen)
   if (kinds.has('cuda-runtime')) return 'accelerator-runtime';
@@ -1041,10 +1094,13 @@ export function detectArchetype(
   // 4. Ortam HAVUZU, paket ONBELLEGI'nden once gelir.
   //    Ikisi de "paket" icerir ama riski farklidir: onbellek yeniden
   //    indirilir, sanal ortam yeniden DERLENIR ve projeyi bozabilir.
+  //
+  //    Log satiri TEK BASINA yetmez: herhangi bir uygulama gunlugu
+  //    "jupyter", "kernel" ya da "pipe" sozcugu icerebilir. Yapisal kanit
+  //    (envs/, runtimed/, pyvenv.cfg, site-packages) aranir.
   if (
     markers.has('envs') || markers.has('runtimed') ||
-    kinds.has('python-env') || kinds.has('venv') || markers.has('site-packages') ||
-    /Python ortam yoneticisi|notebook calistirma|arka plan servisi/i.test(logs)
+    kinds.has('python-env') || kinds.has('venv') || markers.has('site-packages')
   ) {
     return 'runtime-pool';
   }

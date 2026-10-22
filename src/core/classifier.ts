@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { open, readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -18,7 +18,14 @@ import type { FileKind, LogSignal, OwnerSignal } from './types.ts';
  * Residue otomatik tanimaya devam eder.
  */
 
-const MAX_TEXT_PROBE = 512 * 1024; // 512 KB'tan fazla dosya okunmaz
+/**
+ * Log dosyasinin yalnizca SON kismi okunur: guncel durum son satirlarda
+ * yazar, ilk satirlar acilis/kurulum anini anlatir. Buyuk dosyayi
+ * tamamen atlamak kanit kaybettirir (eski davranis 512 KB uzerini
+ * atliyordu), bu yuzden dosya boyutu ne olursa olsun son parca okunur.
+ */
+const LOG_TAIL_BYTES = 64 * 1024;
+const LOG_TAIL_LINES = 400;
 
 export interface Probe {
   owner?: OwnerSignal;
@@ -152,13 +159,35 @@ const ELECTRON_CACHE_MARKERS = new Set([
   'Service Worker', 'CacheStorage', 'Crashpad',
 ]);
 const CUDA_DLL_RE = /^cu(dnn|blas|blaslt|fft|rand|solver|art|graph|jitlink|rtc)[a-z0-9_]*64[_-]\d+\.dll$/i;
-const ORT_DLL_RE = /^onnxruntime[_-].*\.(dll|so|dylib)$/i;
+/**
+ * Yalnizca GPU saglayicilari "cuda-runtime" sayilir.
+ *
+ * `onnxruntime.dll`, `onnxruntime_providers_shared.dll` ve
+ * `onnxruntime-genai.dll` CPU'da da calisir; bunlari hizlandirici
+ * runtime saymak K1 hatasini geri getirir (NVIDIA olmayan makinede
+ * butun klasor "hizlandirici" olup silme hedefi alirdi).
+ */
+const ORT_DLL_RE = /^onnxruntime[_-].*(?:cuda|tensorrt|trt)[a-z0-9_.-]*\.(dll|so|dylib)$/i;
+
 
 /** Node modullerini tanimak icin tipik ayirt edici dosya/dizin. */
 const NODE_MARKERS = new Set(['node_modules', '.bin', 'package-lock.json', 'yarn.lock', '.package-lock.json']);
 const PYENV_MARKERS = new Set(['pyvenv.cfg', 'conda-meta', 'site-packages', 'Scripts', '.venv', 'venv']);
 const RUNTIME_POOL_MARKERS = new Set(['envs', 'conda', 'pixi', 'uv', 'runtimed', '.conda']);
-const MODEL_MARKERS = new Set(['models', 'model.onnx', 'gguf', 'safetensors', 'tokenizer.json', 'genai_config.json']);
+/**
+ * Model deposu isaretleri.
+ *
+ * `models` gibi GENEL ad burada YOK: bir veri klasorunun `models`
+ * alt klasoru tek basina model deposu kaniti degildir. Icerik kaniti
+ * `probeModelDir` ile aranir (model agirligi / tokenizer / yapilandirma).
+ */
+const MODEL_MARKERS = new Set(['model.onnx', 'gguf', 'safetensors', 'tokenizer.json', 'genai_config.json']);
+const MODEL_DIR_NAME = 'models';
+/** Model agirligi veya calistirma yapilandirmasi (icerik kaniti). */
+const MODEL_FILE_RE = /(^model\.onnx$|\.onnx$|\.gguf$|\.safetensors$|^tokenizer\.json$|^genai_config\.json$|^(pytorch_model|model)\.bin$)/i;
+/** Sohbet/oturum gecmisi dosya turleri (dizin adi tek basina kanit degil). */
+const CHAT_FILE_RE = /\.(json|jsonl|ndjson|sqlite|sqlite3|db)$/i;
+const CHAT_DIR_NAMES = new Set(['sessions', 'history', 'conversations', 'chats']);
 const LOG_DIR_RE = /^logs?$|^.*\.logs?$/i;
 
 /** Ajan calisma alani isaretleri: beceri, oturum, hafiza. */
@@ -188,6 +217,11 @@ export async function probeDir(path: string): Promise<Probe> {
       else if (RUNTIME_POOL_MARKERS.has(n)) p.markers.push(e.name);
       else if (MODEL_MARKERS.has(n)) p.markers.push(e.name);
       else if (LOG_DIR_RE.test(e.name)) p.markers.push(e.name);
+      // "models" genel bir addir (veri kumesi, proje klasoru...). Model
+      // deposu sayilmasi icin icinde model agirligi/yapilandirmasi olmali.
+      if (n === MODEL_DIR_NAME && (await probeModelDir(`${path}\\${e.name}`))) {
+        p.markers.push(MODEL_DIR_NAME);
+      }
       if (n === 'node_modules') p.fileKinds.push('node-modules');
       if (n === 'pyvenv.cfg') p.fileKinds.push('python-env');
       // Pac yoneticisi onbellegi semasi: _cacache, pkgs, repodata, store
@@ -215,9 +249,11 @@ export async function probeDir(path: string): Promise<Probe> {
       // Ajan calisma alani isaretleri: beceri, oturum, hafiza.
       if (AGENT_DIR_MARKERS.has(n)) p.markers.push(e.name);
       // T28: sohbet gecmisi klasorleri (ad tek basina KAPI DEGIL; yalnizca
-      // --clear-history ile hedef uretilir).
-      if (n === 'sessions' || n === 'history' || n === 'conversations' || n === 'chats') {
+      // --clear-history ile hedef uretilir). Dizin adi yetmez: icinde
+      // oturum kaydi (json/jsonl/sqlite) yoksa hedef uretilmez.
+      if (CHAT_DIR_NAMES.has(n) && (await probeChatDir(`${path}\\${e.name}`))) {
         p.markers.push('chat-history');
+        p.markers.push(`chat-dir:${n}`);
       }
       // T28: kural klasoru (icinde .rules / rules.json olmali).
       if (n === 'rules' && (await probeRulesDir(`${path}\\${e.name}`))) {
@@ -485,6 +521,11 @@ async function deepProbe(dir: string, p: Probe, depth: number): Promise<void> {
   for (const d of dirs) {
     const n = d.name.toLowerCase();
 
+    // "models" genel adi yalnizca icerik kanitiyla model deposu olur.
+    if (n === MODEL_DIR_NAME && (await probeModelDir(`${dir}\\${d.name}`))) {
+      p.markers.push(MODEL_DIR_NAME);
+    }
+
     // `packages` adli konteyner ozel islem gorur: ic ice paket
     // depolarinda (or. global paket deposu) kanit iki seviye asagidadir.
     // NEVER_PROBE listesindeki ayni ad, burada kanit odakli taramaya
@@ -744,6 +785,46 @@ async function probeRulesDir(dir: string): Promise<boolean> {
   );
 }
 
+/**
+ * `models` klasorunun gercekten model deposu olup olmadigini icerikten anlar.
+ *
+ * Dizin adi tek basina kanit degildir: bir veri klasorunun `data\models`
+ * alt klasoru de ayni adi tasir. Model agirligi (`*.onnx`, `*.gguf`,
+ * `*.safetensors`, `*.bin`) veya calistirma yapilandirmasi
+ * (`tokenizer.json`, `genai_config.json`) aranir. Ilk iki seviye ve
+ * sinirli sayida cocuk taranir.
+ */
+async function probeModelDir(dir: string): Promise<boolean> {
+  const ents = await readdirSafe(dir);
+  if (!ents) return false;
+  if (ents.slice(0, 80).some((e) => e.isFile() && MODEL_FILE_RE.test(e.name))) return true;
+  const children = ents.filter((e) => e.isDirectory()).slice(0, 20);
+  for (const c of children) {
+    const inner = await readdirSafe(`${dir}\\${c.name}`);
+    if (inner?.slice(0, 40).some((e) => e.isFile() && MODEL_FILE_RE.test(e.name))) return true;
+  }
+  return false;
+}
+
+/**
+ * Sohbet/oturum klasorunun icinde gercek oturum kaydi var mi?
+ *
+ * `sessions`, `history`, `conversations`, `chats` adlari her uygulamada
+ * gecebilir (tarayici gecmisi, gunluk klasoru...). Silme hedefi uretmek
+ * icin dizinin ICINDE oturum dosyasi (json/jsonl/sqlite) olmali.
+ */
+async function probeChatDir(dir: string): Promise<boolean> {
+  const ents = await readdirSafe(dir);
+  if (!ents) return false;
+  if (ents.slice(0, 60).some((e) => e.isFile() && CHAT_FILE_RE.test(e.name))) return true;
+  const children = ents.filter((e) => e.isDirectory()).slice(0, 20);
+  for (const c of children) {
+    const inner = await readdirSafe(`${dir}\\${c.name}`);
+    if (inner?.slice(0, 40).some((e) => e.isFile() && CHAT_FILE_RE.test(e.name))) return true;
+  }
+  return false;
+}
+
 /** Kucuk JSON dosyasini guvenli okur (manifest disi veri sayilmaz). */
 async function readJsonSafe(file: string): Promise<Record<string, unknown> | null> {
   try {
@@ -965,9 +1046,12 @@ async function readLogFile(f: string, p: Probe, root?: string): Promise<void> {
   const target = root ? `${root}\\${f.replace(`${root}\\`, '')}` : f;
   try {
     const st = await stat(longPath(target));
-    if (!st.isFile() || st.size > MAX_TEXT_PROBE) return;
-    const txt = await readFile(longPath(target), 'utf8');
-    const lines = txt.split(/\r?\n/).filter(Boolean).slice(0, 400);
+    if (!st.isFile()) return;
+    const txt = st.size > LOG_TAIL_BYTES
+      ? await readFileTail(target, LOG_TAIL_BYTES)
+      : await readFile(longPath(target), 'utf8');
+    // Son satirlar guncel durumu anlatir; ilk satirlar acilis/kurulum.
+    const lines = txt.split(/\r?\n/).filter(Boolean).slice(-LOG_TAIL_LINES);
     for (const line of lines) {
       // BIR SATIR BIRDEN FAZLA isaret tasiyabilir. Ilk eslesmede
       // break etmek kanit kaybettirir: "Device: CPU,EPs: CPUExecutionProvider"
@@ -980,6 +1064,21 @@ async function readLogFile(f: string, p: Probe, root?: string): Promise<void> {
     }
   } catch {
     /* okunamadi, kanit yok */
+  }
+}
+
+/** Dosyanin son `bytes` kadarini okur (tam dosyayi belleğe almaz). */
+async function readFileTail(file: string, bytes: number): Promise<string> {
+  const fh = await open(longPath(file), 'r');
+  try {
+    const st = await fh.stat();
+    const start = Math.max(0, st.size - bytes);
+    const len = st.size - start;
+    const buf = Buffer.alloc(len);
+    await fh.read(buf, 0, len, start);
+    return buf.toString('utf8');
+  } finally {
+    await fh.close();
   }
 }
 
